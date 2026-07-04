@@ -842,19 +842,8 @@ class FaceRecognitionService {
         final nextTracks = <String, _CameraTrack>{};
         for (final f in faces) {
           try {
-            final bbox = f.boundingBox;
-            final left = _toFiniteDouble(bbox.topLeft.x);
-            final top = _toFiniteDouble(bbox.topLeft.y);
-            final width = _toFiniteDouble(bbox.width);
-            final height = _toFiniteDouble(bbox.height);
-            if (left == null || top == null || width == null || height == null) {
-              continue;
-            }
-            if (width <= 1 || height <= 1) {
-              continue;
-            }
-
-            final rect = Rect.fromLTWH(left, top, width, height);
+            final rect = _extractFallbackFaceRect(f, rgb.width, rgb.height);
+            if (rect == null || rect.width <= 1 || rect.height <= 1) continue;
             final ratio = Rect.fromLTWH(
               (rect.left / rgb.width).clamp(0.0, 1.0),
               (rect.top / rgb.height).clamp(0.0, 1.0),
@@ -927,7 +916,7 @@ class FaceRecognitionService {
             final lastAt = _fallbackFaceSkipLogAtByCameraId[cameraId] ?? 0;
             if (now - lastAt >= _fallbackSkipLogIntervalMs) {
               _fallbackFaceSkipLogAtByCameraId[cameraId] = now;
-              _log.debug('Fallback face skipped camera=$cameraId skipped=$count errorType=${e.runtimeType}');
+              _log.debug('Fallback face skipped camera=$cameraId skipped=$count errorType=${e.runtimeType} error=$e');
               _fallbackFaceSkipCountByCameraId[cameraId] = 0;
             }
             continue;
@@ -1532,6 +1521,169 @@ class FaceRecognitionService {
     if (value is num) {
       final v = value.toDouble();
       return v.isFinite ? v : null;
+    }
+    if (value is String) {
+      final v = double.tryParse(value);
+      if (v == null || !v.isFinite) return null;
+      return v;
+    }
+    return null;
+  }
+
+  Rect? _extractFallbackFaceRect(dynamic face, int imageWidth, int imageHeight) {
+    final bbox = _readDynamicMember(face, 'boundingBox');
+    if (bbox == null) return null;
+
+    final left = _firstFiniteDouble(<dynamic>[
+      _readDynamicMember(bbox, 'left'),
+      _readDynamicMember(bbox, 'x'),
+      _readMapValue(bbox, 'left'),
+      _readMapValue(bbox, 'x'),
+      _readMapValue(bbox, 'xmin'),
+      _readNestedPointValue(bbox, 'topLeft', 'x'),
+      _readNestedPointValue(bbox, 'topLeft', 'dx'),
+      _readNestedPointValue(bbox, 'leftTop', 'x'),
+      _readNestedPointValue(bbox, 'leftTop', 'dx'),
+      _readListValue(bbox, 0),
+    ]);
+
+    final top = _firstFiniteDouble(<dynamic>[
+      _readDynamicMember(bbox, 'top'),
+      _readDynamicMember(bbox, 'y'),
+      _readMapValue(bbox, 'top'),
+      _readMapValue(bbox, 'y'),
+      _readMapValue(bbox, 'ymin'),
+      _readNestedPointValue(bbox, 'topLeft', 'y'),
+      _readNestedPointValue(bbox, 'topLeft', 'dy'),
+      _readNestedPointValue(bbox, 'leftTop', 'y'),
+      _readNestedPointValue(bbox, 'leftTop', 'dy'),
+      _readListValue(bbox, 1),
+    ]);
+
+    final width = _firstFiniteDouble(<dynamic>[
+      _readDynamicMember(bbox, 'width'),
+      _readMapValue(bbox, 'width'),
+      _readListValue(bbox, 2),
+      _deriveSizeFromBounds(
+        _firstFiniteDouble(<dynamic>[
+          _readDynamicMember(bbox, 'right'),
+          _readMapValue(bbox, 'right'),
+          _readMapValue(bbox, 'xmax'),
+          _readNestedPointValue(bbox, 'bottomRight', 'x'),
+          _readNestedPointValue(bbox, 'bottomRight', 'dx'),
+        ]),
+        left,
+      ),
+    ]);
+
+    final height = _firstFiniteDouble(<dynamic>[
+      _readDynamicMember(bbox, 'height'),
+      _readMapValue(bbox, 'height'),
+      _readListValue(bbox, 3),
+      _deriveSizeFromBounds(
+        _firstFiniteDouble(<dynamic>[
+          _readDynamicMember(bbox, 'bottom'),
+          _readMapValue(bbox, 'bottom'),
+          _readMapValue(bbox, 'ymax'),
+          _readNestedPointValue(bbox, 'bottomRight', 'y'),
+          _readNestedPointValue(bbox, 'bottomRight', 'dy'),
+        ]),
+        top,
+      ),
+    ]);
+
+    if (left == null || top == null || width == null || height == null) {
+      return null;
+    }
+
+    final clampedLeft = left.clamp(0.0, imageWidth.toDouble() - 1);
+    final clampedTop = top.clamp(0.0, imageHeight.toDouble() - 1);
+    final maxWidth = imageWidth.toDouble() - clampedLeft;
+    final maxHeight = imageHeight.toDouble() - clampedTop;
+    final clampedWidth = width.clamp(0.0, maxWidth);
+    final clampedHeight = height.clamp(0.0, maxHeight);
+    if (clampedWidth <= 0 || clampedHeight <= 0) return null;
+
+    return Rect.fromLTWH(clampedLeft, clampedTop, clampedWidth, clampedHeight);
+  }
+
+  double? _firstFiniteDouble(List<dynamic> values) {
+    for (final value in values) {
+      final parsed = _toFiniteDouble(value);
+      if (parsed != null) return parsed;
+    }
+    return null;
+  }
+
+  double? _deriveSizeFromBounds(double? maxValue, double? minValue) {
+    if (maxValue == null || minValue == null) return null;
+    return maxValue - minValue;
+  }
+
+  dynamic _readDynamicMember(dynamic source, String member) {
+    if (source == null) return null;
+    try {
+      switch (member) {
+        case 'boundingBox':
+          return source.boundingBox;
+        case 'left':
+          return source.left;
+        case 'top':
+          return source.top;
+        case 'right':
+          return source.right;
+        case 'bottom':
+          return source.bottom;
+        case 'x':
+          return source.x;
+        case 'y':
+          return source.y;
+        case 'width':
+          return source.width;
+        case 'height':
+          return source.height;
+        case 'topLeft':
+          return source.topLeft;
+        case 'leftTop':
+          return source.leftTop;
+        case 'bottomRight':
+          return source.bottomRight;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  dynamic _readMapValue(dynamic source, String key) {
+    if (source is Map) {
+      return source[key];
+    }
+    return null;
+  }
+
+  dynamic _readListValue(dynamic source, int index) {
+    if (source is List && index >= 0 && index < source.length) {
+      return source[index];
+    }
+    return null;
+  }
+
+  dynamic _readNestedPointValue(dynamic source, String pointMember, String axis) {
+    final point = _readDynamicMember(source, pointMember) ?? _readMapValue(source, pointMember);
+    if (point == null) return null;
+
+    if (axis == 'x') {
+      return _readDynamicMember(point, 'x') ?? _readMapValue(point, 'x');
+    }
+    if (axis == 'dx') {
+      return _readDynamicMember(point, 'dx') ?? _readMapValue(point, 'dx');
+    }
+    if (axis == 'y') {
+      return _readDynamicMember(point, 'y') ?? _readMapValue(point, 'y');
+    }
+    if (axis == 'dy') {
+      return _readDynamicMember(point, 'dy') ?? _readMapValue(point, 'dy');
     }
     return null;
   }
