@@ -131,11 +131,24 @@ class PlatformSize {
     return _toList();
   }
 
+  static double _decodeDimensionValue(Object? raw) {
+    if (raw is num) {
+      return raw.toDouble();
+    }
+    if (raw is String) {
+      return double.tryParse(raw) ?? 0.0;
+    }
+    if (raw is bool) {
+      return raw ? 1.0 : 0.0;
+    }
+    return 0.0;
+  }
+
   static PlatformSize decode(Object result) {
     result as List<Object?>;
     return PlatformSize(
-      width: result[0]! as double,
-      height: result[1]! as double,
+      width: _decodeDimensionValue(result[0]),
+      height: _decodeDimensionValue(result[1]),
     );
   }
 

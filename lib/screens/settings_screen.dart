@@ -56,48 +56,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'noseRegionMinQuality': 'Nguong chat luong vung mui',
     'mouthRegionMinQuality': 'Nguong chat luong vung mieng',
     'autoTuneRecognitionParameters': 'Tu dong dieu chinh tham so realtime',
+    'enableTraceLogs': 'Bat trace log chi tiet realtime',
+    'enablePerfLogs': 'Bat perf log do tre (Perf[...])',
+    'realtimeInputBrightness': 'Xu ly input: do sang (-48..48)',
+    'realtimeInputContrast': 'Xu ly input: tuong phan (0.7..1.4)',
+    'realtimeInputGamma': 'Xu ly input: gamma (0.7..1.4)',
+    'realtimeInputSaturation': 'Xu ly input: do bao hoa (0.0..1.3)',
+    'realtimeInputGrayscale': 'Xu ly input: ep den trang',
   };
 
   static const Map<String, String> _recognitionParameterNotes = {
-    'knownMatchThreshold': 'Nguong diem so khop tong quan de chap nhan danh tinh.',
-    'knownStrongThreshold': 'Nguong rat cao cho phep chap nhan nhanh hon khi diem rat chac.',
-    'knownCalibratedThreshold': 'Nguong diem sau hieu chinh theo do tach biet giua cac nguoi.',
-    'knownMatchMargin': 'Khoang cach toi thieu giua top1 va top2 de tranh nham lan.',
+    'knownMatchThreshold':
+        'Nguong diem so khop tong quan de chap nhan danh tinh.',
+    'knownStrongThreshold':
+        'Nguong rat cao cho phep chap nhan nhanh hon khi diem rat chac.',
+    'knownCalibratedThreshold':
+        'Nguong diem sau hieu chinh theo do tach biet giua cac nguoi.',
+    'knownMatchMargin':
+        'Khoang cach toi thieu giua top1 va top2 de tranh nham lan.',
     'minTemplateSharpness': 'Do net toi thieu cua anh mau khi tao vector.',
-    'cameraCalibrationDurationMs': 'Thoi gian gom mau de hieu chinh threshold theo camera.',
+    'cameraCalibrationDurationMs':
+        'Thoi gian gom mau de hieu chinh threshold theo camera.',
     'calibrationLogThrottleMs': 'Tan suat ghi log trong giai doan hieu chinh.',
-    'fallbackSkipLogIntervalMs': 'Khoang cach log khi bo qua frame loi fallback.',
-    'fallbackCaptureIntervalMs': 'Khoang cach giua 2 lan chup fallback khi camera khong stream duoc.',
-    'fallbackMaxInputEdge': 'Gioi han canh lon nhat cua frame fallback truoc khi xu ly de giam tai CPU.',
-    'processFrameIntervalMs': 'Khoang cach xu ly giua 2 frame, nho hon thi nhanh hon nhung nang may.',
-    'detectorInputWidth': 'Do rong anh dua vao detector; lon hon tang chat luong nhung cham hon.',
-    'detectorInputHeight': 'Do cao anh dua vao detector; lon hon tang chat luong nhung cham hon.',
+    'fallbackSkipLogIntervalMs':
+        'Khoang cach log khi bo qua frame loi fallback.',
+    'fallbackCaptureIntervalMs':
+        'Khoang cach giua 2 lan chup fallback khi camera khong stream duoc.',
+    'fallbackMaxInputEdge':
+        'Gioi han canh lon nhat cua frame fallback truoc khi xu ly de giam tai CPU.',
+    'processFrameIntervalMs':
+        'Khoang cach xu ly giua 2 frame, nho hon thi nhanh hon nhung nang may.',
+    'detectorInputWidth':
+        'Do rong anh dua vao detector; lon hon tang chat luong nhung cham hon.',
+    'detectorInputHeight':
+        'Do cao anh dua vao detector; lon hon tang chat luong nhung cham hon.',
     'trackKeepAliveMs': 'Thoi gian giu doi tuong theo doi truoc khi reset.',
-    'trackMatchMinScore': 'Diem toi thieu de noi bbox hien tai voi track truoc do.',
-    'bboxSmoothingAlpha': 'He so lam muot bbox, cao thi bam theo nhanh nhung de rung.',
-    'annotatedFrameMinIntervalMs': 'Chu ky toi thieu ve overlay debug, giam de cap nhat nhanh hon.',
-    'eventPublishIntervalMs': 'Khoang cach toi thieu giua 2 su kien cung doi tuong.',
-    'minRealtimeFrameQuality': 'Nguong chat luong frame realtime de cho phep nhan dien.',
-    'minRealtimeFaceAreaRatio': 'Ty le dien tich mat toi thieu tren khung hinh.',
-    'minRealtimeFacePixels': 'Canh ngan nhat cua mat (pixel) de tranh nhan dien mat qua nho.',
+    'trackMatchMinScore':
+        'Diem toi thieu de noi bbox hien tai voi track truoc do.',
+    'bboxSmoothingAlpha':
+        'He so lam muot bbox, cao thi bam theo nhanh nhung de rung.',
+    'annotatedFrameMinIntervalMs':
+        'Chu ky toi thieu ve overlay debug, giam de cap nhat nhanh hon.',
+    'eventPublishIntervalMs':
+        'Khoang cach toi thieu giua 2 su kien cung doi tuong.',
+    'minRealtimeFrameQuality':
+        'Nguong chat luong frame realtime de cho phep nhan dien.',
+    'minRealtimeFaceAreaRatio':
+        'Ty le dien tich mat toi thieu tren khung hinh.',
+    'minRealtimeFacePixels':
+        'Canh ngan nhat cua mat (pixel) de tranh nhan dien mat qua nho.',
     'voteWindowSize': 'So frame luu trong cua so bo phieu tam thoi.',
     'voteMinCount': 'So phieu trung khop toi thieu de chap nhan nguoi quen.',
     'voteMaxAgeMs': 'Do tuoi toi da cua moi phieu trong bo phieu tam thoi.',
-    'minEnrollmentFaceAreaRatio': 'Nguong nho nhat cho dien tich mat khi dang ky.',
-    'maxEnrollmentFaceAreaRatio': 'Nguong lon nhat cho dien tich mat khi dang ky.',
-    'minEnrollmentFaceAspectRatio': 'Ty le khung mat nho nhat cho phep khi dang ky.',
-    'maxEnrollmentFaceAspectRatio': 'Ty le khung mat lon nhat cho phep khi dang ky.',
-    'minEnrollmentFacePixels': 'Kich thuoc canh ngan toi thieu cua mat khi dang ky.',
-    'scrfdInputSize': 'Kich thuoc input model SCRFD, lon hon thi tinh hon nhung cham hon.',
+    'minEnrollmentFaceAreaRatio':
+        'Nguong nho nhat cho dien tich mat khi dang ky.',
+    'maxEnrollmentFaceAreaRatio':
+        'Nguong lon nhat cho dien tich mat khi dang ky.',
+    'minEnrollmentFaceAspectRatio':
+        'Ty le khung mat nho nhat cho phep khi dang ky.',
+    'maxEnrollmentFaceAspectRatio':
+        'Ty le khung mat lon nhat cho phep khi dang ky.',
+    'minEnrollmentFacePixels':
+        'Kich thuoc canh ngan toi thieu cua mat khi dang ky.',
+    'scrfdInputSize':
+        'Kich thuoc input model SCRFD, lon hon thi tinh hon nhung cham hon.',
     'scrfdScoreThreshold': 'Nguong diem detector SCRFD de giu lai bbox.',
     'scrfdNmsThreshold': 'Nguong NMS SCRFD de loai bbox trung lap.',
-    'hnswM': 'So ket noi toi da moi node trong do thi HNSW; lon hon thi tim tot hon nhung ton RAM hon.',
-    'hnswEfConstruction': 'Do rong tim kiem khi xay dung index HNSW; lon hon thi index chat hon nhung build cham hon.',
-    'hnswEfSearch': 'Do rong tim kiem luc query HNSW; lon hon thi chinh xac hon nhung cham hon.',
-    'eyeRegionMinQuality': 'Nguong chat luong vung mat de dua vao partial embedding.',
-    'noseRegionMinQuality': 'Nguong chat luong vung mui de dua vao partial embedding.',
-    'mouthRegionMinQuality': 'Nguong chat luong vung mieng de dua vao partial embedding.',
-    'autoTuneRecognitionParameters': 'Tu dong nang/giam nguong realtime theo chat luong anh va kich thuoc khuon mat.',
+    'hnswM':
+        'So ket noi toi da moi node trong do thi HNSW; lon hon thi tim tot hon nhung ton RAM hon.',
+    'hnswEfConstruction':
+        'Do rong tim kiem khi xay dung index HNSW; lon hon thi index chat hon nhung build cham hon.',
+    'hnswEfSearch':
+        'Do rong tim kiem luc query HNSW; lon hon thi chinh xac hon nhung cham hon.',
+    'eyeRegionMinQuality':
+        'Nguong chat luong vung mat de dua vao partial embedding.',
+    'noseRegionMinQuality':
+        'Nguong chat luong vung mui de dua vao partial embedding.',
+    'mouthRegionMinQuality':
+        'Nguong chat luong vung mieng de dua vao partial embedding.',
+    'autoTuneRecognitionParameters':
+        'Tu dong nang/giam nguong realtime theo chat luong anh va kich thuoc khuon mat.',
+    'enableTraceLogs':
+        'Bat cac log DecisionTrace/Match/GateSkip/CalibTop2 de debug. Tat de giam lag.',
+    'enablePerfLogs':
+        'Bat log hieu nang Perf[ws]/Perf[db]. Tat de tranh IO log khong can thiet.',
+    'realtimeInputBrightness':
+        'Cong/tru do sang truoc khi tinh quality/spoof/embedding realtime.',
+    'realtimeInputContrast': 'He so tuong phan cho anh dau vao realtime.',
+    'realtimeInputGamma': 'He so gamma cho anh dau vao realtime.',
+    'realtimeInputSaturation':
+        'He so bao hoa cho anh dau vao realtime (0 la xam).',
+    'realtimeInputGrayscale':
+        'Chuyen anh dau vao realtime sang den trang truoc khi nhan dien.',
   };
 
   late TextEditingController _signalingServerController;
@@ -144,6 +194,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _eyeRegionMinQualityController;
   late TextEditingController _noseRegionMinQualityController;
   late TextEditingController _mouthRegionMinQualityController;
+  late TextEditingController _realtimeInputBrightnessController;
+  late TextEditingController _realtimeInputContrastController;
+  late TextEditingController _realtimeInputGammaController;
+  late TextEditingController _realtimeInputSaturationController;
   late TextEditingController _reportExportDirectoryController;
   late TextEditingController _reportExportTimeController;
   late TextEditingController _reportApiHostController;
@@ -153,8 +207,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoTuneRecognitionParameters = false;
   bool _enableAudioProcessing = true;
   bool _debugRealtimeOverlay = true;
+  bool _enableTraceLogs = false;
+  bool _enablePerfLogs = false;
+  bool _realtimeInputGrayscale = false;
   bool _enableScheduledReportExport = false;
   bool _enablePublicReportApi = true;
+  bool _isRecognitionAdvancedExpanded = false;
   bool _isLoading = true;
 
   String _recognitionLabel(String key) =>
@@ -233,6 +291,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _eyeRegionMinQualityController = TextEditingController();
     _noseRegionMinQualityController = TextEditingController();
     _mouthRegionMinQualityController = TextEditingController();
+    _realtimeInputBrightnessController = TextEditingController();
+    _realtimeInputContrastController = TextEditingController();
+    _realtimeInputGammaController = TextEditingController();
+    _realtimeInputSaturationController = TextEditingController();
     _reportExportDirectoryController = TextEditingController();
     _reportExportTimeController = TextEditingController();
     _reportApiHostController = TextEditingController();
@@ -243,9 +305,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     try {
       final settings = await SettingsRepository.getOrCreateDefaultSettings();
-        final recognitionConfig =
+      final recognitionConfig =
           await RecognitionSettingsRepository.getOrCreateDefaultConfig();
-      final reportConfig = await ReportSettingsRepository.getOrCreateDefaultConfig();
+      final reportConfig =
+          await ReportSettingsRepository.getOrCreateDefaultConfig();
       if (!mounted) return;
       setState(() {
         _signalingServerController.text = settings.signalingServerUrl;
@@ -253,87 +316,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _turnPasswordController.text = settings.turnPassword;
         _iceTransportPolicyController.text = settings.iceTransportPolicy;
         _enableAudioProcessing = settings.enableAudioProcessing;
-        _knownMatchThresholdController.text =
-          recognitionConfig.knownMatchThreshold.toString();
-        _knownStrongThresholdController.text =
-          recognitionConfig.knownStrongThreshold.toString();
-        _knownCalibratedThresholdController.text =
-          recognitionConfig.knownCalibratedThreshold.toString();
-        _knownMatchMarginController.text =
-          recognitionConfig.knownMatchMargin.toString();
-        _minTemplateSharpnessController.text =
-          recognitionConfig.minTemplateSharpness.toString();
-        _cameraCalibrationDurationMsController.text =
-          recognitionConfig.cameraCalibrationDurationMs.toString();
-        _calibrationLogThrottleMsController.text =
-          recognitionConfig.calibrationLogThrottleMs.toString();
-        _fallbackSkipLogIntervalMsController.text =
-          recognitionConfig.fallbackSkipLogIntervalMs.toString();
-        _fallbackCaptureIntervalMsController.text =
-          recognitionConfig.fallbackCaptureIntervalMs.toString();
-        _fallbackMaxInputEdgeController.text =
-          recognitionConfig.fallbackMaxInputEdge.toString();
-        _processFrameIntervalMsController.text =
-          recognitionConfig.processFrameIntervalMs.toString();
-        _detectorInputWidthController.text =
-          recognitionConfig.detectorInputWidth.toString();
-        _detectorInputHeightController.text =
-          recognitionConfig.detectorInputHeight.toString();
-        _trackKeepAliveMsController.text =
-          recognitionConfig.trackKeepAliveMs.toString();
-        _trackMatchMinScoreController.text =
-          recognitionConfig.trackMatchMinScore.toString();
-        _bboxSmoothingAlphaController.text =
-          recognitionConfig.bboxSmoothingAlpha.toString();
-        _annotatedFrameMinIntervalMsController.text =
-          recognitionConfig.annotatedFrameMinIntervalMs.toString();
-        _eventPublishIntervalMsController.text =
-          recognitionConfig.eventPublishIntervalMs.toString();
-        _minRealtimeFrameQualityController.text =
-          recognitionConfig.minRealtimeFrameQuality.toString();
-        _minRealtimeFaceAreaRatioController.text =
-          recognitionConfig.minRealtimeFaceAreaRatio.toString();
-        _minRealtimeFacePixelsController.text =
-          recognitionConfig.minRealtimeFacePixels.toString();
-        _voteWindowSizeController.text = recognitionConfig.voteWindowSize.toString();
-        _voteMinCountController.text = recognitionConfig.voteMinCount.toString();
-        _voteMaxAgeMsController.text = recognitionConfig.voteMaxAgeMs.toString();
-        _minEnrollmentFaceAreaRatioController.text =
-          recognitionConfig.minEnrollmentFaceAreaRatio.toString();
-        _maxEnrollmentFaceAreaRatioController.text =
-          recognitionConfig.maxEnrollmentFaceAreaRatio.toString();
-        _minEnrollmentFaceAspectRatioController.text =
-          recognitionConfig.minEnrollmentFaceAspectRatio.toString();
-        _maxEnrollmentFaceAspectRatioController.text =
-          recognitionConfig.maxEnrollmentFaceAspectRatio.toString();
-        _minEnrollmentFacePixelsController.text =
-          recognitionConfig.minEnrollmentFacePixels.toString();
-        _scrfdInputSizeController.text = recognitionConfig.scrfdInputSize.toString();
-        _scrfdScoreThresholdController.text =
-          recognitionConfig.scrfdScoreThreshold.toString();
-        _scrfdNmsThresholdController.text =
-          recognitionConfig.scrfdNmsThreshold.toString();
+        _knownMatchThresholdController.text = recognitionConfig
+            .knownMatchThreshold
+            .toString();
+        _knownStrongThresholdController.text = recognitionConfig
+            .knownStrongThreshold
+            .toString();
+        _knownCalibratedThresholdController.text = recognitionConfig
+            .knownCalibratedThreshold
+            .toString();
+        _knownMatchMarginController.text = recognitionConfig.knownMatchMargin
+            .toString();
+        _minTemplateSharpnessController.text = recognitionConfig
+            .minTemplateSharpness
+            .toString();
+        _cameraCalibrationDurationMsController.text = recognitionConfig
+            .cameraCalibrationDurationMs
+            .toString();
+        _calibrationLogThrottleMsController.text = recognitionConfig
+            .calibrationLogThrottleMs
+            .toString();
+        _fallbackSkipLogIntervalMsController.text = recognitionConfig
+            .fallbackSkipLogIntervalMs
+            .toString();
+        _fallbackCaptureIntervalMsController.text = recognitionConfig
+            .fallbackCaptureIntervalMs
+            .toString();
+        _fallbackMaxInputEdgeController.text = recognitionConfig
+            .fallbackMaxInputEdge
+            .toString();
+        _processFrameIntervalMsController.text = recognitionConfig
+            .processFrameIntervalMs
+            .toString();
+        _detectorInputWidthController.text = recognitionConfig
+            .detectorInputWidth
+            .toString();
+        _detectorInputHeightController.text = recognitionConfig
+            .detectorInputHeight
+            .toString();
+        _trackKeepAliveMsController.text = recognitionConfig.trackKeepAliveMs
+            .toString();
+        _trackMatchMinScoreController.text = recognitionConfig
+            .trackMatchMinScore
+            .toString();
+        _bboxSmoothingAlphaController.text = recognitionConfig
+            .bboxSmoothingAlpha
+            .toString();
+        _annotatedFrameMinIntervalMsController.text = recognitionConfig
+            .annotatedFrameMinIntervalMs
+            .toString();
+        _eventPublishIntervalMsController.text = recognitionConfig
+            .eventPublishIntervalMs
+            .toString();
+        _minRealtimeFrameQualityController.text = recognitionConfig
+            .minRealtimeFrameQuality
+            .toString();
+        _minRealtimeFaceAreaRatioController.text = recognitionConfig
+            .minRealtimeFaceAreaRatio
+            .toString();
+        _minRealtimeFacePixelsController.text = recognitionConfig
+            .minRealtimeFacePixels
+            .toString();
+        _voteWindowSizeController.text = recognitionConfig.voteWindowSize
+            .toString();
+        _voteMinCountController.text = recognitionConfig.voteMinCount
+            .toString();
+        _voteMaxAgeMsController.text = recognitionConfig.voteMaxAgeMs
+            .toString();
+        _minEnrollmentFaceAreaRatioController.text = recognitionConfig
+            .minEnrollmentFaceAreaRatio
+            .toString();
+        _maxEnrollmentFaceAreaRatioController.text = recognitionConfig
+            .maxEnrollmentFaceAreaRatio
+            .toString();
+        _minEnrollmentFaceAspectRatioController.text = recognitionConfig
+            .minEnrollmentFaceAspectRatio
+            .toString();
+        _maxEnrollmentFaceAspectRatioController.text = recognitionConfig
+            .maxEnrollmentFaceAspectRatio
+            .toString();
+        _minEnrollmentFacePixelsController.text = recognitionConfig
+            .minEnrollmentFacePixels
+            .toString();
+        _scrfdInputSizeController.text = recognitionConfig.scrfdInputSize
+            .toString();
+        _scrfdScoreThresholdController.text = recognitionConfig
+            .scrfdScoreThreshold
+            .toString();
+        _scrfdNmsThresholdController.text = recognitionConfig.scrfdNmsThreshold
+            .toString();
         _hnswMController.text = recognitionConfig.hnswM.toString();
-        _hnswEfConstructionController.text =
-          recognitionConfig.hnswEfConstruction.toString();
-        _hnswEfSearchController.text = recognitionConfig.hnswEfSearch.toString();
-        _eyeRegionMinQualityController.text =
-          recognitionConfig.eyeRegionMinQuality.toString();
-        _noseRegionMinQualityController.text =
-          recognitionConfig.noseRegionMinQuality.toString();
-        _mouthRegionMinQualityController.text =
-          recognitionConfig.mouthRegionMinQuality.toString();
-        _autoTuneRecognitionParameters = recognitionConfig.autoTuneRecognitionParameters;
+        _hnswEfConstructionController.text = recognitionConfig
+            .hnswEfConstruction
+            .toString();
+        _hnswEfSearchController.text = recognitionConfig.hnswEfSearch
+            .toString();
+        _eyeRegionMinQualityController.text = recognitionConfig
+            .eyeRegionMinQuality
+            .toString();
+        _noseRegionMinQualityController.text = recognitionConfig
+            .noseRegionMinQuality
+            .toString();
+        _mouthRegionMinQualityController.text = recognitionConfig
+            .mouthRegionMinQuality
+            .toString();
+        _realtimeInputBrightnessController.text = recognitionConfig
+            .realtimeInputBrightness
+            .toString();
+        _realtimeInputContrastController.text = recognitionConfig
+            .realtimeInputContrast
+            .toString();
+        _realtimeInputGammaController.text = recognitionConfig
+            .realtimeInputGamma
+            .toString();
+        _realtimeInputSaturationController.text = recognitionConfig
+            .realtimeInputSaturation
+            .toString();
+        _autoTuneRecognitionParameters =
+            recognitionConfig.autoTuneRecognitionParameters;
         _debugRealtimeOverlay = recognitionConfig.debugRealtimeOverlay;
+        _enableTraceLogs = recognitionConfig.enableTraceLogs;
+        _enablePerfLogs = recognitionConfig.enablePerfLogs;
+        _realtimeInputGrayscale = recognitionConfig.realtimeInputGrayscale;
         _reportExportDirectoryController.text =
-          reportConfig.scheduledExportDirectory;
+            reportConfig.scheduledExportDirectory;
         _reportExportTimeController.text = reportConfig.scheduledExportTime;
         _reportApiHostController.text = reportConfig.apiHost;
         _reportApiPortController.text = reportConfig.apiPort.toString();
         _reportFilePrefixController.text = reportConfig.filePrefix;
         _enableScheduledReportExport = reportConfig.scheduledExportEnabled;
         _enablePublicReportApi = reportConfig.apiEnabled;
-        _selectedRecognitionPreset = _recognitionPresetForConfig(recognitionConfig);
+        _selectedRecognitionPreset = _recognitionPresetForConfig(
+          recognitionConfig,
+        );
 
         try {
           final stunList = jsonDecode(settings.stunServers) as List<dynamic>;
@@ -357,9 +472,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = false;
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi tải cấu hình: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi tải cấu hình: $e')));
     }
   }
 
@@ -368,7 +483,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       double parseDouble(TextEditingController controller, String label) {
         final value = double.tryParse(controller.text.trim());
         if (value == null) {
-          throw FormatException('Gia tri "${_recognitionLabel(label)}" khong hop le');
+          throw FormatException(
+            'Gia tri "${_recognitionLabel(label)}" khong hop le',
+          );
         }
         return value;
       }
@@ -376,7 +493,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       int parseInt(TextEditingController controller, String label) {
         final value = int.tryParse(controller.text.trim());
         if (value == null) {
-          throw FormatException('Gia tri "${_recognitionLabel(label)}" khong hop le');
+          throw FormatException(
+            'Gia tri "${_recognitionLabel(label)}" khong hop le',
+          );
         }
         return value;
       }
@@ -416,46 +535,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await SettingsRepository.saveSettings(settings);
 
       final recognitionConfig = RecognitionRuntimeConfig(
-        knownMatchThreshold: parseDouble(_knownMatchThresholdController, 'knownMatchThreshold'),
-        knownStrongThreshold: parseDouble(_knownStrongThresholdController, 'knownStrongThreshold'),
-        knownCalibratedThreshold: parseDouble(_knownCalibratedThresholdController, 'knownCalibratedThreshold'),
-        knownMatchMargin: parseDouble(_knownMatchMarginController, 'knownMatchMargin'),
-        minTemplateSharpness: parseDouble(_minTemplateSharpnessController, 'minTemplateSharpness'),
-        cameraCalibrationDurationMs: parseInt(_cameraCalibrationDurationMsController, 'cameraCalibrationDurationMs'),
-        calibrationLogThrottleMs: parseInt(_calibrationLogThrottleMsController, 'calibrationLogThrottleMs'),
-        fallbackSkipLogIntervalMs: parseInt(_fallbackSkipLogIntervalMsController, 'fallbackSkipLogIntervalMs'),
-        fallbackCaptureIntervalMs: parseInt(_fallbackCaptureIntervalMsController, 'fallbackCaptureIntervalMs'),
-        fallbackMaxInputEdge: parseInt(_fallbackMaxInputEdgeController, 'fallbackMaxInputEdge'),
-        processFrameIntervalMs: parseInt(_processFrameIntervalMsController, 'processFrameIntervalMs'),
-        detectorInputWidth: parseInt(_detectorInputWidthController, 'detectorInputWidth'),
-        detectorInputHeight: parseInt(_detectorInputHeightController, 'detectorInputHeight'),
-        trackKeepAliveMs: parseInt(_trackKeepAliveMsController, 'trackKeepAliveMs'),
-        trackMatchMinScore: parseDouble(_trackMatchMinScoreController, 'trackMatchMinScore'),
-        bboxSmoothingAlpha: parseDouble(_bboxSmoothingAlphaController, 'bboxSmoothingAlpha'),
-        annotatedFrameMinIntervalMs: parseInt(_annotatedFrameMinIntervalMsController, 'annotatedFrameMinIntervalMs'),
-        eventPublishIntervalMs: parseInt(_eventPublishIntervalMsController, 'eventPublishIntervalMs'),
-        minRealtimeFrameQuality: parseDouble(_minRealtimeFrameQualityController, 'minRealtimeFrameQuality'),
-        minRealtimeFaceAreaRatio: parseDouble(_minRealtimeFaceAreaRatioController, 'minRealtimeFaceAreaRatio'),
-        minRealtimeFacePixels: parseInt(_minRealtimeFacePixelsController, 'minRealtimeFacePixels'),
+        knownMatchThreshold: parseDouble(
+          _knownMatchThresholdController,
+          'knownMatchThreshold',
+        ),
+        knownStrongThreshold: parseDouble(
+          _knownStrongThresholdController,
+          'knownStrongThreshold',
+        ),
+        knownCalibratedThreshold: parseDouble(
+          _knownCalibratedThresholdController,
+          'knownCalibratedThreshold',
+        ),
+        knownMatchMargin: parseDouble(
+          _knownMatchMarginController,
+          'knownMatchMargin',
+        ),
+        minTemplateSharpness: parseDouble(
+          _minTemplateSharpnessController,
+          'minTemplateSharpness',
+        ),
+        cameraCalibrationDurationMs: parseInt(
+          _cameraCalibrationDurationMsController,
+          'cameraCalibrationDurationMs',
+        ),
+        calibrationLogThrottleMs: parseInt(
+          _calibrationLogThrottleMsController,
+          'calibrationLogThrottleMs',
+        ),
+        fallbackSkipLogIntervalMs: parseInt(
+          _fallbackSkipLogIntervalMsController,
+          'fallbackSkipLogIntervalMs',
+        ),
+        fallbackCaptureIntervalMs: parseInt(
+          _fallbackCaptureIntervalMsController,
+          'fallbackCaptureIntervalMs',
+        ),
+        fallbackMaxInputEdge: parseInt(
+          _fallbackMaxInputEdgeController,
+          'fallbackMaxInputEdge',
+        ),
+        processFrameIntervalMs: parseInt(
+          _processFrameIntervalMsController,
+          'processFrameIntervalMs',
+        ),
+        detectorInputWidth: parseInt(
+          _detectorInputWidthController,
+          'detectorInputWidth',
+        ),
+        detectorInputHeight: parseInt(
+          _detectorInputHeightController,
+          'detectorInputHeight',
+        ),
+        trackKeepAliveMs: parseInt(
+          _trackKeepAliveMsController,
+          'trackKeepAliveMs',
+        ),
+        trackMatchMinScore: parseDouble(
+          _trackMatchMinScoreController,
+          'trackMatchMinScore',
+        ),
+        bboxSmoothingAlpha: parseDouble(
+          _bboxSmoothingAlphaController,
+          'bboxSmoothingAlpha',
+        ),
+        annotatedFrameMinIntervalMs: parseInt(
+          _annotatedFrameMinIntervalMsController,
+          'annotatedFrameMinIntervalMs',
+        ),
+        eventPublishIntervalMs: parseInt(
+          _eventPublishIntervalMsController,
+          'eventPublishIntervalMs',
+        ),
+        minRealtimeFrameQuality: parseDouble(
+          _minRealtimeFrameQualityController,
+          'minRealtimeFrameQuality',
+        ),
+        minRealtimeFaceAreaRatio: parseDouble(
+          _minRealtimeFaceAreaRatioController,
+          'minRealtimeFaceAreaRatio',
+        ),
+        minRealtimeFacePixels: parseInt(
+          _minRealtimeFacePixelsController,
+          'minRealtimeFacePixels',
+        ),
         voteWindowSize: parseInt(_voteWindowSizeController, 'voteWindowSize'),
         voteMinCount: parseInt(_voteMinCountController, 'voteMinCount'),
         voteMaxAgeMs: parseInt(_voteMaxAgeMsController, 'voteMaxAgeMs'),
-        minEnrollmentFaceAreaRatio: parseDouble(_minEnrollmentFaceAreaRatioController, 'minEnrollmentFaceAreaRatio'),
-        maxEnrollmentFaceAreaRatio: parseDouble(_maxEnrollmentFaceAreaRatioController, 'maxEnrollmentFaceAreaRatio'),
-        minEnrollmentFaceAspectRatio: parseDouble(_minEnrollmentFaceAspectRatioController, 'minEnrollmentFaceAspectRatio'),
-        maxEnrollmentFaceAspectRatio: parseDouble(_maxEnrollmentFaceAspectRatioController, 'maxEnrollmentFaceAspectRatio'),
-        minEnrollmentFacePixels: parseInt(_minEnrollmentFacePixelsController, 'minEnrollmentFacePixels'),
+        minEnrollmentFaceAreaRatio: parseDouble(
+          _minEnrollmentFaceAreaRatioController,
+          'minEnrollmentFaceAreaRatio',
+        ),
+        maxEnrollmentFaceAreaRatio: parseDouble(
+          _maxEnrollmentFaceAreaRatioController,
+          'maxEnrollmentFaceAreaRatio',
+        ),
+        minEnrollmentFaceAspectRatio: parseDouble(
+          _minEnrollmentFaceAspectRatioController,
+          'minEnrollmentFaceAspectRatio',
+        ),
+        maxEnrollmentFaceAspectRatio: parseDouble(
+          _maxEnrollmentFaceAspectRatioController,
+          'maxEnrollmentFaceAspectRatio',
+        ),
+        minEnrollmentFacePixels: parseInt(
+          _minEnrollmentFacePixelsController,
+          'minEnrollmentFacePixels',
+        ),
         scrfdInputSize: parseInt(_scrfdInputSizeController, 'scrfdInputSize'),
-        scrfdScoreThreshold: parseDouble(_scrfdScoreThresholdController, 'scrfdScoreThreshold'),
-        scrfdNmsThreshold: parseDouble(_scrfdNmsThresholdController, 'scrfdNmsThreshold'),
+        scrfdScoreThreshold: parseDouble(
+          _scrfdScoreThresholdController,
+          'scrfdScoreThreshold',
+        ),
+        scrfdNmsThreshold: parseDouble(
+          _scrfdNmsThresholdController,
+          'scrfdNmsThreshold',
+        ),
         hnswM: parseInt(_hnswMController, 'hnswM'),
-        hnswEfConstruction: parseInt(_hnswEfConstructionController, 'hnswEfConstruction'),
+        hnswEfConstruction: parseInt(
+          _hnswEfConstructionController,
+          'hnswEfConstruction',
+        ),
         hnswEfSearch: parseInt(_hnswEfSearchController, 'hnswEfSearch'),
-        eyeRegionMinQuality: parseDouble(_eyeRegionMinQualityController, 'eyeRegionMinQuality'),
-        noseRegionMinQuality: parseDouble(_noseRegionMinQualityController, 'noseRegionMinQuality'),
-        mouthRegionMinQuality: parseDouble(_mouthRegionMinQualityController, 'mouthRegionMinQuality'),
+        eyeRegionMinQuality: parseDouble(
+          _eyeRegionMinQualityController,
+          'eyeRegionMinQuality',
+        ),
+        noseRegionMinQuality: parseDouble(
+          _noseRegionMinQualityController,
+          'noseRegionMinQuality',
+        ),
+        mouthRegionMinQuality: parseDouble(
+          _mouthRegionMinQualityController,
+          'mouthRegionMinQuality',
+        ),
         autoTuneRecognitionParameters: _autoTuneRecognitionParameters,
         debugRealtimeOverlay: _debugRealtimeOverlay,
+        enableTraceLogs: _enableTraceLogs,
+        enablePerfLogs: _enablePerfLogs,
+        realtimeInputBrightness: parseInt(
+          _realtimeInputBrightnessController,
+          'realtimeInputBrightness',
+        ),
+        realtimeInputContrast: parseDouble(
+          _realtimeInputContrastController,
+          'realtimeInputContrast',
+        ),
+        realtimeInputGamma: parseDouble(
+          _realtimeInputGammaController,
+          'realtimeInputGamma',
+        ),
+        realtimeInputSaturation: parseDouble(
+          _realtimeInputSaturationController,
+          'realtimeInputSaturation',
+        ),
+        realtimeInputGrayscale: _realtimeInputGrayscale,
       );
       await RecognitionSettingsRepository.saveConfig(recognitionConfig);
 
@@ -470,13 +704,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final scheduleHour = int.parse(scheduleParts[0]);
       final scheduleMinute = int.parse(scheduleParts[1]);
-      if (scheduleHour < 0 || scheduleHour > 23 || scheduleMinute < 0 || scheduleMinute > 59) {
+      if (scheduleHour < 0 ||
+          scheduleHour > 23 ||
+          scheduleMinute < 0 ||
+          scheduleMinute > 59) {
         _showErrorSnackBar('Thoi gian chay job khong hop le');
         return;
       }
 
       final reportApiPort = int.tryParse(_reportApiPortController.text.trim());
-      if (reportApiPort == null || reportApiPort <= 0 || reportApiPort > 65535) {
+      if (reportApiPort == null ||
+          reportApiPort <= 0 ||
+          reportApiPort > 65535) {
         _showErrorSnackBar('Cong API bao cao khong hop le (1-65535)');
         return;
       }
@@ -506,48 +745,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _setRecognitionControllers(RecognitionRuntimeConfig config) {
     _knownMatchThresholdController.text = config.knownMatchThreshold.toString();
-    _knownStrongThresholdController.text = config.knownStrongThreshold.toString();
-    _knownCalibratedThresholdController.text =
-        config.knownCalibratedThreshold.toString();
+    _knownStrongThresholdController.text = config.knownStrongThreshold
+        .toString();
+    _knownCalibratedThresholdController.text = config.knownCalibratedThreshold
+        .toString();
     _knownMatchMarginController.text = config.knownMatchMargin.toString();
-    _minTemplateSharpnessController.text = config.minTemplateSharpness.toString();
-    _cameraCalibrationDurationMsController.text =
-        config.cameraCalibrationDurationMs.toString();
-    _calibrationLogThrottleMsController.text =
-        config.calibrationLogThrottleMs.toString();
-    _fallbackSkipLogIntervalMsController.text =
-        config.fallbackSkipLogIntervalMs.toString();
-    _fallbackCaptureIntervalMsController.text =
-      config.fallbackCaptureIntervalMs.toString();
-    _fallbackMaxInputEdgeController.text =
-      config.fallbackMaxInputEdge.toString();
-    _processFrameIntervalMsController.text = config.processFrameIntervalMs.toString();
+    _minTemplateSharpnessController.text = config.minTemplateSharpness
+        .toString();
+    _cameraCalibrationDurationMsController.text = config
+        .cameraCalibrationDurationMs
+        .toString();
+    _calibrationLogThrottleMsController.text = config.calibrationLogThrottleMs
+        .toString();
+    _fallbackSkipLogIntervalMsController.text = config.fallbackSkipLogIntervalMs
+        .toString();
+    _fallbackCaptureIntervalMsController.text = config.fallbackCaptureIntervalMs
+        .toString();
+    _fallbackMaxInputEdgeController.text = config.fallbackMaxInputEdge
+        .toString();
+    _processFrameIntervalMsController.text = config.processFrameIntervalMs
+        .toString();
     _detectorInputWidthController.text = config.detectorInputWidth.toString();
     _detectorInputHeightController.text = config.detectorInputHeight.toString();
     _trackKeepAliveMsController.text = config.trackKeepAliveMs.toString();
     _trackMatchMinScoreController.text = config.trackMatchMinScore.toString();
     _bboxSmoothingAlphaController.text = config.bboxSmoothingAlpha.toString();
-    _annotatedFrameMinIntervalMsController.text =
-        config.annotatedFrameMinIntervalMs.toString();
-    _eventPublishIntervalMsController.text = config.eventPublishIntervalMs.toString();
-    _minRealtimeFrameQualityController.text =
-        config.minRealtimeFrameQuality.toString();
-    _minRealtimeFaceAreaRatioController.text =
-        config.minRealtimeFaceAreaRatio.toString();
-    _minRealtimeFacePixelsController.text = config.minRealtimeFacePixels.toString();
+    _annotatedFrameMinIntervalMsController.text = config
+        .annotatedFrameMinIntervalMs
+        .toString();
+    _eventPublishIntervalMsController.text = config.eventPublishIntervalMs
+        .toString();
+    _minRealtimeFrameQualityController.text = config.minRealtimeFrameQuality
+        .toString();
+    _minRealtimeFaceAreaRatioController.text = config.minRealtimeFaceAreaRatio
+        .toString();
+    _minRealtimeFacePixelsController.text = config.minRealtimeFacePixels
+        .toString();
     _voteWindowSizeController.text = config.voteWindowSize.toString();
     _voteMinCountController.text = config.voteMinCount.toString();
     _voteMaxAgeMsController.text = config.voteMaxAgeMs.toString();
-    _minEnrollmentFaceAreaRatioController.text =
-        config.minEnrollmentFaceAreaRatio.toString();
-    _maxEnrollmentFaceAreaRatioController.text =
-        config.maxEnrollmentFaceAreaRatio.toString();
-    _minEnrollmentFaceAspectRatioController.text =
-        config.minEnrollmentFaceAspectRatio.toString();
-    _maxEnrollmentFaceAspectRatioController.text =
-        config.maxEnrollmentFaceAspectRatio.toString();
-    _minEnrollmentFacePixelsController.text =
-        config.minEnrollmentFacePixels.toString();
+    _minEnrollmentFaceAreaRatioController.text = config
+        .minEnrollmentFaceAreaRatio
+        .toString();
+    _maxEnrollmentFaceAreaRatioController.text = config
+        .maxEnrollmentFaceAreaRatio
+        .toString();
+    _minEnrollmentFaceAspectRatioController.text = config
+        .minEnrollmentFaceAspectRatio
+        .toString();
+    _maxEnrollmentFaceAspectRatioController.text = config
+        .maxEnrollmentFaceAspectRatio
+        .toString();
+    _minEnrollmentFacePixelsController.text = config.minEnrollmentFacePixels
+        .toString();
     _scrfdInputSizeController.text = config.scrfdInputSize.toString();
     _scrfdScoreThresholdController.text = config.scrfdScoreThreshold.toString();
     _scrfdNmsThresholdController.text = config.scrfdNmsThreshold.toString();
@@ -555,10 +805,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _hnswEfConstructionController.text = config.hnswEfConstruction.toString();
     _hnswEfSearchController.text = config.hnswEfSearch.toString();
     _eyeRegionMinQualityController.text = config.eyeRegionMinQuality.toString();
-    _noseRegionMinQualityController.text = config.noseRegionMinQuality.toString();
-    _mouthRegionMinQualityController.text = config.mouthRegionMinQuality.toString();
+    _noseRegionMinQualityController.text = config.noseRegionMinQuality
+        .toString();
+    _mouthRegionMinQualityController.text = config.mouthRegionMinQuality
+        .toString();
+    _realtimeInputBrightnessController.text = config.realtimeInputBrightness
+        .toString();
+    _realtimeInputContrastController.text = config.realtimeInputContrast
+        .toString();
+    _realtimeInputGammaController.text = config.realtimeInputGamma.toString();
+    _realtimeInputSaturationController.text = config.realtimeInputSaturation
+        .toString();
     _autoTuneRecognitionParameters = config.autoTuneRecognitionParameters;
     _debugRealtimeOverlay = config.debugRealtimeOverlay;
+    _enableTraceLogs = config.enableTraceLogs;
+    _enablePerfLogs = config.enablePerfLogs;
+    _realtimeInputGrayscale = config.realtimeInputGrayscale;
   }
 
   RecognitionRuntimeConfig _presetAccuracyConfig() {
@@ -782,7 +1044,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _recognitionPresetForConfig(RecognitionRuntimeConfig config) {
     if (config.toJson() == _presetStrictConfig().toJson()) return 'strict';
     if (config.toJson() == _presetLowLightConfig().toJson()) return 'low-light';
-    if (config.toJson() == _presetFarDistanceConfig().toJson()) return 'far-distance';
+    if (config.toJson() == _presetFarDistanceConfig().toJson()) {
+      return 'far-distance';
+    }
     if (config.toJson() == _presetBalancedConfig().toJson()) return 'balanced';
     if (config.toJson() == _presetAccuracyConfig().toJson()) return 'accuracy';
     if (config.toJson() == _presetSpeedConfig().toJson()) return 'speed';
@@ -832,7 +1096,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final defaults = WebRTCSettings(
                   id: 'default_webrtc_config',
                   signalingServerUrl: 'wss://signaling.example.com',
-                  stunServers: '["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]',
+                  stunServers:
+                      '["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]',
                   turnServers: '["turn:turnserver.example.com:3478"]',
                   turnUsername: '',
                   turnPassword: '',
@@ -901,6 +1166,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _eyeRegionMinQualityController.dispose();
     _noseRegionMinQualityController.dispose();
     _mouthRegionMinQualityController.dispose();
+    _realtimeInputBrightnessController.dispose();
+    _realtimeInputContrastController.dispose();
+    _realtimeInputGammaController.dispose();
+    _realtimeInputSaturationController.dispose();
     _reportExportDirectoryController.dispose();
     _reportExportTimeController.dispose();
     _reportApiHostController.dispose();
@@ -912,10 +1181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cấu hình hệ thống'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Cấu hình hệ thống'), elevation: 0),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -949,7 +1215,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             controller: _signalingServerController,
                             label: 'URL Máy chủ Signaling',
                             hint: 'wss://signaling.example.com',
-                            helperText: 'Nhập địa chỉ máy chủ signaling (WebSocket)',
+                            helperText:
+                                'Nhập địa chỉ máy chủ signaling (WebSocket)',
                           ),
                           const SizedBox(height: 16),
                           _buildServersField(
@@ -1054,7 +1321,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onPressed: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (context) => const PeopleManagementScreen(),
+                                  builder: (context) =>
+                                      const PeopleManagementScreen(),
                                 ),
                               );
                             },
@@ -1096,7 +1364,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onPressed: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (context) => const UserManagementScreen(),
+                                  builder: (context) =>
+                                      const UserManagementScreen(),
                                 ),
                               );
                             },
@@ -1139,123 +1408,413 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             runSpacing: 8,
                             children: [
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('accuracy'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('accuracy'),
                                 icon: const Icon(Icons.bolt),
                                 label: const Text('Accuracy cao'),
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('balanced'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('balanced'),
                                 icon: const Icon(Icons.balance),
                                 label: const Text('Can bang'),
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('speed'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('speed'),
                                 icon: const Icon(Icons.speed),
                                 label: const Text('Toc do cao'),
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('strict'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('strict'),
                                 icon: const Icon(Icons.gpp_good),
                                 label: const Text('Chong nhan nham'),
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('low-light'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('low-light'),
                                 icon: const Icon(Icons.dark_mode),
                                 label: const Text('Anh sang yeu'),
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('far-distance'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('far-distance'),
                                 icon: const Icon(Icons.zoom_out_map),
                                 label: const Text('Xa camera'),
                               ),
                               FilledButton.tonalIcon(
-                                onPressed: () => _applyRecognitionPreset('recall'),
+                                onPressed: () =>
+                                    _applyRecognitionPreset('recall'),
                                 icon: const Icon(Icons.person_search),
                                 label: const Text('Uu tien khong bo sot'),
                               ),
                               Chip(
-                                label: Text('Preset: ${_presetDisplayName(_selectedRecognitionPreset)}'),
+                                label: Text(
+                                  'Preset: ${_presetDisplayName(_selectedRecognitionPreset)}',
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Accuracy cao: tang do chac chan, giam nham lan, doi hoi anh/chat luong tot.',
+                            'Mo phan nang cao khi can tinh chinh chi tiet. Mac dinh thu gon de man hinh Settings muot hon.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          Text(
-                            'Can bang: thong so mac dinh cho van hanh chung.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            'Toc do cao: uu tien toc do, chap nhan giam do chac chan.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            'Chong nhan nham: uu tien khong nhan nguoi la thanh nguoi that (siết mạnh).',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            'Anh sang yeu: can bang cho moi truong toi/anh xau, siết nham lan nhung van giu do on dinh cho frame tot.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            'Xa camera: giam nguong cho mat nho/far, uu tien giu mat o xa van duoc nhan dien thay vi bo qua.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Text(
-                            'Uu tien khong bo sot: uu tien nhan ra nguoi that, co the tang nham lan neu moi truong xau.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
+                          const SizedBox(height: 8),
+                          ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            childrenPadding: const EdgeInsets.only(bottom: 8),
+                            maintainState: false,
+                            initiallyExpanded: _isRecognitionAdvancedExpanded,
+                            onExpansionChanged: (expanded) {
+                              setState(() {
+                                _isRecognitionAdvancedExpanded = expanded;
+                              });
+                            },
+                            title: const Text(
+                              'Tham so nang cao (toi uu/chuan doan)',
+                            ),
+                            subtitle: const Text(
+                              'Chi render khi mo ra de giam giat lag luc vao Settings.',
+                            ),
                             children: [
-                              _buildRecognitionTextField(controller: _knownMatchThresholdController, label: _recognitionLabel('knownMatchThreshold')),
-                              _buildRecognitionTextField(controller: _knownStrongThresholdController, label: _recognitionLabel('knownStrongThreshold')),
-                              _buildRecognitionTextField(controller: _knownCalibratedThresholdController, label: _recognitionLabel('knownCalibratedThreshold')),
-                              _buildRecognitionTextField(controller: _knownMatchMarginController, label: _recognitionLabel('knownMatchMargin')),
-                              _buildRecognitionTextField(controller: _minTemplateSharpnessController, label: _recognitionLabel('minTemplateSharpness')),
-                              _buildRecognitionTextField(controller: _cameraCalibrationDurationMsController, label: _recognitionLabel('cameraCalibrationDurationMs')),
-                              _buildRecognitionTextField(controller: _calibrationLogThrottleMsController, label: _recognitionLabel('calibrationLogThrottleMs')),
-                              _buildRecognitionTextField(controller: _fallbackSkipLogIntervalMsController, label: _recognitionLabel('fallbackSkipLogIntervalMs')),
-                              _buildRecognitionTextField(controller: _fallbackCaptureIntervalMsController, label: _recognitionLabel('fallbackCaptureIntervalMs')),
-                              _buildRecognitionTextField(controller: _fallbackMaxInputEdgeController, label: _recognitionLabel('fallbackMaxInputEdge')),
-                              _buildRecognitionTextField(controller: _processFrameIntervalMsController, label: _recognitionLabel('processFrameIntervalMs')),
-                              _buildRecognitionTextField(controller: _detectorInputWidthController, label: _recognitionLabel('detectorInputWidth')),
-                              _buildRecognitionTextField(controller: _detectorInputHeightController, label: _recognitionLabel('detectorInputHeight')),
-                              _buildRecognitionTextField(controller: _trackKeepAliveMsController, label: _recognitionLabel('trackKeepAliveMs')),
-                              _buildRecognitionTextField(controller: _trackMatchMinScoreController, label: _recognitionLabel('trackMatchMinScore')),
-                              _buildRecognitionTextField(controller: _bboxSmoothingAlphaController, label: _recognitionLabel('bboxSmoothingAlpha')),
-                              _buildRecognitionTextField(controller: _annotatedFrameMinIntervalMsController, label: _recognitionLabel('annotatedFrameMinIntervalMs')),
-                              _buildRecognitionTextField(controller: _eventPublishIntervalMsController, label: _recognitionLabel('eventPublishIntervalMs')),
-                              _buildRecognitionTextField(controller: _minRealtimeFrameQualityController, label: _recognitionLabel('minRealtimeFrameQuality')),
-                              _buildRecognitionTextField(controller: _minRealtimeFaceAreaRatioController, label: _recognitionLabel('minRealtimeFaceAreaRatio')),
-                              _buildRecognitionTextField(controller: _minRealtimeFacePixelsController, label: _recognitionLabel('minRealtimeFacePixels')),
-                              _buildRecognitionTextField(controller: _voteWindowSizeController, label: _recognitionLabel('voteWindowSize')),
-                              _buildRecognitionTextField(controller: _voteMinCountController, label: _recognitionLabel('voteMinCount')),
-                              _buildRecognitionTextField(controller: _voteMaxAgeMsController, label: _recognitionLabel('voteMaxAgeMs')),
-                              _buildRecognitionTextField(controller: _minEnrollmentFaceAreaRatioController, label: _recognitionLabel('minEnrollmentFaceAreaRatio')),
-                              _buildRecognitionTextField(controller: _maxEnrollmentFaceAreaRatioController, label: _recognitionLabel('maxEnrollmentFaceAreaRatio')),
-                              _buildRecognitionTextField(controller: _minEnrollmentFaceAspectRatioController, label: _recognitionLabel('minEnrollmentFaceAspectRatio')),
-                              _buildRecognitionTextField(controller: _maxEnrollmentFaceAspectRatioController, label: _recognitionLabel('maxEnrollmentFaceAspectRatio')),
-                              _buildRecognitionTextField(controller: _minEnrollmentFacePixelsController, label: _recognitionLabel('minEnrollmentFacePixels')),
-                              _buildRecognitionTextField(controller: _scrfdInputSizeController, label: _recognitionLabel('scrfdInputSize')),
-                              _buildRecognitionTextField(controller: _scrfdScoreThresholdController, label: _recognitionLabel('scrfdScoreThreshold')),
-                              _buildRecognitionTextField(controller: _scrfdNmsThresholdController, label: _recognitionLabel('scrfdNmsThreshold')),
-                              _buildRecognitionTextField(controller: _hnswMController, label: _recognitionLabel('hnswM'), parameterKey: 'hnswM'),
-                              _buildRecognitionTextField(controller: _hnswEfConstructionController, label: _recognitionLabel('hnswEfConstruction'), parameterKey: 'hnswEfConstruction'),
-                              _buildRecognitionTextField(controller: _hnswEfSearchController, label: _recognitionLabel('hnswEfSearch'), parameterKey: 'hnswEfSearch'),
-                              _buildRecognitionTextField(controller: _eyeRegionMinQualityController, label: _recognitionLabel('eyeRegionMinQuality'), parameterKey: 'eyeRegionMinQuality'),
-                              _buildRecognitionTextField(controller: _noseRegionMinQualityController, label: _recognitionLabel('noseRegionMinQuality'), parameterKey: 'noseRegionMinQuality'),
-                              _buildRecognitionTextField(controller: _mouthRegionMinQualityController, label: _recognitionLabel('mouthRegionMinQuality'), parameterKey: 'mouthRegionMinQuality'),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Accuracy cao: tang do chac chan, giam nham lan, doi hoi anh/chat luong tot.',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      'Can bang: thong so mac dinh cho van hanh chung.',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      'Toc do cao: uu tien toc do, chap nhan giam do chac chan.',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      'Chong nhan nham: uu tien khong nhan nguoi la thanh nguoi that (siet manh).',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      'Anh sang yeu: can bang cho moi truong toi/anh xau, siet nham lan nhung van giu do on dinh cho frame tot.',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      'Xa camera: giam nguong cho mat nho/far, uu tien giu mat o xa van duoc nhan dien thay vi bo qua.',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    Text(
+                                      'Uu tien khong bo sot: uu tien nhan ra nguoi that, co the tang nham lan neu moi truong xau.',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: [
+                                  _buildRecognitionTextField(
+                                    controller: _knownMatchThresholdController,
+                                    label: _recognitionLabel(
+                                      'knownMatchThreshold',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _knownStrongThresholdController,
+                                    label: _recognitionLabel(
+                                      'knownStrongThreshold',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _knownCalibratedThresholdController,
+                                    label: _recognitionLabel(
+                                      'knownCalibratedThreshold',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _knownMatchMarginController,
+                                    label: _recognitionLabel(
+                                      'knownMatchMargin',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _minTemplateSharpnessController,
+                                    label: _recognitionLabel(
+                                      'minTemplateSharpness',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _cameraCalibrationDurationMsController,
+                                    label: _recognitionLabel(
+                                      'cameraCalibrationDurationMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _calibrationLogThrottleMsController,
+                                    label: _recognitionLabel(
+                                      'calibrationLogThrottleMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _fallbackSkipLogIntervalMsController,
+                                    label: _recognitionLabel(
+                                      'fallbackSkipLogIntervalMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _fallbackCaptureIntervalMsController,
+                                    label: _recognitionLabel(
+                                      'fallbackCaptureIntervalMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _fallbackMaxInputEdgeController,
+                                    label: _recognitionLabel(
+                                      'fallbackMaxInputEdge',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _processFrameIntervalMsController,
+                                    label: _recognitionLabel(
+                                      'processFrameIntervalMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _detectorInputWidthController,
+                                    label: _recognitionLabel(
+                                      'detectorInputWidth',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _detectorInputHeightController,
+                                    label: _recognitionLabel(
+                                      'detectorInputHeight',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _trackKeepAliveMsController,
+                                    label: _recognitionLabel(
+                                      'trackKeepAliveMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _trackMatchMinScoreController,
+                                    label: _recognitionLabel(
+                                      'trackMatchMinScore',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _bboxSmoothingAlphaController,
+                                    label: _recognitionLabel(
+                                      'bboxSmoothingAlpha',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _annotatedFrameMinIntervalMsController,
+                                    label: _recognitionLabel(
+                                      'annotatedFrameMinIntervalMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _eventPublishIntervalMsController,
+                                    label: _recognitionLabel(
+                                      'eventPublishIntervalMs',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _minRealtimeFrameQualityController,
+                                    label: _recognitionLabel(
+                                      'minRealtimeFrameQuality',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _minRealtimeFaceAreaRatioController,
+                                    label: _recognitionLabel(
+                                      'minRealtimeFaceAreaRatio',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _minRealtimeFacePixelsController,
+                                    label: _recognitionLabel(
+                                      'minRealtimeFacePixels',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _voteWindowSizeController,
+                                    label: _recognitionLabel('voteWindowSize'),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _voteMinCountController,
+                                    label: _recognitionLabel('voteMinCount'),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _voteMaxAgeMsController,
+                                    label: _recognitionLabel('voteMaxAgeMs'),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _minEnrollmentFaceAreaRatioController,
+                                    label: _recognitionLabel(
+                                      'minEnrollmentFaceAreaRatio',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _maxEnrollmentFaceAreaRatioController,
+                                    label: _recognitionLabel(
+                                      'maxEnrollmentFaceAreaRatio',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _minEnrollmentFaceAspectRatioController,
+                                    label: _recognitionLabel(
+                                      'minEnrollmentFaceAspectRatio',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _maxEnrollmentFaceAspectRatioController,
+                                    label: _recognitionLabel(
+                                      'maxEnrollmentFaceAspectRatio',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _minEnrollmentFacePixelsController,
+                                    label: _recognitionLabel(
+                                      'minEnrollmentFacePixels',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _scrfdInputSizeController,
+                                    label: _recognitionLabel('scrfdInputSize'),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _scrfdScoreThresholdController,
+                                    label: _recognitionLabel(
+                                      'scrfdScoreThreshold',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _scrfdNmsThresholdController,
+                                    label: _recognitionLabel(
+                                      'scrfdNmsThreshold',
+                                    ),
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _hnswMController,
+                                    label: _recognitionLabel('hnswM'),
+                                    parameterKey: 'hnswM',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _hnswEfConstructionController,
+                                    label: _recognitionLabel(
+                                      'hnswEfConstruction',
+                                    ),
+                                    parameterKey: 'hnswEfConstruction',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _hnswEfSearchController,
+                                    label: _recognitionLabel('hnswEfSearch'),
+                                    parameterKey: 'hnswEfSearch',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _eyeRegionMinQualityController,
+                                    label: _recognitionLabel(
+                                      'eyeRegionMinQuality',
+                                    ),
+                                    parameterKey: 'eyeRegionMinQuality',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _noseRegionMinQualityController,
+                                    label: _recognitionLabel(
+                                      'noseRegionMinQuality',
+                                    ),
+                                    parameterKey: 'noseRegionMinQuality',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _mouthRegionMinQualityController,
+                                    label: _recognitionLabel(
+                                      'mouthRegionMinQuality',
+                                    ),
+                                    parameterKey: 'mouthRegionMinQuality',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _realtimeInputBrightnessController,
+                                    label: _recognitionLabel(
+                                      'realtimeInputBrightness',
+                                    ),
+                                    parameterKey: 'realtimeInputBrightness',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _realtimeInputContrastController,
+                                    label: _recognitionLabel(
+                                      'realtimeInputContrast',
+                                    ),
+                                    parameterKey: 'realtimeInputContrast',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller: _realtimeInputGammaController,
+                                    label: _recognitionLabel(
+                                      'realtimeInputGamma',
+                                    ),
+                                    parameterKey: 'realtimeInputGamma',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _realtimeInputSaturationController,
+                                    label: _recognitionLabel(
+                                      'realtimeInputSaturation',
+                                    ),
+                                    parameterKey: 'realtimeInputSaturation',
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           SwitchListTile(
-                            title: const Text('Tu dong dieu chinh tham so realtime'),
-                            subtitle: const Text('He thong tu nắn nguong theo chat luong anh va kich thuoc khuon mat trong luc chay'),
+                            title: const Text(
+                              'Tu dong dieu chinh tham so realtime',
+                            ),
+                            subtitle: const Text(
+                              'He thong tu nắn nguong theo chat luong anh va kich thuoc khuon mat trong luc chay',
+                            ),
                             value: _autoTuneRecognitionParameters,
                             onChanged: (value) {
                               setState(() {
@@ -1265,11 +1824,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           SwitchListTile(
                             title: const Text('Overlay debug realtime'),
-                            subtitle: const Text('Hien thi globalScore, partialScore va trong so mat/mui/mieng tren bbox'),
+                            subtitle: const Text(
+                              'Hien thi globalScore, partialScore va trong so mat/mui/mieng tren bbox',
+                            ),
                             value: _debugRealtimeOverlay,
                             onChanged: (value) {
                               setState(() {
                                 _debugRealtimeOverlay = value;
+                              });
+                            },
+                          ),
+                          SwitchListTile(
+                            title: const Text(
+                              'Bat trace log chi tiet realtime',
+                            ),
+                            subtitle: const Text(
+                              'DecisionTrace, Match decision, GateSkip, CalibTop2. Tat de giam cham IO log.',
+                            ),
+                            value: _enableTraceLogs,
+                            onChanged: (value) {
+                              setState(() {
+                                _enableTraceLogs = value;
+                              });
+                            },
+                          ),
+                          SwitchListTile(
+                            title: const Text('Bat perf log'),
+                            subtitle: const Text(
+                              'Ghi log Perf[ws]/Perf[db] de do tre he thong.',
+                            ),
+                            value: _enablePerfLogs,
+                            onChanged: (value) {
+                              setState(() {
+                                _enablePerfLogs = value;
+                              });
+                            },
+                          ),
+                          SwitchListTile(
+                            title: const Text('Xu ly input: ep den trang'),
+                            subtitle: const Text(
+                              'Ap dung tren crop mat realtime truoc khi tinh quality/spoof/embedding.',
+                            ),
+                            value: _realtimeInputGrayscale,
+                            onChanged: (value) {
+                              setState(() {
+                                _realtimeInputGrayscale = value;
                               });
                             },
                           ),
@@ -1301,7 +1900,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 12),
                           SwitchListTile(
                             title: const Text('Bat job xuat bao cao dinh ky'),
-                            subtitle: const Text('App se tu dong xuat CSV theo gio da cau hinh'),
+                            subtitle: const Text(
+                              'App se tu dong xuat CSV theo gio da cau hinh',
+                            ),
                             value: _enableScheduledReportExport,
                             onChanged: (value) {
                               setState(() {
@@ -1317,7 +1918,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   controller: _reportExportDirectoryController,
                                   label: 'Thu muc xuat bao cao',
                                   hint: 'C:/reports/attendance',
-                                  helperText: 'Dung cho job dinh ky va API save=true',
+                                  helperText:
+                                      'Dung cho job dinh ky va API save=true',
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -1344,7 +1946,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 12),
                           SwitchListTile(
                             title: const Text('Bat public API xuat bao cao'),
-                            subtitle: const Text('GET /api/reports/export?from=2026-07-01&to=2026-07-04&subject=An&type=start'),
+                            subtitle: const Text(
+                              'GET /api/reports/export?from=2026-07-01&to=2026-07-04&subject=An&type=start',
+                            ),
                             value: _enablePublicReportApi,
                             onChanged: (value) {
                               setState(() {
@@ -1448,7 +2052,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String label,
     String? parameterKey,
   }) {
-    final resolvedKey = parameterKey ??
+    final resolvedKey =
+        parameterKey ??
         _recognitionParameterLabels.entries
             .firstWhere(
               (entry) => entry.value == label,
@@ -1505,7 +2110,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildCheckboxField() {
     return CheckboxListTile(
       title: const Text('Kích hoạt xử lý âm thanh'),
-      subtitle: const Text('Bật xử lý âm thanh nâng cao để cải thiện chất lượng'),
+      subtitle: const Text(
+        'Bật xử lý âm thanh nâng cao để cải thiện chất lượng',
+      ),
       value: _enableAudioProcessing,
       onChanged: (value) {
         if (value != null) {
@@ -1566,7 +2173,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class ParameterHelpButton extends StatefulWidget {
-  const ParameterHelpButton({super.key, required this.label, required this.note});
+  const ParameterHelpButton({
+    super.key,
+    required this.label,
+    required this.note,
+  });
 
   final String label;
   final String note;
@@ -1637,7 +2248,9 @@ class _ParameterHelpButtonState extends State<ParameterHelpButton> {
                           ),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: theme.colorScheme.outline.withValues(alpha: 0.20),
+                            color: theme.colorScheme.outline.withValues(
+                              alpha: 0.20,
+                            ),
                           ),
                           boxShadow: const [
                             BoxShadow(
@@ -1699,7 +2312,9 @@ class _ParameterHelpButtonState extends State<ParameterHelpButton> {
   void _hidePanel() {
     _hideTimer?.cancel();
     _hideTimer = null;
-    _overlayEntry?.remove();
+    if (_overlayEntry?.mounted ?? false) {
+      _overlayEntry?.remove();
+    }
     _overlayEntry = null;
     if (_activeState == this) {
       _activeState = null;
@@ -1737,7 +2352,9 @@ class _ParameterHelpButtonState extends State<ParameterHelpButton> {
   void dispose() {
     _hideTimer?.cancel();
     _hideTimer = null;
-    _overlayEntry?.remove();
+    if (_overlayEntry?.mounted ?? false) {
+      _overlayEntry?.remove();
+    }
     _overlayEntry = null;
     if (_activeState == this) {
       _activeState = null;
@@ -1763,7 +2380,9 @@ class _ParameterHelpButtonState extends State<ParameterHelpButton> {
           decoration: BoxDecoration(
             color: visible
                 ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                : theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.55,
+                  ),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: visible

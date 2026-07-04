@@ -7,46 +7,53 @@ import 'app_database.dart';
 
 class RecognitionRuntimeConfig {
   const RecognitionRuntimeConfig({
-    this.knownMatchThreshold = 0.965,
-    this.knownStrongThreshold = 0.985,
-    this.knownCalibratedThreshold = 0.94,
-    this.knownMatchMargin = 0.26,
-    this.minTemplateSharpness = 38.0,
+    this.knownMatchThreshold = 0.945,
+    this.knownStrongThreshold = 0.972,
+    this.knownCalibratedThreshold = 0.905,
+    this.knownMatchMargin = 0.185,
+    this.minTemplateSharpness = 34.0,
     this.cameraCalibrationDurationMs = 25000,
     this.calibrationLogThrottleMs = 750,
     this.fallbackSkipLogIntervalMs = 3000,
     this.fallbackCaptureIntervalMs = 100,
     this.fallbackMaxInputEdge = 960,
-    this.processFrameIntervalMs = 70,
+    this.processFrameIntervalMs = 82,
     this.detectorInputWidth = 640,
     this.detectorInputHeight = 480,
     this.trackKeepAliveMs = 1200,
     this.trackMatchMinScore = 0.42,
     this.bboxSmoothingAlpha = 0.34,
-    this.annotatedFrameMinIntervalMs = 100,
+    this.annotatedFrameMinIntervalMs = 140,
     this.eventPublishIntervalMs = 80000,
-    this.minRealtimeFrameQuality = 0.30,
-    this.minRealtimeFaceAreaRatio = 0.055,
-    this.minRealtimeFacePixels = 76,
-    this.voteWindowSize = 8,
-    this.voteMinCount = 6,
-    this.voteMaxAgeMs = 2600,
-    this.minEnrollmentFaceAreaRatio = 0.07,
+    this.minRealtimeFrameQuality = 0.28,
+    this.minRealtimeFaceAreaRatio = 0.030,
+    this.minRealtimeFacePixels = 52,
+    this.voteWindowSize = 7,
+    this.voteMinCount = 5,
+    this.voteMaxAgeMs = 2200,
+    this.minEnrollmentFaceAreaRatio = 0.08,
     this.maxEnrollmentFaceAreaRatio = 0.75,
     this.minEnrollmentFaceAspectRatio = 0.65,
     this.maxEnrollmentFaceAspectRatio = 1.55,
-    this.minEnrollmentFacePixels = 72,
+    this.minEnrollmentFacePixels = 84,
     this.scrfdInputSize = 640,
-    this.scrfdScoreThreshold = 0.64,
-    this.scrfdNmsThreshold = 0.33,
+    this.scrfdScoreThreshold = 0.60,
+    this.scrfdNmsThreshold = 0.35,
     this.hnswM = 24,
     this.hnswEfConstruction = 200,
     this.hnswEfSearch = 220,
-    this.eyeRegionMinQuality = 0.30,
-    this.noseRegionMinQuality = 0.28,
-    this.mouthRegionMinQuality = 0.28,
-    this.autoTuneRecognitionParameters = false,
+    this.eyeRegionMinQuality = 0.28,
+    this.noseRegionMinQuality = 0.26,
+    this.mouthRegionMinQuality = 0.26,
+    this.autoTuneRecognitionParameters = true,
     this.debugRealtimeOverlay = true,
+    this.enableTraceLogs = false,
+    this.enablePerfLogs = false,
+    this.realtimeInputBrightness = 0,
+    this.realtimeInputContrast = 1.0,
+    this.realtimeInputGamma = 1.0,
+    this.realtimeInputSaturation = 1.0,
+    this.realtimeInputGrayscale = false,
   });
 
   final double knownMatchThreshold;
@@ -89,6 +96,135 @@ class RecognitionRuntimeConfig {
   final double mouthRegionMinQuality;
   final bool autoTuneRecognitionParameters;
   final bool debugRealtimeOverlay;
+  final bool enableTraceLogs;
+  final bool enablePerfLogs;
+  final int realtimeInputBrightness;
+  final double realtimeInputContrast;
+  final double realtimeInputGamma;
+  final double realtimeInputSaturation;
+  final bool realtimeInputGrayscale;
+
+  RecognitionRuntimeConfig copyWith({
+    double? knownMatchThreshold,
+    double? knownStrongThreshold,
+    double? knownCalibratedThreshold,
+    double? knownMatchMargin,
+    double? minTemplateSharpness,
+    int? cameraCalibrationDurationMs,
+    int? calibrationLogThrottleMs,
+    int? fallbackSkipLogIntervalMs,
+    int? fallbackCaptureIntervalMs,
+    int? fallbackMaxInputEdge,
+    int? processFrameIntervalMs,
+    int? detectorInputWidth,
+    int? detectorInputHeight,
+    int? trackKeepAliveMs,
+    double? trackMatchMinScore,
+    double? bboxSmoothingAlpha,
+    int? annotatedFrameMinIntervalMs,
+    int? eventPublishIntervalMs,
+    double? minRealtimeFrameQuality,
+    double? minRealtimeFaceAreaRatio,
+    int? minRealtimeFacePixels,
+    int? voteWindowSize,
+    int? voteMinCount,
+    int? voteMaxAgeMs,
+    double? minEnrollmentFaceAreaRatio,
+    double? maxEnrollmentFaceAreaRatio,
+    double? minEnrollmentFaceAspectRatio,
+    double? maxEnrollmentFaceAspectRatio,
+    int? minEnrollmentFacePixels,
+    int? scrfdInputSize,
+    double? scrfdScoreThreshold,
+    double? scrfdNmsThreshold,
+    int? hnswM,
+    int? hnswEfConstruction,
+    int? hnswEfSearch,
+    double? eyeRegionMinQuality,
+    double? noseRegionMinQuality,
+    double? mouthRegionMinQuality,
+    bool? autoTuneRecognitionParameters,
+    bool? debugRealtimeOverlay,
+    bool? enableTraceLogs,
+    bool? enablePerfLogs,
+    int? realtimeInputBrightness,
+    double? realtimeInputContrast,
+    double? realtimeInputGamma,
+    double? realtimeInputSaturation,
+    bool? realtimeInputGrayscale,
+  }) {
+    return RecognitionRuntimeConfig(
+      knownMatchThreshold: knownMatchThreshold ?? this.knownMatchThreshold,
+      knownStrongThreshold: knownStrongThreshold ?? this.knownStrongThreshold,
+      knownCalibratedThreshold:
+          knownCalibratedThreshold ?? this.knownCalibratedThreshold,
+      knownMatchMargin: knownMatchMargin ?? this.knownMatchMargin,
+      minTemplateSharpness: minTemplateSharpness ?? this.minTemplateSharpness,
+      cameraCalibrationDurationMs:
+          cameraCalibrationDurationMs ?? this.cameraCalibrationDurationMs,
+      calibrationLogThrottleMs:
+          calibrationLogThrottleMs ?? this.calibrationLogThrottleMs,
+      fallbackSkipLogIntervalMs:
+          fallbackSkipLogIntervalMs ?? this.fallbackSkipLogIntervalMs,
+      fallbackCaptureIntervalMs:
+          fallbackCaptureIntervalMs ?? this.fallbackCaptureIntervalMs,
+      fallbackMaxInputEdge: fallbackMaxInputEdge ?? this.fallbackMaxInputEdge,
+      processFrameIntervalMs:
+          processFrameIntervalMs ?? this.processFrameIntervalMs,
+      detectorInputWidth: detectorInputWidth ?? this.detectorInputWidth,
+      detectorInputHeight: detectorInputHeight ?? this.detectorInputHeight,
+      trackKeepAliveMs: trackKeepAliveMs ?? this.trackKeepAliveMs,
+      trackMatchMinScore: trackMatchMinScore ?? this.trackMatchMinScore,
+      bboxSmoothingAlpha: bboxSmoothingAlpha ?? this.bboxSmoothingAlpha,
+      annotatedFrameMinIntervalMs:
+          annotatedFrameMinIntervalMs ?? this.annotatedFrameMinIntervalMs,
+      eventPublishIntervalMs:
+          eventPublishIntervalMs ?? this.eventPublishIntervalMs,
+      minRealtimeFrameQuality:
+          minRealtimeFrameQuality ?? this.minRealtimeFrameQuality,
+      minRealtimeFaceAreaRatio:
+          minRealtimeFaceAreaRatio ?? this.minRealtimeFaceAreaRatio,
+      minRealtimeFacePixels:
+          minRealtimeFacePixels ?? this.minRealtimeFacePixels,
+      voteWindowSize: voteWindowSize ?? this.voteWindowSize,
+      voteMinCount: voteMinCount ?? this.voteMinCount,
+      voteMaxAgeMs: voteMaxAgeMs ?? this.voteMaxAgeMs,
+      minEnrollmentFaceAreaRatio:
+          minEnrollmentFaceAreaRatio ?? this.minEnrollmentFaceAreaRatio,
+      maxEnrollmentFaceAreaRatio:
+          maxEnrollmentFaceAreaRatio ?? this.maxEnrollmentFaceAreaRatio,
+      minEnrollmentFaceAspectRatio:
+          minEnrollmentFaceAspectRatio ?? this.minEnrollmentFaceAspectRatio,
+      maxEnrollmentFaceAspectRatio:
+          maxEnrollmentFaceAspectRatio ?? this.maxEnrollmentFaceAspectRatio,
+      minEnrollmentFacePixels:
+          minEnrollmentFacePixels ?? this.minEnrollmentFacePixels,
+      scrfdInputSize: scrfdInputSize ?? this.scrfdInputSize,
+      scrfdScoreThreshold: scrfdScoreThreshold ?? this.scrfdScoreThreshold,
+      scrfdNmsThreshold: scrfdNmsThreshold ?? this.scrfdNmsThreshold,
+      hnswM: hnswM ?? this.hnswM,
+      hnswEfConstruction: hnswEfConstruction ?? this.hnswEfConstruction,
+      hnswEfSearch: hnswEfSearch ?? this.hnswEfSearch,
+      eyeRegionMinQuality: eyeRegionMinQuality ?? this.eyeRegionMinQuality,
+      noseRegionMinQuality: noseRegionMinQuality ?? this.noseRegionMinQuality,
+      mouthRegionMinQuality:
+          mouthRegionMinQuality ?? this.mouthRegionMinQuality,
+      autoTuneRecognitionParameters:
+          autoTuneRecognitionParameters ?? this.autoTuneRecognitionParameters,
+      debugRealtimeOverlay: debugRealtimeOverlay ?? this.debugRealtimeOverlay,
+      enableTraceLogs: enableTraceLogs ?? this.enableTraceLogs,
+      enablePerfLogs: enablePerfLogs ?? this.enablePerfLogs,
+      realtimeInputBrightness:
+          realtimeInputBrightness ?? this.realtimeInputBrightness,
+      realtimeInputContrast:
+          realtimeInputContrast ?? this.realtimeInputContrast,
+      realtimeInputGamma: realtimeInputGamma ?? this.realtimeInputGamma,
+      realtimeInputSaturation:
+          realtimeInputSaturation ?? this.realtimeInputSaturation,
+      realtimeInputGrayscale:
+          realtimeInputGrayscale ?? this.realtimeInputGrayscale,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -132,6 +268,13 @@ class RecognitionRuntimeConfig {
       'mouthRegionMinQuality': mouthRegionMinQuality,
       'autoTuneRecognitionParameters': autoTuneRecognitionParameters,
       'debugRealtimeOverlay': debugRealtimeOverlay,
+      'enableTraceLogs': enableTraceLogs,
+      'enablePerfLogs': enablePerfLogs,
+      'realtimeInputBrightness': realtimeInputBrightness,
+      'realtimeInputContrast': realtimeInputContrast,
+      'realtimeInputGamma': realtimeInputGamma,
+      'realtimeInputSaturation': realtimeInputSaturation,
+      'realtimeInputGrayscale': realtimeInputGrayscale,
     };
   }
 
@@ -163,46 +306,53 @@ class RecognitionRuntimeConfig {
     }
 
     return RecognitionRuntimeConfig(
-      knownMatchThreshold: d('knownMatchThreshold', 0.92),
-      knownStrongThreshold: d('knownStrongThreshold', 0.96),
-      knownCalibratedThreshold: d('knownCalibratedThreshold', 0.78),
-      knownMatchMargin: d('knownMatchMargin', 0.18),
-      minTemplateSharpness: d('minTemplateSharpness', 28.0),
+      knownMatchThreshold: d('knownMatchThreshold', 0.945),
+      knownStrongThreshold: d('knownStrongThreshold', 0.972),
+      knownCalibratedThreshold: d('knownCalibratedThreshold', 0.905),
+      knownMatchMargin: d('knownMatchMargin', 0.185),
+      minTemplateSharpness: d('minTemplateSharpness', 34.0),
       cameraCalibrationDurationMs: i('cameraCalibrationDurationMs', 25000),
       calibrationLogThrottleMs: i('calibrationLogThrottleMs', 750),
       fallbackSkipLogIntervalMs: i('fallbackSkipLogIntervalMs', 3000),
       fallbackCaptureIntervalMs: i('fallbackCaptureIntervalMs', 100),
       fallbackMaxInputEdge: i('fallbackMaxInputEdge', 960),
-      processFrameIntervalMs: i('processFrameIntervalMs', 50),
+      processFrameIntervalMs: i('processFrameIntervalMs', 82),
       detectorInputWidth: i('detectorInputWidth', 640),
       detectorInputHeight: i('detectorInputHeight', 480),
       trackKeepAliveMs: i('trackKeepAliveMs', 1200),
       trackMatchMinScore: d('trackMatchMinScore', 0.42),
       bboxSmoothingAlpha: d('bboxSmoothingAlpha', 0.34),
-      annotatedFrameMinIntervalMs: i('annotatedFrameMinIntervalMs', 100),
-      eventPublishIntervalMs: i('eventPublishIntervalMs', 60000),
-      minRealtimeFrameQuality: d('minRealtimeFrameQuality', 0.22),
-      minRealtimeFaceAreaRatio: d('minRealtimeFaceAreaRatio', 0.035),
-      minRealtimeFacePixels: i('minRealtimeFacePixels', 56),
-      voteWindowSize: i('voteWindowSize', 5),
-      voteMinCount: i('voteMinCount', 3),
-      voteMaxAgeMs: i('voteMaxAgeMs', 1800),
-      minEnrollmentFaceAreaRatio: d('minEnrollmentFaceAreaRatio', 0.07),
+      annotatedFrameMinIntervalMs: i('annotatedFrameMinIntervalMs', 140),
+      eventPublishIntervalMs: i('eventPublishIntervalMs', 80000),
+      minRealtimeFrameQuality: d('minRealtimeFrameQuality', 0.28),
+      minRealtimeFaceAreaRatio: d('minRealtimeFaceAreaRatio', 0.030),
+      minRealtimeFacePixels: i('minRealtimeFacePixels', 52),
+      voteWindowSize: i('voteWindowSize', 7),
+      voteMinCount: i('voteMinCount', 5),
+      voteMaxAgeMs: i('voteMaxAgeMs', 2200),
+      minEnrollmentFaceAreaRatio: d('minEnrollmentFaceAreaRatio', 0.08),
       maxEnrollmentFaceAreaRatio: d('maxEnrollmentFaceAreaRatio', 0.75),
       minEnrollmentFaceAspectRatio: d('minEnrollmentFaceAspectRatio', 0.65),
       maxEnrollmentFaceAspectRatio: d('maxEnrollmentFaceAspectRatio', 1.55),
-      minEnrollmentFacePixels: i('minEnrollmentFacePixels', 72),
+      minEnrollmentFacePixels: i('minEnrollmentFacePixels', 84),
       scrfdInputSize: i('scrfdInputSize', 640),
-      scrfdScoreThreshold: d('scrfdScoreThreshold', 0.55),
-      scrfdNmsThreshold: d('scrfdNmsThreshold', 0.38),
-      hnswM: i('hnswM', 20),
-      hnswEfConstruction: i('hnswEfConstruction', 144),
-      hnswEfSearch: i('hnswEfSearch', 160),
-      eyeRegionMinQuality: d('eyeRegionMinQuality', 0.24),
-      noseRegionMinQuality: d('noseRegionMinQuality', 0.22),
-      mouthRegionMinQuality: d('mouthRegionMinQuality', 0.22),
-      autoTuneRecognitionParameters: b('autoTuneRecognitionParameters', false),
+      scrfdScoreThreshold: d('scrfdScoreThreshold', 0.60),
+      scrfdNmsThreshold: d('scrfdNmsThreshold', 0.35),
+      hnswM: i('hnswM', 24),
+      hnswEfConstruction: i('hnswEfConstruction', 200),
+      hnswEfSearch: i('hnswEfSearch', 220),
+      eyeRegionMinQuality: d('eyeRegionMinQuality', 0.28),
+      noseRegionMinQuality: d('noseRegionMinQuality', 0.26),
+      mouthRegionMinQuality: d('mouthRegionMinQuality', 0.26),
+      autoTuneRecognitionParameters: b('autoTuneRecognitionParameters', true),
       debugRealtimeOverlay: b('debugRealtimeOverlay', true),
+      enableTraceLogs: b('enableTraceLogs', false),
+      enablePerfLogs: b('enablePerfLogs', false),
+      realtimeInputBrightness: i('realtimeInputBrightness', 0),
+      realtimeInputContrast: d('realtimeInputContrast', 1.0),
+      realtimeInputGamma: d('realtimeInputGamma', 1.0),
+      realtimeInputSaturation: d('realtimeInputSaturation', 1.0),
+      realtimeInputGrayscale: b('realtimeInputGrayscale', false),
     );
   }
 
@@ -239,11 +389,10 @@ class RecognitionSettingsRepository {
 
     if (row.isEmpty) {
       const defaults = RecognitionRuntimeConfig();
-      await db.insert(
-        _settingsTable,
-        {'key': _configKey, 'value': defaults.toJson()},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.insert(_settingsTable, {
+        'key': _configKey,
+        'value': defaults.toJson(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       return defaults;
     }
 
@@ -257,11 +406,10 @@ class RecognitionSettingsRepository {
 
   static Future<void> saveConfig(RecognitionRuntimeConfig config) async {
     final db = await AppDatabase.instance();
-    await db.insert(
-      _settingsTable,
-      {'key': _configKey, 'value': config.toJson()},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert(_settingsTable, {
+      'key': _configKey,
+      'value': config.toJson(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     if (!_changes.isClosed) {
       _changes.add(config);
     }
