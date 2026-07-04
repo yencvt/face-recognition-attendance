@@ -841,9 +841,12 @@ class FaceRecognitionService {
         final overlays = <FaceOverlayBox>[];
         final nextTracks = <String, _CameraTrack>{};
         for (final f in faces) {
+          var stage = 'start';
           try {
+            stage = 'extract_rect';
             final rect = _extractFallbackFaceRect(f, rgb.width, rgb.height);
             if (rect == null || rect.width <= 1 || rect.height <= 1) continue;
+            stage = 'build_ratio';
             final ratio = Rect.fromLTWH(
               (rect.left / rgb.width).clamp(0.0, 1.0),
               (rect.top / rgb.height).clamp(0.0, 1.0),
@@ -851,22 +854,34 @@ class FaceRecognitionService {
               (rect.height / rgb.height).clamp(0.0, 1.0),
             );
 
+            stage = 'zone_check';
             if (!_isInsideZone(ratio, zone)) continue;
 
+            stage = 'crop';
             final crop = _cropFace(rgb, rect);
             if (crop == null) continue;
 
+            stage = 'embedding';
             final frameQuality = (_imageSharpness(crop) / 140.0).clamp(0.0, 1.0);
             final vector = await _embeddingFromImage(crop);
             final faceLogKey = '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}';
-            final match = _findBestMatch(
-              vector,
-              excludedPersonIds: nextTracks.values.map((track) => track.event.personId).whereType<String>().toSet(),
-              frameQuality: frameQuality,
-              cameraId: cameraId,
-              faceLogKey: faceLogKey,
-            );
+            _MatchResult? match;
+            try {
+              stage = 'match';
+              match = _findBestMatch(
+                vector,
+                excludedPersonIds: nextTracks.values.map((track) => track.event.personId).whereType<String>().toSet(),
+                frameQuality: frameQuality,
+                cameraId: cameraId,
+                faceLogKey: faceLogKey,
+              );
+            } catch (matchError, matchSt) {
+              final matchStLine = matchSt.toString().split('\n').first;
+              _log.debug('Fallback face match degraded camera=$cameraId errorType=${matchError.runtimeType} error=$matchError stack=$matchStLine');
+              match = null;
+            }
             final isKnown = match != null && match.score >= _knownMatchThreshold;
+            stage = 'build_event';
             final now = DateTime.now().millisecondsSinceEpoch;
             final event = isKnown
                 ? RecognitionEvent(
@@ -888,7 +903,15 @@ class FaceRecognitionService {
                     createdAt: now,
                   );
 
-            final key = _matchTrackKey(cameraId, ratio, event, nextTracks);
+            stage = 'track_key';
+            String key;
+            try {
+              key = _matchTrackKey(cameraId, ratio, event, nextTracks);
+            } catch (_) {
+              key = event.isStranger
+                  ? 'stranger_${cameraId}_${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}'
+                  : 'known_${cameraId}_${event.personId}_${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}';
+            }
             nextTracks[key] = _CameraTrack(
               key: key,
               currentRect: ratio,
@@ -909,14 +932,15 @@ class FaceRecognitionService {
                 _notiQueue.add(FaceRecognitionNotification(cameraId: cameraId, event: event));
               }
             }
-          } catch (e) {
+          } catch (e, st) {
             final now = DateTime.now().millisecondsSinceEpoch;
             final count = (_fallbackFaceSkipCountByCameraId[cameraId] ?? 0) + 1;
             _fallbackFaceSkipCountByCameraId[cameraId] = count;
             final lastAt = _fallbackFaceSkipLogAtByCameraId[cameraId] ?? 0;
             if (now - lastAt >= _fallbackSkipLogIntervalMs) {
               _fallbackFaceSkipLogAtByCameraId[cameraId] = now;
-              _log.debug('Fallback face skipped camera=$cameraId skipped=$count errorType=${e.runtimeType} error=$e');
+              final stLine = st.toString().split('\n').first;
+              _log.debug('Fallback face skipped camera=$cameraId skipped=$count stage=$stage errorType=${e.runtimeType} error=$e stack=$stLine');
               _fallbackFaceSkipCountByCameraId[cameraId] = 0;
             }
             continue;
@@ -1531,80 +1555,84 @@ class FaceRecognitionService {
   }
 
   Rect? _extractFallbackFaceRect(dynamic face, int imageWidth, int imageHeight) {
-    final bbox = _readDynamicMember(face, 'boundingBox');
-    if (bbox == null) return null;
+    try {
+      final bbox = _readDynamicMember(face, 'boundingBox');
+      if (bbox == null) return null;
 
-    final left = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'left'),
-      _readDynamicMember(bbox, 'x'),
-      _readMapValue(bbox, 'left'),
-      _readMapValue(bbox, 'x'),
-      _readMapValue(bbox, 'xmin'),
-      _readNestedPointValue(bbox, 'topLeft', 'x'),
-      _readNestedPointValue(bbox, 'topLeft', 'dx'),
-      _readNestedPointValue(bbox, 'leftTop', 'x'),
-      _readNestedPointValue(bbox, 'leftTop', 'dx'),
-      _readListValue(bbox, 0),
-    ]);
+      final left = _firstFiniteDouble(<dynamic>[
+        _readDynamicMember(bbox, 'left'),
+        _readDynamicMember(bbox, 'x'),
+        _readMapValue(bbox, 'left'),
+        _readMapValue(bbox, 'x'),
+        _readMapValue(bbox, 'xmin'),
+        _readNestedPointValue(bbox, 'topLeft', 'x'),
+        _readNestedPointValue(bbox, 'topLeft', 'dx'),
+        _readNestedPointValue(bbox, 'leftTop', 'x'),
+        _readNestedPointValue(bbox, 'leftTop', 'dx'),
+        _readListValue(bbox, 0),
+      ]);
 
-    final top = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'top'),
-      _readDynamicMember(bbox, 'y'),
-      _readMapValue(bbox, 'top'),
-      _readMapValue(bbox, 'y'),
-      _readMapValue(bbox, 'ymin'),
-      _readNestedPointValue(bbox, 'topLeft', 'y'),
-      _readNestedPointValue(bbox, 'topLeft', 'dy'),
-      _readNestedPointValue(bbox, 'leftTop', 'y'),
-      _readNestedPointValue(bbox, 'leftTop', 'dy'),
-      _readListValue(bbox, 1),
-    ]);
+      final top = _firstFiniteDouble(<dynamic>[
+        _readDynamicMember(bbox, 'top'),
+        _readDynamicMember(bbox, 'y'),
+        _readMapValue(bbox, 'top'),
+        _readMapValue(bbox, 'y'),
+        _readMapValue(bbox, 'ymin'),
+        _readNestedPointValue(bbox, 'topLeft', 'y'),
+        _readNestedPointValue(bbox, 'topLeft', 'dy'),
+        _readNestedPointValue(bbox, 'leftTop', 'y'),
+        _readNestedPointValue(bbox, 'leftTop', 'dy'),
+        _readListValue(bbox, 1),
+      ]);
 
-    final width = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'width'),
-      _readMapValue(bbox, 'width'),
-      _readListValue(bbox, 2),
-      _deriveSizeFromBounds(
-        _firstFiniteDouble(<dynamic>[
-          _readDynamicMember(bbox, 'right'),
-          _readMapValue(bbox, 'right'),
-          _readMapValue(bbox, 'xmax'),
-          _readNestedPointValue(bbox, 'bottomRight', 'x'),
-          _readNestedPointValue(bbox, 'bottomRight', 'dx'),
-        ]),
-        left,
-      ),
-    ]);
+      final width = _firstFiniteDouble(<dynamic>[
+        _readDynamicMember(bbox, 'width'),
+        _readMapValue(bbox, 'width'),
+        _readListValue(bbox, 2),
+        _deriveSizeFromBounds(
+          _firstFiniteDouble(<dynamic>[
+            _readDynamicMember(bbox, 'right'),
+            _readMapValue(bbox, 'right'),
+            _readMapValue(bbox, 'xmax'),
+            _readNestedPointValue(bbox, 'bottomRight', 'x'),
+            _readNestedPointValue(bbox, 'bottomRight', 'dx'),
+          ]),
+          left,
+        ),
+      ]);
 
-    final height = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'height'),
-      _readMapValue(bbox, 'height'),
-      _readListValue(bbox, 3),
-      _deriveSizeFromBounds(
-        _firstFiniteDouble(<dynamic>[
-          _readDynamicMember(bbox, 'bottom'),
-          _readMapValue(bbox, 'bottom'),
-          _readMapValue(bbox, 'ymax'),
-          _readNestedPointValue(bbox, 'bottomRight', 'y'),
-          _readNestedPointValue(bbox, 'bottomRight', 'dy'),
-        ]),
-        top,
-      ),
-    ]);
+      final height = _firstFiniteDouble(<dynamic>[
+        _readDynamicMember(bbox, 'height'),
+        _readMapValue(bbox, 'height'),
+        _readListValue(bbox, 3),
+        _deriveSizeFromBounds(
+          _firstFiniteDouble(<dynamic>[
+            _readDynamicMember(bbox, 'bottom'),
+            _readMapValue(bbox, 'bottom'),
+            _readMapValue(bbox, 'ymax'),
+            _readNestedPointValue(bbox, 'bottomRight', 'y'),
+            _readNestedPointValue(bbox, 'bottomRight', 'dy'),
+          ]),
+          top,
+        ),
+      ]);
 
-    if (left == null || top == null || width == null || height == null) {
+      if (left == null || top == null || width == null || height == null) {
+        return null;
+      }
+
+      final clampedLeft = left.clamp(0.0, imageWidth.toDouble() - 1);
+      final clampedTop = top.clamp(0.0, imageHeight.toDouble() - 1);
+      final maxWidth = imageWidth.toDouble() - clampedLeft;
+      final maxHeight = imageHeight.toDouble() - clampedTop;
+      final clampedWidth = width.clamp(0.0, maxWidth);
+      final clampedHeight = height.clamp(0.0, maxHeight);
+      if (clampedWidth <= 0 || clampedHeight <= 0) return null;
+
+      return Rect.fromLTWH(clampedLeft, clampedTop, clampedWidth, clampedHeight);
+    } catch (_) {
       return null;
     }
-
-    final clampedLeft = left.clamp(0.0, imageWidth.toDouble() - 1);
-    final clampedTop = top.clamp(0.0, imageHeight.toDouble() - 1);
-    final maxWidth = imageWidth.toDouble() - clampedLeft;
-    final maxHeight = imageHeight.toDouble() - clampedTop;
-    final clampedWidth = width.clamp(0.0, maxWidth);
-    final clampedHeight = height.clamp(0.0, maxHeight);
-    if (clampedWidth <= 0 || clampedHeight <= 0) return null;
-
-    return Rect.fromLTWH(clampedLeft, clampedTop, clampedWidth, clampedHeight);
   }
 
   double? _firstFiniteDouble(List<dynamic> values) {
