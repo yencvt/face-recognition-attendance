@@ -102,6 +102,12 @@ class FaceVectorCacheEntry {
     this.eyeVectorBlob,
     this.noseVectorBlob,
     this.mouthVectorBlob,
+    this.foreheadVectorBlob,
+    this.leftEyeVectorBlob,
+    this.rightEyeVectorBlob,
+    this.leftCheekVectorBlob,
+    this.rightCheekVectorBlob,
+    this.chinVectorBlob,
   });
 
   final String sourceId;
@@ -111,6 +117,12 @@ class FaceVectorCacheEntry {
   final Uint8List? eyeVectorBlob;
   final Uint8List? noseVectorBlob;
   final Uint8List? mouthVectorBlob;
+  final Uint8List? foreheadVectorBlob;
+  final Uint8List? leftEyeVectorBlob;
+  final Uint8List? rightEyeVectorBlob;
+  final Uint8List? leftCheekVectorBlob;
+  final Uint8List? rightCheekVectorBlob;
+  final Uint8List? chinVectorBlob;
   final double quality;
   final int createdAt;
   final int updatedAt;
@@ -124,6 +136,12 @@ class FaceVectorCacheEntry {
       eyeVectorBlob: map['eye_vector_blob'] as Uint8List?,
       noseVectorBlob: map['nose_vector_blob'] as Uint8List?,
       mouthVectorBlob: map['mouth_vector_blob'] as Uint8List?,
+      foreheadVectorBlob: map['forehead_vector_blob'] as Uint8List?,
+      leftEyeVectorBlob: map['left_eye_vector_blob'] as Uint8List?,
+      rightEyeVectorBlob: map['right_eye_vector_blob'] as Uint8List?,
+      leftCheekVectorBlob: map['left_cheek_vector_blob'] as Uint8List?,
+      rightCheekVectorBlob: map['right_cheek_vector_blob'] as Uint8List?,
+      chinVectorBlob: map['chin_vector_blob'] as Uint8List?,
       quality: (map['quality'] as num?)?.toDouble() ?? 0.0,
       createdAt: (map['created_at'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
       updatedAt: (map['updated_at'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
@@ -139,6 +157,12 @@ class FaceVectorCacheEntry {
       'eye_vector_blob': eyeVectorBlob,
       'nose_vector_blob': noseVectorBlob,
       'mouth_vector_blob': mouthVectorBlob,
+      'forehead_vector_blob': foreheadVectorBlob,
+      'left_eye_vector_blob': leftEyeVectorBlob,
+      'right_eye_vector_blob': rightEyeVectorBlob,
+      'left_cheek_vector_blob': leftCheekVectorBlob,
+      'right_cheek_vector_blob': rightCheekVectorBlob,
+      'chin_vector_blob': chinVectorBlob,
       'quality': quality,
       'created_at': createdAt,
       'updated_at': updatedAt,

@@ -140,6 +140,6 @@ class ReportExportService {
     final hh = date.hour.toString().padLeft(2, '0');
     final mm = date.minute.toString().padLeft(2, '0');
     final ss = date.second.toString().padLeft(2, '0');
-    return '${y}${m}${d}_${hh}${mm}${ss}';
+    return '$y$m${d}_$hh$mm$ss';
   }
 }

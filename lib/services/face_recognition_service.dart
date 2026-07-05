@@ -78,44 +78,185 @@ class EnrollmentFaceCropResult {
   final double? sharpness;
 }
 
+class UploadedImageRecognitionCandidateScore {
+  UploadedImageRecognitionCandidateScore({
+    required this.personId,
+    required this.personName,
+    required this.score,
+  });
+
+  final String personId;
+  final String personName;
+  final double score;
+}
+
+class UploadedImageRecognitionFaceMatch {
+  UploadedImageRecognitionFaceMatch({
+    required this.rect,
+    required this.name,
+    required this.personId,
+    required this.score,
+  });
+
+  final Rect rect;
+  final String name;
+  final String? personId;
+  final double score;
+
+  bool get isKnown => personId != null && personId!.isNotEmpty;
+}
+
+class UploadedImageRecognitionFaceDebugInfo {
+  UploadedImageRecognitionFaceDebugInfo({
+    required this.faceIndex,
+    required this.rect,
+    required this.originalFaceBytes,
+    required this.cleanedFaceBytes,
+    required this.vector,
+    required this.vectorNorm,
+    required this.detectorScore,
+    required this.areaRatio,
+    required this.aspectRatio,
+    required this.minFacePixels,
+    required this.originalLuma,
+    required this.cleanedLuma,
+    required this.originalSharpness,
+    required this.cleanedSharpness,
+    required this.matchThreshold,
+    required this.topCandidates,
+  });
+
+  final int faceIndex;
+  final Rect rect;
+  final Uint8List originalFaceBytes;
+  final Uint8List cleanedFaceBytes;
+  final List<double> vector;
+  final double vectorNorm;
+  final double detectorScore;
+  final double areaRatio;
+  final double aspectRatio;
+  final int minFacePixels;
+  final double originalLuma;
+  final double cleanedLuma;
+  final double originalSharpness;
+  final double cleanedSharpness;
+  final double matchThreshold;
+  final List<UploadedImageRecognitionCandidateScore> topCandidates;
+}
+
+class UploadedImageRecognitionResult {
+  UploadedImageRecognitionResult({
+    required this.pass,
+    required this.message,
+    required this.annotatedImageBytes,
+    required this.matches,
+    required this.faceDebugInfos,
+    required this.recognizedPersonIds,
+    required this.missingPersonIds,
+    required this.matchThreshold,
+  });
+
+  final bool pass;
+  final String message;
+  final Uint8List annotatedImageBytes;
+  final List<UploadedImageRecognitionFaceMatch> matches;
+  final List<UploadedImageRecognitionFaceDebugInfo> faceDebugInfos;
+  final Set<String> recognizedPersonIds;
+  final List<String> missingPersonIds;
+  final double matchThreshold;
+}
+
 class _FaceTemplate {
   _FaceTemplate({
     required this.person,
     required this.vector,
     required this.quality,
     this.eyeVector,
+    this.leftEyeVector,
+    this.rightEyeVector,
     this.noseVector,
     this.mouthVector,
+    this.foreheadVector,
+    this.leftCheekVector,
+    this.rightCheekVector,
+    this.chinVector,
   });
 
   final FacePerson person;
   final List<double> vector;
   final double quality;
   final List<double>? eyeVector;
+  final List<double>? leftEyeVector;
+  final List<double>? rightEyeVector;
   final List<double>? noseVector;
   final List<double>? mouthVector;
+  final List<double>? foreheadVector;
+  final List<double>? leftCheekVector;
+  final List<double>? rightCheekVector;
+  final List<double>? chinVector;
 }
 
 class _PartialEmbeddingBundle {
   const _PartialEmbeddingBundle({
     this.eyeVector,
+    this.leftEyeVector,
+    this.rightEyeVector,
     this.noseVector,
     this.mouthVector,
+    this.foreheadVector,
+    this.leftCheekVector,
+    this.rightCheekVector,
+    this.chinVector,
     this.eyeWeight = 0.0,
+    this.leftEyeWeight = 0.0,
+    this.rightEyeWeight = 0.0,
     this.noseWeight = 0.0,
     this.mouthWeight = 0.0,
+    this.foreheadWeight = 0.0,
+    this.leftCheekWeight = 0.0,
+    this.rightCheekWeight = 0.0,
+    this.chinWeight = 0.0,
   });
 
   final List<double>? eyeVector;
+  final List<double>? leftEyeVector;
+  final List<double>? rightEyeVector;
   final List<double>? noseVector;
   final List<double>? mouthVector;
+  final List<double>? foreheadVector;
+  final List<double>? leftCheekVector;
+  final List<double>? rightCheekVector;
+  final List<double>? chinVector;
   final double eyeWeight;
+  final double leftEyeWeight;
+  final double rightEyeWeight;
   final double noseWeight;
   final double mouthWeight;
+  final double foreheadWeight;
+  final double leftCheekWeight;
+  final double rightCheekWeight;
+  final double chinWeight;
 
-  double get totalWeight => eyeWeight + noseWeight + mouthWeight;
+  double get totalWeight =>
+      eyeWeight +
+      leftEyeWeight +
+      rightEyeWeight +
+      noseWeight +
+      mouthWeight +
+      foreheadWeight +
+      leftCheekWeight +
+      rightCheekWeight +
+      chinWeight;
   bool get hasAny =>
-      eyeVector != null || noseVector != null || mouthVector != null;
+      eyeVector != null ||
+      leftEyeVector != null ||
+      rightEyeVector != null ||
+      noseVector != null ||
+      mouthVector != null ||
+      foreheadVector != null ||
+      leftCheekVector != null ||
+      rightCheekVector != null ||
+      chinVector != null;
 }
 
 class _MatchResult {
@@ -658,25 +799,6 @@ class _CameraTrack {
   int lastSeenAt;
 }
 
-class _TrackVote {
-  _TrackVote({required this.personId, required this.atMs});
-
-  final String personId;
-  final int atMs;
-}
-
-class _SingleFaceIdentityLock {
-  _SingleFaceIdentityLock({
-    required this.personId,
-    required this.lastSeenAtMs,
-    required this.confidence,
-  });
-
-  String personId;
-  int lastSeenAtMs;
-  double confidence;
-}
-
 class _DetectedFace {
   _DetectedFace({required this.rect, this.alignedCrop, this.score = 1.0});
 
@@ -732,6 +854,13 @@ class _AutoTuneRuntimeProfile {
     required this.strongThresholdBoost,
     required this.marginBoost,
     required this.voteMinCountBoost,
+    required this.autoBrightnessDelta,
+    required this.autoContrastMultiplier,
+    required this.autoGammaMultiplier,
+    required this.autoSharpenAmount,
+    required this.lowLightSeverity,
+    required this.overExposureSeverity,
+    required this.blurSeverity,
   });
 
   final double faceAreaRatioFloor;
@@ -745,6 +874,13 @@ class _AutoTuneRuntimeProfile {
   final double strongThresholdBoost;
   final double marginBoost;
   final int voteMinCountBoost;
+  final int autoBrightnessDelta;
+  final double autoContrastMultiplier;
+  final double autoGammaMultiplier;
+  final double autoSharpenAmount;
+  final double lowLightSeverity;
+  final double overExposureSeverity;
+  final double blurSeverity;
 }
 
 class FaceRecognitionService {
@@ -768,6 +904,7 @@ class FaceRecognitionService {
 
   final Map<String, _Processor> _processorsByCameraId = {};
   final Map<String, bool> _streamUnavailableByCameraId = {};
+  final Set<String> _processorStartingCameraIds = <String>{};
   final Map<String, List<FaceOverlayBox>> _overlaysByCameraId = {};
   final Map<String, int> _lastEventAt = {};
   final Map<String, Map<String, _CameraTrack>> _overlayTracksByCameraId = {};
@@ -775,9 +912,6 @@ class FaceRecognitionService {
   final Map<String, int> _fallbackFaceSkipLogAtByCameraId = {};
   final Map<String, int> _autoTuneDebugLogAtByCameraId = {};
   final Map<String, RecognitionZone> _zoneByCameraId = {};
-  final Map<String, List<_TrackVote>> _votesByTrack = {};
-  final Map<String, List<_TrackVote>> _votesBySingleFaceCamera = {};
-  final Map<String, _SingleFaceIdentityLock> _singleFaceLockByCameraId = {};
   final Map<String, _SpoofState> _spoofStates = {};
   final Map<String, _AdaptiveDistanceState> _adaptiveDistanceStates = {};
   final Map<String, int> _missingTemplateGuardLogAtByCameraId = {};
@@ -856,14 +990,12 @@ class FaceRecognitionService {
   static const int _adaptiveFarDistanceFacePixels = 24;
   static const double _adaptiveFarDistanceFrameQuality = 0.20;
   static const int _autoTuneDebugLogIntervalMs = 1000;
-  int get _eventPublishIntervalMs => _runtimeConfig.eventPublishIntervalMs;
+  int get _eventPublishIntervalMs =>
+      _runtimeConfig.eventPublishIntervalMs.clamp(1000, 20000).toInt();
   double get _minRealtimeFrameQuality => _runtimeConfig.minRealtimeFrameQuality;
   double get _minRealtimeFaceAreaRatio =>
       _runtimeConfig.minRealtimeFaceAreaRatio;
   int get _minRealtimeFacePixels => _runtimeConfig.minRealtimeFacePixels;
-  int get _voteWindowSize => _runtimeConfig.voteWindowSize;
-  int get _voteMinCount => _runtimeConfig.voteMinCount;
-  int get _voteMaxAgeMs => _runtimeConfig.voteMaxAgeMs;
   double get _minEnrollmentFaceAreaRatio =>
       _runtimeConfig.minEnrollmentFaceAreaRatio;
   double get _maxEnrollmentFaceAreaRatio =>
@@ -898,6 +1030,12 @@ class FaceRecognitionService {
   double get _realtimeInputGamma => _runtimeConfig.realtimeInputGamma;
   double get _realtimeInputSaturation => _runtimeConfig.realtimeInputSaturation;
   bool get _realtimeInputGrayscale => _runtimeConfig.realtimeInputGrayscale;
+    double get _autoTuneMaxSharpenAmount =>
+      _runtimeConfig.autoTuneMaxSharpenAmount;
+    double get _autoTuneLowLightThreshold =>
+      _runtimeConfig.autoTuneLowLightThreshold;
+    double get _autoTuneOverExposureThreshold =>
+      _runtimeConfig.autoTuneOverExposureThreshold;
 
   Stream<RecognitionFramePacket> get frameQueue => _frameQueue.stream;
   Stream<FaceRecognitionNotification> get notificationQueue =>
@@ -1213,10 +1351,295 @@ class FaceRecognitionService {
     }
   }
 
+  Future<UploadedImageRecognitionResult> analyzeUploadedImage({
+      required Uint8List imageBytes,
+      required List<FacePerson> selectedPeople,
+      double matchThreshold = 0.55,
+    }) async {
+      if (selectedPeople.isEmpty) {
+        return UploadedImageRecognitionResult(
+          pass: false,
+          message: 'Vui long chon it nhat 1 doi tuong can nhan dien.',
+          annotatedImageBytes: imageBytes,
+          matches: const <UploadedImageRecognitionFaceMatch>[],
+          faceDebugInfos: const <UploadedImageRecognitionFaceDebugInfo>[],
+          recognizedPersonIds: <String>{},
+          missingPersonIds: const <String>[],
+          matchThreshold: matchThreshold,
+        );
+      }
+
+      if (imageBytes.isEmpty) {
+        return UploadedImageRecognitionResult(
+          pass: false,
+          message: 'Anh trong, vui long chon lai.',
+          annotatedImageBytes: imageBytes,
+          matches: const <UploadedImageRecognitionFaceMatch>[],
+          faceDebugInfos: const <UploadedImageRecognitionFaceDebugInfo>[],
+          recognizedPersonIds: <String>{},
+          missingPersonIds: selectedPeople
+              .map((e) => e.id)
+              .toList(growable: false),
+          matchThreshold: matchThreshold,
+        );
+      }
+
+      await initialize();
+      await refreshTemplates();
+      await _ensureFallbackDetectorReady();
+
+      final decoded = img.decodeImage(imageBytes);
+      if (decoded == null) {
+        return UploadedImageRecognitionResult(
+          pass: false,
+          message: 'Khong doc duoc anh upload.',
+          annotatedImageBytes: imageBytes,
+          matches: const <UploadedImageRecognitionFaceMatch>[],
+          faceDebugInfos: const <UploadedImageRecognitionFaceDebugInfo>[],
+          recognizedPersonIds: <String>{},
+          missingPersonIds: selectedPeople
+              .map((e) => e.id)
+              .toList(growable: false),
+          matchThreshold: matchThreshold,
+        );
+      }
+
+      final selectedIds = selectedPeople.map((person) => person.id).toSet();
+      final selectedBuckets = _templatesByPersonId.values
+          .where((bucket) => selectedIds.contains(bucket.person.id))
+          .toList(growable: false);
+      if (selectedBuckets.isEmpty) {
+        return UploadedImageRecognitionResult(
+          pass: false,
+          message: 'Khong co vector cache hop le trong RAM cho doi tuong da chon.',
+          annotatedImageBytes: imageBytes,
+          matches: const <UploadedImageRecognitionFaceMatch>[],
+          faceDebugInfos: const <UploadedImageRecognitionFaceDebugInfo>[],
+          recognizedPersonIds: <String>{},
+          missingPersonIds: selectedPeople
+              .map((e) => e.id)
+              .toList(growable: false),
+          matchThreshold: matchThreshold,
+        );
+      }
+
+      final selectedPeopleById = <String, FacePerson>{
+        for (final person in selectedPeople) person.id: person,
+      };
+      final excludedPersonIds = _templatesByPersonId.keys
+          .where((id) => !selectedIds.contains(id))
+          .toSet();
+
+      final detections = await _detectFacesForFallback(decoded, 'uploaded-image');
+      final faces = detections.isNotEmpty
+          ? detections
+          : <_DetectedFace>[
+              _DetectedFace(
+                rect: _centerFallbackRect(decoded),
+                score: 0.2,
+              ),
+            ];
+
+      faces.sort((a, b) {
+        final areaA = a.rect.width * a.rect.height * a.score;
+        final areaB = b.rect.width * b.rect.height * b.score;
+        return areaB.compareTo(areaA);
+      });
+
+      final matches = <UploadedImageRecognitionFaceMatch>[];
+      final faceDebugInfos = <UploadedImageRecognitionFaceDebugInfo>[];
+      final recognizedPersonIds = <String>{};
+
+      for (var faceIndex = 0; faceIndex < faces.length; faceIndex++) {
+        final detectedFace = faces[faceIndex];
+        final rect = detectedFace.rect;
+        if (rect.width <= 1 || rect.height <= 1) {
+          continue;
+        }
+
+        final originalCrop = _cropFaceTight(decoded, rect);
+        if (originalCrop == null) {
+          continue;
+        }
+
+        final cleanedCrop = _prepareFaceForEmbedding(originalCrop);
+        final vector = await _embeddingFromImage(
+          cleanedCrop,
+          alreadyPrepared: true,
+          robust: false,
+        );
+        if (vector.isEmpty) {
+          continue;
+        }
+
+        final frameQuality = _regionQuality(
+          cleanedCrop,
+          minSharpness: _minTemplateSharpness * 0.40,
+        );
+        final partialBundle = await _buildPartialEmbeddingsFromFace(
+          cleanedCrop,
+          targetDimension: _templateVectorDimension,
+          frameQuality: frameQuality,
+          forRealtime: false,
+          faceAlreadyPrepared: true,
+        );
+        final match = _findBestMatch(
+          vector,
+          partialBundle: partialBundle,
+          excludedPersonIds: excludedPersonIds,
+          frameQuality: frameQuality,
+          cameraId: 'uploaded-image',
+          faceLogKey: 'upload-$faceIndex',
+        );
+
+        final topCandidates = _topUploadedImageCandidates(
+          vector,
+          selectedBuckets,
+          selectedPeopleById,
+        );
+        final isRecognized = match != null && match.score >= matchThreshold;
+        final recognizedPersonId = isRecognized ? match.template.person.id : null;
+        if (recognizedPersonId != null) {
+          recognizedPersonIds.add(recognizedPersonId);
+        }
+
+        matches.add(
+          UploadedImageRecognitionFaceMatch(
+            rect: rect,
+            name: isRecognized ? match.template.person.name : 'Unknown',
+            personId: recognizedPersonId,
+            score: match?.score ??
+                (topCandidates.isNotEmpty ? topCandidates.first.score : 0.0),
+          ),
+        );
+
+        final originalBytes = Uint8List.fromList(img.encodePng(originalCrop));
+        final cleanedBytes = Uint8List.fromList(img.encodePng(cleanedCrop));
+        final vectorNorm = math.sqrt(
+          vector.fold<double>(0.0, (sum, value) => sum + value * value),
+        );
+        faceDebugInfos.add(
+          UploadedImageRecognitionFaceDebugInfo(
+            faceIndex: faceIndex,
+            rect: rect,
+            originalFaceBytes: originalBytes,
+            cleanedFaceBytes: cleanedBytes,
+            vector: vector,
+            vectorNorm: vectorNorm,
+            detectorScore: detectedFace.score,
+            areaRatio:
+                (rect.width * rect.height) /
+                (decoded.width * decoded.height),
+            aspectRatio: rect.width / rect.height,
+            minFacePixels: math.min(rect.width, rect.height).round(),
+            originalLuma: _averageLuma(originalCrop),
+            cleanedLuma: _averageLuma(cleanedCrop),
+            originalSharpness: _imageSharpness(originalCrop),
+            cleanedSharpness: _imageSharpness(cleanedCrop),
+            matchThreshold: matchThreshold,
+            topCandidates: topCandidates,
+          ),
+        );
+      }
+
+      final missingPersonIds = selectedIds
+          .where((id) => !recognizedPersonIds.contains(id))
+          .toList(growable: false);
+      final annotatedImageBytes = _drawUploadedImageAnnotations(decoded, matches);
+      final pass = missingPersonIds.isEmpty;
+      return UploadedImageRecognitionResult(
+        pass: pass,
+        message: pass
+            ? 'PASS - Da nhan dien du cac doi tuong trong danh sach.'
+            : 'FAILED - Con thieu ${missingPersonIds.length} doi tuong trong danh sach.',
+        annotatedImageBytes: annotatedImageBytes,
+        matches: matches,
+        faceDebugInfos: faceDebugInfos,
+        recognizedPersonIds: recognizedPersonIds,
+        missingPersonIds: missingPersonIds,
+        matchThreshold: matchThreshold,
+      );
+  }
+
   Future<void> _ensureFallbackDetectorReady() async {
     if (_fallbackDetectorInitialized) return;
     await _fallbackFaceDetector.initialize(model: tfl.FaceDetectionModel.full);
     _fallbackDetectorInitialized = true;
+  }
+
+  Rect _centerFallbackRect(img.Image source) {
+    final side = (math.min(source.width, source.height) * 0.62).round();
+    final clampedSide = math.max(1, side);
+    final left = ((source.width - clampedSide) / 2).round();
+    final top = ((source.height - clampedSide) / 2).round();
+    return Rect.fromLTWH(
+      left.toDouble(),
+      top.toDouble(),
+      clampedSide.toDouble(),
+      clampedSide.toDouble(),
+    );
+  }
+
+  List<UploadedImageRecognitionCandidateScore>
+  _topUploadedImageCandidates(
+    List<double> query,
+    List<_PersonScoreBucket> buckets,
+    Map<String, FacePerson> selectedPeopleById, {
+    int maxItems = 3,
+  }) {
+    final bestByPerson = <String, UploadedImageRecognitionCandidateScore>{};
+    for (final bucket in buckets) {
+      if (bucket.templates.isEmpty) continue;
+      final person = selectedPeopleById[bucket.person.id] ?? bucket.person;
+      for (final template in bucket.templates) {
+        final score = _debiasedCosine(query, template.vector);
+        final current = bestByPerson[person.id];
+        if (current == null || score > current.score) {
+          bestByPerson[person.id] = UploadedImageRecognitionCandidateScore(
+            personId: person.id,
+            personName: person.name,
+            score: score,
+          );
+        }
+      }
+    }
+
+    final ranked = bestByPerson.values.toList(growable: false)
+      ..sort((a, b) => b.score.compareTo(a.score));
+    if (ranked.length <= maxItems) {
+      return ranked;
+    }
+    return ranked.take(maxItems).toList(growable: false);
+  }
+
+  Uint8List _drawUploadedImageAnnotations(
+    img.Image source,
+    List<UploadedImageRecognitionFaceMatch> matches,
+  ) {
+    try {
+      final annotated = img.Image.from(source);
+      for (final match in matches) {
+        final color = match.isKnown
+            ? img.ColorRgba8(72, 219, 101, 255)
+            : img.ColorRgba8(255, 165, 0, 255);
+        final left = match.rect.left.floor().clamp(0, annotated.width - 1);
+        final top = match.rect.top.floor().clamp(0, annotated.height - 1);
+        final right = match.rect.right.ceil().clamp(left, annotated.width - 1);
+        final bottom = match.rect.bottom.ceil().clamp(top, annotated.height - 1);
+        _drawRectStrokeManual(
+          annotated,
+          left: left,
+          top: top,
+          right: right,
+          bottom: bottom,
+          color: color,
+          thickness: 3,
+        );
+      }
+      return Uint8List.fromList(img.encodePng(annotated));
+    } catch (_) {
+      return Uint8List.fromList(img.encodePng(source));
+    }
   }
 
   String _poseError(String poseLabel, String message) {
@@ -1333,64 +1756,70 @@ class FaceRecognitionService {
     String cameraId, {
     int preferredDeviceIndex = 0,
   }) async {
-    if (_processorsByCameraId.containsKey(cameraId)) {
+    if (_processorsByCameraId.containsKey(cameraId) ||
+        _processorStartingCameraIds.contains(cameraId)) {
       return;
     }
+    _processorStartingCameraIds.add(cameraId);
 
-    if (_availableCameras.isEmpty) {
-      _availableCameras = await availableCameras();
+    try {
       if (_availableCameras.isEmpty) {
-        return;
+        _availableCameras = await availableCameras();
+        if (_availableCameras.isEmpty) {
+          return;
+        }
       }
-    }
 
-    final safeIndex = preferredDeviceIndex
-        .clamp(0, _availableCameras.length - 1)
-        .toInt();
-    final desc = _availableCameras[safeIndex];
-    _log.info(
-      'Starting recognition processor camera=$cameraId device=${desc.name} mode=$runtimeModeLabel',
-    );
-    final controller = CameraController(
-      desc,
-      ResolutionPreset.medium,
-      enableAudio: false,
-      imageFormatGroup: _preferredImageFormat(),
-    );
-    try {
-      await controller.initialize();
-    } catch (e) {
-      _log.error(
-        'CameraController initialize failed camera=$cameraId error=$e',
+      final safeIndex = preferredDeviceIndex
+          .clamp(0, _availableCameras.length - 1)
+          .toInt();
+      final desc = _availableCameras[safeIndex];
+      _log.info(
+        'Starting recognition processor camera=$cameraId device=${desc.name} mode=$runtimeModeLabel',
       );
-      rethrow;
-    }
+      final controller = CameraController(
+        desc,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: _preferredImageFormat(),
+      );
+      try {
+        await controller.initialize();
+      } catch (e) {
+        _log.error(
+          'CameraController initialize failed camera=$cameraId error=$e',
+        );
+        rethrow;
+      }
 
-    final processor = _Processor(controller: controller);
-    _processorsByCameraId[cameraId] = processor;
+      final processor = _Processor(controller: controller);
+      _processorsByCameraId[cameraId] = processor;
 
-    try {
-      if (!controller.supportsImageStreaming()) {
+      try {
+        if (!controller.supportsImageStreaming()) {
+          _streamUnavailableByCameraId[cameraId] = true;
+          _log.info(
+            'CameraController does not support image streaming camera=$cameraId; using in-memory preview-frame fallback',
+          );
+          _startStillCaptureFallback(cameraId, processor);
+          return;
+        }
+
+        _streamUnavailableByCameraId.remove(cameraId);
+        _startCameraCalibrationWindow(cameraId);
+
+        await controller.startImageStream((image) {
+          unawaited(_processFrame(cameraId, processor, image));
+        });
+      } catch (_) {
         _streamUnavailableByCameraId[cameraId] = true;
         _log.info(
-          'CameraController does not support image streaming camera=$cameraId; using in-memory preview-frame fallback',
+          'Failed to start image stream camera=$cameraId; switching to in-memory preview-frame fallback',
         );
         _startStillCaptureFallback(cameraId, processor);
-        return;
       }
-
-      _streamUnavailableByCameraId.remove(cameraId);
-      _startCameraCalibrationWindow(cameraId);
-
-      await controller.startImageStream((image) {
-        unawaited(_processFrame(cameraId, processor, image));
-      });
-    } catch (_) {
-      _streamUnavailableByCameraId[cameraId] = true;
-      _log.info(
-        'Failed to start image stream camera=$cameraId; switching to in-memory preview-frame fallback',
-      );
-      _startStillCaptureFallback(cameraId, processor);
+    } finally {
+      _processorStartingCameraIds.remove(cameraId);
     }
   }
 
@@ -1409,9 +1838,6 @@ class FaceRecognitionService {
     _streamUnavailableByCameraId.remove(cameraId);
     _overlaysByCameraId.remove(cameraId);
     _overlayTracksByCameraId.remove(cameraId);
-    _votesByTrack.removeWhere((key, _) => key.startsWith('$cameraId|'));
-    _votesBySingleFaceCamera.remove(cameraId);
-    _singleFaceLockByCameraId.remove(cameraId);
     _fallbackFaceSkipCountByCameraId.remove(cameraId);
     _fallbackFaceSkipLogAtByCameraId.remove(cameraId);
     _zoneByCameraId.remove(cameraId);
@@ -1582,6 +2008,14 @@ class FaceRecognitionService {
         FaceAttendanceRepository.decodeVector(entry.eyeVectorBlob),
         inferredDim,
       );
+      final leftEyeVector = _alignVectorDimension(
+        FaceAttendanceRepository.decodeVector(entry.leftEyeVectorBlob),
+        inferredDim,
+      );
+      final rightEyeVector = _alignVectorDimension(
+        FaceAttendanceRepository.decodeVector(entry.rightEyeVectorBlob),
+        inferredDim,
+      );
       final noseVector = _alignVectorDimension(
         FaceAttendanceRepository.decodeVector(entry.noseVectorBlob),
         inferredDim,
@@ -1590,23 +2024,63 @@ class FaceRecognitionService {
         FaceAttendanceRepository.decodeVector(entry.mouthVectorBlob),
         inferredDim,
       );
+      final foreheadVector = _alignVectorDimension(
+        FaceAttendanceRepository.decodeVector(entry.foreheadVectorBlob),
+        inferredDim,
+      );
+      final leftCheekVector = _alignVectorDimension(
+        FaceAttendanceRepository.decodeVector(entry.leftCheekVectorBlob),
+        inferredDim,
+      );
+      final rightCheekVector = _alignVectorDimension(
+        FaceAttendanceRepository.decodeVector(entry.rightCheekVectorBlob),
+        inferredDim,
+      );
+      final chinVector = _alignVectorDimension(
+        FaceAttendanceRepository.decodeVector(entry.chinVectorBlob),
+        inferredDim,
+      );
       final normalizedEyeVector = eyeVector.isEmpty
           ? null
           : _normalizeVector(eyeVector);
+      final normalizedLeftEyeVector = leftEyeVector.isEmpty
+          ? null
+          : _normalizeVector(leftEyeVector);
+      final normalizedRightEyeVector = rightEyeVector.isEmpty
+          ? null
+          : _normalizeVector(rightEyeVector);
       final normalizedNoseVector = noseVector.isEmpty
           ? null
           : _normalizeVector(noseVector);
       final normalizedMouthVector = mouthVector.isEmpty
           ? null
           : _normalizeVector(mouthVector);
+      final normalizedForeheadVector = foreheadVector.isEmpty
+          ? null
+          : _normalizeVector(foreheadVector);
+      final normalizedLeftCheekVector = leftCheekVector.isEmpty
+          ? null
+          : _normalizeVector(leftCheekVector);
+      final normalizedRightCheekVector = rightCheekVector.isEmpty
+          ? null
+          : _normalizeVector(rightCheekVector);
+      final normalizedChinVector = chinVector.isEmpty
+          ? null
+          : _normalizeVector(chinVector);
 
       final template = _FaceTemplate(
         person: person,
         vector: normalizedVector,
         quality: entry.quality.clamp(0.20, 1.0).toDouble(),
         eyeVector: normalizedEyeVector,
+        leftEyeVector: normalizedLeftEyeVector,
+        rightEyeVector: normalizedRightEyeVector,
         noseVector: normalizedNoseVector,
         mouthVector: normalizedMouthVector,
+        foreheadVector: normalizedForeheadVector,
+        leftCheekVector: normalizedLeftCheekVector,
+        rightCheekVector: normalizedRightCheekVector,
+        chinVector: normalizedChinVector,
       );
       result.add(template);
       byPerson[person.id]!.addTemplate(template);
@@ -1627,13 +2101,13 @@ class FaceRecognitionService {
     if (shouldBlockKnown != _knownRecognitionBlockedByMissingTemplateCache) {
       if (shouldBlockKnown) {
         _log.error(
-          'Known recognition blocked: missing vector cache for '
+          'Known recognition degraded: missing vector cache for '
           '${missingPeople.length}/${people.length} people '
           'sample=[$_missingTemplatePeoplePreview]',
         );
       } else {
         _log.info(
-          'Known recognition unblocked: all registered people have vector cache',
+          'Known recognition normal: all registered people have vector cache',
         );
       }
     }
@@ -1852,7 +2326,7 @@ class FaceRecognitionService {
         return null;
       }
 
-      final partials = await _buildPartialEmbeddingsFromFace(
+      final faceMap = await _buildPartialEmbeddingsFromFace(
         prepared,
         targetDimension: vector.length,
         faceAlreadyPrepared: true,
@@ -1865,9 +2339,15 @@ class FaceRecognitionService {
           'VectorBuild personId=$personId sourceId=$sourceId sourceType=$sourceType '
           'sharpness=${sharpness.toStringAsFixed(2)} quality=${quality.toStringAsFixed(3)} '
           'vector=${_vectorStats(vector)} preview=${_vectorPreview(vector)} '
-          'eye=${partials.eyeVector == null ? 'none' : _vectorStats(partials.eyeVector!)} '
-          'nose=${partials.noseVector == null ? 'none' : _vectorStats(partials.noseVector!)} '
-          'mouth=${partials.mouthVector == null ? 'none' : _vectorStats(partials.mouthVector!)}',
+            'eye=${faceMap.eyeVector == null ? 'none' : _vectorStats(faceMap.eyeVector!)} '
+            'leftEye=${faceMap.leftEyeVector == null ? 'none' : _vectorStats(faceMap.leftEyeVector!)} '
+            'rightEye=${faceMap.rightEyeVector == null ? 'none' : _vectorStats(faceMap.rightEyeVector!)} '
+            'nose=${faceMap.noseVector == null ? 'none' : _vectorStats(faceMap.noseVector!)} '
+            'mouth=${faceMap.mouthVector == null ? 'none' : _vectorStats(faceMap.mouthVector!)} '
+            'forehead=${faceMap.foreheadVector == null ? 'none' : _vectorStats(faceMap.foreheadVector!)} '
+            'leftCheek=${faceMap.leftCheekVector == null ? 'none' : _vectorStats(faceMap.leftCheekVector!)} '
+            'rightCheek=${faceMap.rightCheekVector == null ? 'none' : _vectorStats(faceMap.rightCheekVector!)} '
+            'chin=${faceMap.chinVector == null ? 'none' : _vectorStats(faceMap.chinVector!)}',
         );
       }
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -1876,15 +2356,33 @@ class FaceRecognitionService {
         personId: personId,
         sourceType: sourceType,
         vectorBlob: FaceAttendanceRepository.encodeVector(vector),
-        eyeVectorBlob: partials.eyeVector == null
+          eyeVectorBlob: faceMap.eyeVector == null
             ? null
-            : FaceAttendanceRepository.encodeVector(partials.eyeVector!),
-        noseVectorBlob: partials.noseVector == null
+            : FaceAttendanceRepository.encodeVector(faceMap.eyeVector!),
+          noseVectorBlob: faceMap.noseVector == null
             ? null
-            : FaceAttendanceRepository.encodeVector(partials.noseVector!),
-        mouthVectorBlob: partials.mouthVector == null
+            : FaceAttendanceRepository.encodeVector(faceMap.noseVector!),
+          mouthVectorBlob: faceMap.mouthVector == null
             ? null
-            : FaceAttendanceRepository.encodeVector(partials.mouthVector!),
+            : FaceAttendanceRepository.encodeVector(faceMap.mouthVector!),
+          foreheadVectorBlob: faceMap.foreheadVector == null
+            ? null
+            : FaceAttendanceRepository.encodeVector(faceMap.foreheadVector!),
+          leftEyeVectorBlob: faceMap.leftEyeVector == null
+            ? null
+            : FaceAttendanceRepository.encodeVector(faceMap.leftEyeVector!),
+          rightEyeVectorBlob: faceMap.rightEyeVector == null
+            ? null
+            : FaceAttendanceRepository.encodeVector(faceMap.rightEyeVector!),
+          leftCheekVectorBlob: faceMap.leftCheekVector == null
+            ? null
+            : FaceAttendanceRepository.encodeVector(faceMap.leftCheekVector!),
+          rightCheekVectorBlob: faceMap.rightCheekVector == null
+            ? null
+            : FaceAttendanceRepository.encodeVector(faceMap.rightCheekVector!),
+          chinVectorBlob: faceMap.chinVector == null
+            ? null
+            : FaceAttendanceRepository.encodeVector(faceMap.chinVector!),
         quality: quality,
         createdAt: now,
         updatedAt: now,
@@ -1946,7 +2444,6 @@ class FaceRecognitionService {
 
         final inference = await _runMediaPipeInference(frameInput);
         final faces = inference?.meshResults ?? const <FaceMeshResult>[];
-        final singleFaceInFrame = faces.length <= 1;
         final previousTracks =
             _overlayTracksByCameraId[cameraId] ??
             const <String, _CameraTrack>{};
@@ -2020,11 +2517,36 @@ class FaceRecognitionService {
           }
           workingCrop = _applyRealtimeInputProcessing(workingCrop);
           luminance = _robustFaceLuminance(workingCrop);
-
-          final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0).clamp(
-            0.0,
-            1.0,
+          final preSharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
+              .clamp(0.0, 1.0)
+              .toDouble();
+          final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
+          final preRegionQuality = _regionQuality(
+            workingCrop,
+            minSharpness:
+                _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45),
           );
+          final preFrameQuality = math
+              .min(preSharpnessQuality, preRegionQuality)
+              .clamp(0.0, 1.0)
+              .toDouble();
+          final autoTuneProfile = _buildAutoTuneRuntimeProfile(
+            adaptiveFarDistance: adaptiveFarDistance,
+            faceAreaRatio: faceAreaRatio,
+            facePixels: minFacePixels,
+            frameQuality: preFrameQuality,
+            luminance: luminance,
+            sharpnessQuality: preSharpnessQuality,
+            lumaStdDev: preLumaStdDev,
+          );
+          workingCrop = _applyAutoTuneRealtimeInputProcessing(
+            workingCrop,
+            autoTuneProfile,
+          );
+          luminance = _robustFaceLuminance(workingCrop);
+          final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
+              .clamp(0.0, 1.0)
+              .toDouble();
           final regionQuality = _regionQuality(
             workingCrop,
             minSharpness:
@@ -2032,14 +2554,8 @@ class FaceRecognitionService {
           );
           final frameQuality = math
               .min(sharpnessQuality, regionQuality)
-              .clamp(0.0, 1.0);
-          final autoTuneProfile = _buildAutoTuneRuntimeProfile(
-            adaptiveFarDistance: adaptiveFarDistance,
-            faceAreaRatio: faceAreaRatio,
-            facePixels: minFacePixels,
-            frameQuality: frameQuality,
-            luminance: luminance,
-          );
+              .clamp(0.0, 1.0)
+              .toDouble();
           _logAutoTuneRuntimeProfile(
             cameraId: cameraId,
             nowMs: nowMs,
@@ -2096,24 +2612,16 @@ class FaceRecognitionService {
           final luminanceFloor = autoTuneProfile.luminanceFloor;
           final farQualityRelax = adaptiveFarDistance ? 0.08 : 0.0;
           final farLuminanceRelax = adaptiveFarDistance ? 0.06 : 0.0;
-          final effectiveFrameQualityFloor = singleFaceInFrame
-              ? (frameQualityFloor - 0.05 - farQualityRelax).clamp(
-                  0.12,
-                  frameQualityFloor,
-                )
-              : (frameQualityFloor - farQualityRelax).clamp(
-                  0.12,
-                  frameQualityFloor,
-                );
-          final effectiveLuminanceFloor = singleFaceInFrame
-              ? (luminanceFloor - 0.04 - farLuminanceRelax).clamp(
-                  0.12,
-                  luminanceFloor,
-                )
-              : (luminanceFloor - farLuminanceRelax).clamp(
-                  0.12,
-                  luminanceFloor,
-                );
+          final effectiveFrameQualityFloor =
+              (frameQualityFloor - farQualityRelax).clamp(
+                0.12,
+                frameQualityFloor,
+              );
+          final effectiveLuminanceFloor =
+              (luminanceFloor - farLuminanceRelax).clamp(
+                0.12,
+                luminanceFloor,
+              );
           if (frameQuality < effectiveFrameQualityFloor ||
               luminance < effectiveLuminanceFloor) {
             _logRealtimeGateSkip(
@@ -2203,7 +2711,6 @@ class FaceRecognitionService {
             faceAreaRatio: faceAreaRatio,
             frameQuality: frameQuality,
             adaptiveFarDistance: adaptiveFarDistance,
-            singleFaceInFrame: singleFaceInFrame,
           );
           final partialBundle = usePartials
               ? await _buildPartialEmbeddingsFromFace(
@@ -2213,37 +2720,21 @@ class FaceRecognitionService {
                   forRealtime: true,
                 )
               : const _PartialEmbeddingBundle();
-          final faceLogKey = _faceLogKeyFromRatio(ratio);
+          final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
+          final assignedKnownIds = nextTracks.values
+              .map((track) => track.event.personId)
+              .whereType<String>()
+              .toSet();
           final match = _findBestMatch(
             vector,
             partialBundle: partialBundle,
-            excludedPersonIds: nextTracks.values
-                .map((track) => track.event.personId)
-                .whereType<String>()
-                .toSet(),
+            excludedPersonIds: assignedKnownIds,
             frameQuality: frameQuality,
             cameraId: cameraId,
             faceLogKey: faceLogKey,
             autoTuneProfile: autoTuneProfile,
-            singleFaceInFrame: singleFaceInFrame,
           );
-          final isKnown = _isKnownAfterTemporalVoting(
-            cameraId: cameraId,
-            faceLogKey: faceLogKey,
-            match: match,
-            frameQuality: frameQuality,
-            singleFaceInFrame: singleFaceInFrame,
-            nowMs: nowMs,
-            autoTuneProfile: autoTuneProfile,
-          );
-          final effectiveKnown = _applySingleFaceIdentityLock(
-            cameraId: cameraId,
-            singleFaceInFrame: singleFaceInFrame,
-            match: match,
-            isKnownByVoting: isKnown,
-            frameQuality: frameQuality,
-            nowMs: nowMs,
-          );
+          final effectiveKnown = match != null;
           _logRealtimeDecisionTrace(
             cameraId: cameraId,
             faceLogKey: faceLogKey,
@@ -2353,8 +2844,6 @@ class FaceRecognitionService {
         frameWidth: rgb.width,
         frameHeight: rgb.height,
       );
-      final singleFaceInFrame = filteredDetections.length <= 1;
-
       final overlays = <FaceOverlayBox>[];
       final nextTracks = <String, _CameraTrack>{};
       final previousTracks =
@@ -2395,11 +2884,36 @@ class FaceRecognitionService {
           }
           workingCrop = _applyRealtimeInputProcessing(workingCrop);
           luminance = _robustFaceLuminance(workingCrop);
-
-          final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0).clamp(
-            0.0,
-            1.0,
+          final preSharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
+              .clamp(0.0, 1.0)
+              .toDouble();
+          final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
+          final preRegionQuality = _regionQuality(
+            workingCrop,
+            minSharpness:
+                _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45),
           );
+          final preFrameQuality = math
+              .min(preSharpnessQuality, preRegionQuality)
+              .clamp(0.0, 1.0)
+              .toDouble();
+          final autoTuneProfile = _buildAutoTuneRuntimeProfile(
+            adaptiveFarDistance: adaptiveFarDistance,
+            faceAreaRatio: faceAreaRatio,
+            facePixels: minFacePixels,
+            frameQuality: preFrameQuality,
+            luminance: luminance,
+            sharpnessQuality: preSharpnessQuality,
+            lumaStdDev: preLumaStdDev,
+          );
+          workingCrop = _applyAutoTuneRealtimeInputProcessing(
+            workingCrop,
+            autoTuneProfile,
+          );
+          luminance = _robustFaceLuminance(workingCrop);
+          final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
+              .clamp(0.0, 1.0)
+              .toDouble();
           final regionQuality = _regionQuality(
             workingCrop,
             minSharpness:
@@ -2407,14 +2921,8 @@ class FaceRecognitionService {
           );
           final frameQuality = math
               .min(sharpnessQuality, regionQuality)
-              .clamp(0.0, 1.0);
-          final autoTuneProfile = _buildAutoTuneRuntimeProfile(
-            adaptiveFarDistance: adaptiveFarDistance,
-            faceAreaRatio: faceAreaRatio,
-            facePixels: minFacePixels,
-            frameQuality: frameQuality,
-            luminance: luminance,
-          );
+              .clamp(0.0, 1.0)
+              .toDouble();
           _logAutoTuneRuntimeProfile(
             cameraId: cameraId,
             nowMs: nowMs,
@@ -2432,12 +2940,7 @@ class FaceRecognitionService {
                   _adaptiveFarDistanceFaceAreaRatio,
                   effectiveFaceAreaRatio,
                 )
-              : (singleFaceInFrame
-                    ? (effectiveFaceAreaRatio * 0.82).clamp(
-                        _adaptiveFarDistanceFaceAreaRatio,
-                        effectiveFaceAreaRatio,
-                      )
-                    : effectiveFaceAreaRatio);
+              : effectiveFaceAreaRatio;
           final adjustedFacePixelsFloor = adaptiveFarDistance
               ? (effectiveFacePixels * 0.74).round().clamp(
                   _adaptiveFarDistanceFacePixels,
@@ -2459,8 +2962,7 @@ class FaceRecognitionService {
             if (_traceLogsEnabled) {
               _log.debug(
                 'GateSkipDetail camera=$cameraId stage=fallback face_area_floor='
-                '${adjustedFaceAreaRatioFloor.toStringAsFixed(4)} '
-                'singleFace=$singleFaceInFrame',
+                '${adjustedFaceAreaRatioFloor.toStringAsFixed(4)}',
               );
             }
             continue;
@@ -2483,24 +2985,16 @@ class FaceRecognitionService {
           final luminanceFloor = autoTuneProfile.luminanceFloor;
           final farQualityRelax = adaptiveFarDistance ? 0.08 : 0.0;
           final farLuminanceRelax = adaptiveFarDistance ? 0.06 : 0.0;
-          final effectiveFrameQualityFloor = singleFaceInFrame
-              ? (frameQualityFloor - 0.05 - farQualityRelax).clamp(
-                  0.12,
-                  frameQualityFloor,
-                )
-              : (frameQualityFloor - farQualityRelax).clamp(
-                  0.12,
-                  frameQualityFloor,
-                );
-          final effectiveLuminanceFloor = singleFaceInFrame
-              ? (luminanceFloor - 0.04 - farLuminanceRelax).clamp(
-                  0.12,
-                  luminanceFloor,
-                )
-              : (luminanceFloor - farLuminanceRelax).clamp(
-                  0.12,
-                  luminanceFloor,
-                );
+          final effectiveFrameQualityFloor =
+              (frameQualityFloor - farQualityRelax).clamp(
+                0.12,
+                frameQualityFloor,
+              );
+          final effectiveLuminanceFloor =
+              (luminanceFloor - farLuminanceRelax).clamp(
+                0.12,
+                luminanceFloor,
+              );
           if (frameQuality < effectiveFrameQualityFloor ||
               luminance < effectiveLuminanceFloor) {
             _logRealtimeGateSkip(
@@ -2590,7 +3084,6 @@ class FaceRecognitionService {
             faceAreaRatio: faceAreaRatio,
             frameQuality: frameQuality,
             adaptiveFarDistance: adaptiveFarDistance,
-            singleFaceInFrame: singleFaceInFrame,
           );
           final partialBundle = usePartials
               ? await _buildPartialEmbeddingsFromFace(
@@ -2600,37 +3093,22 @@ class FaceRecognitionService {
                   forRealtime: true,
                 )
               : const _PartialEmbeddingBundle();
-          final faceLogKey = _faceLogKeyFromRatio(ratio);
+          final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
+          final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
+          final assignedKnownIds = nextTracks.values
+              .map((track) => track.event.personId)
+              .whereType<String>()
+              .toSet();
           final match = _findBestMatch(
             vector,
             partialBundle: partialBundle,
-            excludedPersonIds: nextTracks.values
-                .map((track) => track.event.personId)
-                .whereType<String>()
-                .toSet(),
+            excludedPersonIds: assignedKnownIds,
             frameQuality: frameQuality,
             cameraId: cameraId,
             faceLogKey: faceLogKey,
             autoTuneProfile: autoTuneProfile,
-            singleFaceInFrame: singleFaceInFrame,
           );
-          final isKnown = _isKnownAfterTemporalVoting(
-            cameraId: cameraId,
-            faceLogKey: faceLogKey,
-            match: match,
-            frameQuality: frameQuality,
-            singleFaceInFrame: singleFaceInFrame,
-            nowMs: nowMs,
-            autoTuneProfile: autoTuneProfile,
-          );
-          final effectiveKnown = _applySingleFaceIdentityLock(
-            cameraId: cameraId,
-            singleFaceInFrame: singleFaceInFrame,
-            match: match,
-            isKnownByVoting: isKnown,
-            frameQuality: frameQuality,
-            nowMs: nowMs,
-          );
+          final effectiveKnown = match != null;
           _logRealtimeDecisionTrace(
             cameraId: cameraId,
             faceLogKey: faceLogKey,
@@ -3122,21 +3600,23 @@ class FaceRecognitionService {
     RecognitionEvent event,
     Map<String, _CameraTrack> nextTracks,
   ) {
+    final previousTracks =
+        _overlayTracksByCameraId[cameraId] ?? const <String, _CameraTrack>{};
     if (!event.isStranger &&
         event.personId != null &&
         event.personId!.isNotEmpty) {
-      final previousTracks =
-          _overlayTracksByCameraId[cameraId] ?? const <String, _CameraTrack>{};
-      final knownKeys = <String>[...previousTracks.keys, ...nextTracks.keys]
+      final knownKeys = previousTracks.keys
           .where(
-            (key) => key.startsWith('known_${cameraId}_${event.personId}_'),
+            (key) =>
+                key.startsWith('known_${cameraId}_${event.personId}_') &&
+                !nextTracks.containsKey(key),
           )
           .toList(growable: false);
 
       String? bestKnownKey;
       var bestKnownScore = 0.0;
       for (final key in knownKeys) {
-        final candidate = previousTracks[key] ?? nextTracks[key];
+        final candidate = previousTracks[key];
         if (candidate == null) continue;
         final iou = _rectIoU(candidate.currentRect, ratio);
         final distance = _rectCenterDistance(candidate.currentRect, ratio);
@@ -3157,7 +3637,13 @@ class FaceRecognitionService {
     var bestKey =
         'stranger_${cameraId}_${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}';
     var bestScore = 0.0;
-    for (final entry in nextTracks.entries) {
+    for (final entry in previousTracks.entries) {
+      if (!entry.key.startsWith('stranger_${cameraId}_')) {
+        continue;
+      }
+      if (nextTracks.containsKey(entry.key)) {
+        continue;
+      }
       final candidate = entry.value;
       final score =
           _rectIoU(candidate.currentRect, ratio) +
@@ -3166,7 +3652,7 @@ class FaceRecognitionService {
                 candidate.currentRect,
                 ratio,
               ).clamp(0.0, 1.0));
-      if (score > bestScore) {
+      if (score > bestScore && score >= 0.95) {
         bestScore = score;
         bestKey = entry.key;
       }
@@ -3812,6 +4298,9 @@ class FaceRecognitionService {
       );
     }
 
+    // Persist quickly so DB-backed log list updates almost immediately.
+    unawaited(_flushPendingEventsToDb());
+
     _broadcastRealtimeEvent(event);
   }
 
@@ -4279,6 +4768,73 @@ class FaceRecognitionService {
     );
   }
 
+  img.Image _applyAutoTuneRealtimeInputProcessing(
+    img.Image source,
+    _AutoTuneRuntimeProfile profile,
+  ) {
+    if (!_autoTuneRecognitionParameters) {
+      return source;
+    }
+
+    final brightness = profile.autoBrightnessDelta.clamp(-24, 24);
+    final contrast = profile.autoContrastMultiplier.clamp(0.85, 1.28).toDouble();
+    final gamma = profile.autoGammaMultiplier.clamp(0.80, 1.26).toDouble();
+    final needsToneAdjust =
+        brightness != 0 ||
+        (contrast - 1.0).abs() > 0.001 ||
+        (gamma - 1.0).abs() > 0.001;
+
+    var adjusted = source;
+    if (needsToneAdjust) {
+      adjusted = img.adjustColor(
+        adjusted,
+        brightness: brightness,
+        contrast: contrast,
+        gamma: gamma,
+        saturation: 1.0,
+      );
+    }
+
+    final sharpenAmount = profile.autoSharpenAmount
+      .clamp(0.0, _autoTuneMaxSharpenAmount.clamp(0.0, 1.0))
+      .toDouble();
+    if (sharpenAmount <= 0.01) {
+      return adjusted;
+    }
+    return _sharpenFaceCrop(adjusted, sharpenAmount);
+  }
+
+  img.Image _sharpenFaceCrop(img.Image source, double amount) {
+    final safeAmount = amount.clamp(0.0, 1.0).toDouble();
+    if (safeAmount <= 0.0) {
+      return source;
+    }
+
+    final blurred = img.gaussianBlur(img.Image.from(source), radius: 1);
+    final out = img.Image.from(source);
+    for (var y = 0; y < out.height; y++) {
+      for (var x = 0; x < out.width; x++) {
+        final p = source.getPixel(x, y);
+        final b = blurred.getPixel(x, y);
+
+        int sharpenChannel(int orig, int blur) {
+          final boosted = orig + (orig - blur) * safeAmount;
+          return boosted.round().clamp(0, 255);
+        }
+
+        out.setPixelRgba(
+          x,
+          y,
+          sharpenChannel(p.r.toInt(), b.r.toInt()),
+          sharpenChannel(p.g.toInt(), b.g.toInt()),
+          sharpenChannel(p.b.toInt(), b.b.toInt()),
+          p.a.toInt(),
+        );
+      }
+    }
+    return out;
+  }
+
   void _flattenNumericValues(dynamic value, List<double> out) {
     if (value is num) {
       out.add(value.toDouble());
@@ -4660,6 +5216,8 @@ class FaceRecognitionService {
     required int facePixels,
     required double frameQuality,
     required double luminance,
+    required double sharpnessQuality,
+    required double lumaStdDev,
   }) {
     final cappedRealtimeAreaFloor = _autoTuneRecognitionParameters
         ? math.min(_minRealtimeFaceAreaRatio, 0.022)
@@ -4691,6 +5249,13 @@ class FaceRecognitionService {
         strongThresholdBoost: 0.0,
         marginBoost: 0.0,
         voteMinCountBoost: 0,
+        autoBrightnessDelta: 0,
+        autoContrastMultiplier: 1.0,
+        autoGammaMultiplier: 1.0,
+        autoSharpenAmount: 0.0,
+        lowLightSeverity: 0.0,
+        overExposureSeverity: 0.0,
+        blurSeverity: 0.0,
       );
     }
 
@@ -4712,6 +5277,29 @@ class FaceRecognitionService {
     final lightSeverity = ((0.34 - luminance).clamp(0.0, 0.34) / 0.34)
         .clamp(0.0, 1.0)
         .toDouble();
+    final lowLightThreshold = _autoTuneLowLightThreshold.clamp(0.25, 0.60);
+    final overExposureThreshold = _autoTuneOverExposureThreshold.clamp(
+      0.55,
+      0.90,
+    );
+    final lowLightSpan = math.max(lowLightThreshold, 0.06);
+    final overExposureSpan = math.max(1.0 - overExposureThreshold, 0.06);
+
+    final lowLightSeverity =
+      ((lowLightThreshold - luminance).clamp(0.0, lowLightSpan) /
+          lowLightSpan)
+      .clamp(0.0, 1.0)
+      .toDouble();
+    final overExposureSeverity =
+      ((luminance - overExposureThreshold)
+            .clamp(0.0, overExposureSpan) /
+          overExposureSpan)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final lowContrastSeverity =
+      ((0.13 - lumaStdDev).clamp(0.0, 0.13) / 0.13).clamp(0.0, 1.0).toDouble();
+    final blurSeverity =
+      ((0.42 - sharpnessQuality).clamp(0.0, 0.42) / 0.42).clamp(0.0, 1.0).toDouble();
 
     final signalSeverity =
         (faceSizeSeverity * 0.42 +
@@ -4745,6 +5333,30 @@ class FaceRecognitionService {
         ? (0.016 + faceSizeSeverity * 0.018 + signalSeverity * 0.006)
         : 0.0;
 
+    final autoBrightnessDelta =
+      (lowLightSeverity * 18 +
+          lowContrastSeverity * 6 -
+          overExposureSeverity * 16)
+        .round()
+        .clamp(-18, 18);
+    final autoContrastMultiplier =
+      (1.0 +
+          lowContrastSeverity * 0.20 +
+          overExposureSeverity * 0.12 -
+          lowLightSeverity * 0.05)
+        .clamp(0.88, 1.28)
+        .toDouble();
+    final autoGammaMultiplier =
+      (1.0 -
+          lowLightSeverity * 0.20 +
+          overExposureSeverity * 0.18 -
+          lowContrastSeverity * 0.05)
+        .clamp(0.80, 1.26)
+        .toDouble();
+    final autoSharpenAmount = (blurSeverity * 0.86 + lowContrastSeverity * 0.22)
+      .clamp(0.0, _autoTuneMaxSharpenAmount.clamp(0.0, 1.0))
+      .toDouble();
+
     return _AutoTuneRuntimeProfile(
       faceAreaRatioFloor: tunedFaceAreaFloor,
       facePixelsFloor: tunedFacePixelsFloor,
@@ -4773,6 +5385,13 @@ class FaceRecognitionService {
               .clamp(-0.02, 0.05)
               .toDouble(),
       voteMinCountBoost: signalSeverity >= 0.65 ? 1 : 0,
+      autoBrightnessDelta: autoBrightnessDelta,
+      autoContrastMultiplier: autoContrastMultiplier,
+      autoGammaMultiplier: autoGammaMultiplier,
+      autoSharpenAmount: autoSharpenAmount,
+      lowLightSeverity: lowLightSeverity,
+      overExposureSeverity: overExposureSeverity,
+      blurSeverity: blurSeverity,
     );
   }
 
@@ -4795,7 +5414,6 @@ class FaceRecognitionService {
     required double faceAreaRatio,
     required double frameQuality,
     required bool adaptiveFarDistance,
-    required bool singleFaceInFrame,
   }) {
     if (frameQuality < 0.44) {
       return false;
@@ -4808,7 +5426,7 @@ class FaceRecognitionService {
     if (adaptiveFarDistance && minFacePixels < 56) {
       return false;
     }
-    if (!singleFaceInFrame && frameQuality < 0.52) {
+    if (frameQuality < 0.52) {
       return false;
     }
     return true;
@@ -4846,6 +5464,13 @@ class FaceRecognitionService {
       's=${profile.strongThresholdBoost.toStringAsFixed(3)} '
       'g=${profile.marginBoost.toStringAsFixed(3)} '
       'v=${profile.voteMinCountBoost}) '
+      'img(b=${profile.autoBrightnessDelta} '
+      'ct=${profile.autoContrastMultiplier.toStringAsFixed(2)} '
+      'gm=${profile.autoGammaMultiplier.toStringAsFixed(2)} '
+      'sh=${profile.autoSharpenAmount.toStringAsFixed(2)} '
+      'll=${profile.lowLightSeverity.toStringAsFixed(2)} '
+      'oe=${profile.overExposureSeverity.toStringAsFixed(2)} '
+      'bl=${profile.blurSeverity.toStringAsFixed(2)}) '
       'farMode=$adaptiveFarDistance',
     );
   }
@@ -4938,24 +5563,18 @@ class FaceRecognitionService {
     String? cameraId,
     String? faceLogKey,
     _AutoTuneRuntimeProfile? autoTuneProfile,
-    bool singleFaceInFrame = false,
   }) {
-    if (_knownRecognitionBlockedByMissingTemplateCache) {
-      if (cameraId != null) {
-        final nowMs = DateTime.now().millisecondsSinceEpoch;
-        final lastAt = _missingTemplateGuardLogAtByCameraId[cameraId] ?? 0;
-        if (nowMs - lastAt >= 2000) {
-          _missingTemplateGuardLogAtByCameraId[cameraId] = nowMs;
-          if (_traceLogsEnabled) {
-            _log.debug(
-              'Match blocked camera=$cameraId face=${faceLogKey ?? '-'} '
-              'reason=missing_template_cache missingPeople=$_missingTemplatePeopleCount '
-              'sample=[$_missingTemplatePeoplePreview]',
-            );
-          }
-        }
+    if (_knownRecognitionBlockedByMissingTemplateCache && cameraId != null) {
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final lastAt = _missingTemplateGuardLogAtByCameraId[cameraId] ?? 0;
+      if (nowMs - lastAt >= 3000) {
+        _missingTemplateGuardLogAtByCameraId[cameraId] = nowMs;
+        _log.info(
+          'Recognition degraded camera=$cameraId face=${faceLogKey ?? '-'} '
+          'reason=missing_template_cache missingPeople=$_missingTemplatePeopleCount '
+          'sample=[$_missingTemplatePeoplePreview]',
+        );
       }
-      return null;
     }
 
     _CandidateScore? best;
@@ -5063,6 +5682,16 @@ class FaceRecognitionService {
         probePartials.eyeWeight,
       );
       addPartial(
+        probePartials.leftEyeVector,
+        bestTemplate.leftEyeVector,
+        probePartials.leftEyeWeight,
+      );
+      addPartial(
+        probePartials.rightEyeVector,
+        bestTemplate.rightEyeVector,
+        probePartials.rightEyeWeight,
+      );
+      addPartial(
         probePartials.noseVector,
         bestTemplate.noseVector,
         probePartials.noseWeight,
@@ -5071,6 +5700,26 @@ class FaceRecognitionService {
         probePartials.mouthVector,
         bestTemplate.mouthVector,
         probePartials.mouthWeight,
+      );
+      addPartial(
+        probePartials.foreheadVector,
+        bestTemplate.foreheadVector,
+        probePartials.foreheadWeight,
+      );
+      addPartial(
+        probePartials.leftCheekVector,
+        bestTemplate.leftCheekVector,
+        probePartials.leftCheekWeight,
+      );
+      addPartial(
+        probePartials.rightCheekVector,
+        bestTemplate.rightCheekVector,
+        probePartials.rightCheekWeight,
+      );
+      addPartial(
+        probePartials.chinVector,
+        bestTemplate.chinVector,
+        probePartials.chinWeight,
       );
 
       final partialCoverage = probePartials.totalWeight <= 0
@@ -5086,7 +5735,7 @@ class FaceRecognitionService {
           (templateScore * 0.55 + multiPoseScore * 0.30 + centroidScore * 0.15)
               .clamp(-1.0, 1.0)
               .toDouble();
-      final partialMix = (0.24 * partialCoverage).clamp(0.0, 0.24).toDouble();
+      final partialMix = (0.32 * partialCoverage).clamp(0.0, 0.32).toDouble();
       final score =
           (structuralScore * (1.0 - partialMix) + partialScore * partialMix)
               .clamp(-1.0, 1.0)
@@ -5247,22 +5896,6 @@ class FaceRecognitionService {
         (tunedMarginThreshold - closeQualityReliability * 0.08)
             .clamp(0.10, 0.35)
             .toDouble();
-    if (singleFaceInFrame) {
-      final singleFaceAssist =
-          ((best.templateScore - 0.89).clamp(0.0, 0.08) * 0.25) +
-          ((best.partialCoverage - 0.85).clamp(0.0, 0.15) * 0.12) +
-          ((best.centroidScore - 0.89).clamp(0.0, 0.08) * 0.10);
-      matchThreshold = (matchThreshold - singleFaceAssist)
-          .clamp(0.64, 0.99)
-          .toDouble();
-      calibratedThreshold = (calibratedThreshold - singleFaceAssist * 0.85)
-          .clamp(0.66, 0.99)
-          .toDouble();
-      effectiveMarginThreshold =
-          (effectiveMarginThreshold - singleFaceAssist * 0.35)
-              .clamp(0.08, 0.18)
-              .toDouble();
-    }
     if (totalPersons <= 3) {
       // Small galleries are naturally tight; keep ambiguity guard but avoid
       // requiring unrealistically large top1-top2 margins.
@@ -5278,7 +5911,7 @@ class FaceRecognitionService {
     final bestDecision = decisionOf(best);
     final secondDecision = secondBest == null ? 0.0 : decisionOf(secondBest);
     final hasCompetition = top2 != null;
-    final strictCompetition = hasCompetition && !singleFaceInFrame;
+    final strictCompetition = hasCompetition;
 
     final margin = bestDecision - secondDecision;
     var rejectionReason = '';
@@ -5316,7 +5949,6 @@ class FaceRecognitionService {
     if (rejectionReason.isEmpty &&
         hasCompetition &&
         !dualConsensus &&
-        !singleFaceInFrame &&
         bestDecision < (tunedStrongThreshold - 0.02)) {
       rejectionReason = 'consensus';
     }
@@ -5326,10 +5958,7 @@ class FaceRecognitionService {
         margin <
             (effectiveMarginThreshold +
                 ((0.60 - frameQuality).clamp(0.0, 0.60) * 0.10)) &&
-        bestDecision <
-            (singleFaceInFrame
-                ? (tunedStrongThreshold - 0.015)
-                : tunedStrongThreshold)) {
+        bestDecision < tunedStrongThreshold) {
       rejectionReason = 'ambiguous';
     }
 
@@ -5349,13 +5978,20 @@ class FaceRecognitionService {
       rejectionReason = 'template';
     }
 
+    if (rejectionReason.isEmpty && best.templateScore < 0.850) {
+      rejectionReason = 'template-abs';
+    }
+
+    if (rejectionReason.isEmpty && best.centroidScore < 0.830) {
+      rejectionReason = 'centroid-abs';
+    }
+
     if (rejectionReason.isEmpty &&
         strictCompetition &&
         top2.bucket.person.id != best.bucket.person.id &&
         bestDecision >= (tunedStrongThreshold + 0.01) &&
         decisionOf(top2) >= (tunedStrongThreshold + 0.01) &&
-        margin <
-            (effectiveMarginThreshold + (singleFaceInFrame ? 0.018 : 0.03))) {
+        margin < (effectiveMarginThreshold + 0.03)) {
       rejectionReason = 'strong-tie';
     }
 
@@ -5376,6 +6012,25 @@ class FaceRecognitionService {
                   0.02 +
                   ((0.60 - frameQuality).clamp(0.0, 0.60) * 0.08))) {
         rejectionReason = 'near-tie';
+      }
+    }
+
+    if (rejectionReason.isEmpty && totalPersons <= 3 && hasCompetition) {
+      final templateMargin = best.templateScore - top2.templateScore;
+      final centroidMargin = best.centroidScore - top2.centroidScore;
+      final requiredTemplateMargin = frameQuality >= 0.70 ? 0.016 : 0.024;
+      final requiredCentroidMargin = frameQuality >= 0.70 ? 0.010 : 0.015;
+      final requiredDecisionMargin = frameQuality >= 0.70 ? 0.022 : 0.032;
+      final strongSmallGalleryEvidence =
+          best.templateScore >= 0.910 &&
+          best.centroidScore >= 0.885 &&
+          best.calibratedScore >= (tunedCalibratedThreshold - 0.02) &&
+          bestDecision >= (tunedStrongThreshold - 0.01);
+      if (!strongSmallGalleryEvidence &&
+          (templateMargin < requiredTemplateMargin ||
+              centroidMargin < requiredCentroidMargin ||
+              margin < requiredDecisionMargin)) {
+        rejectionReason = 'small-gallery-ambiguous';
       }
     }
 
@@ -5442,7 +6097,6 @@ class FaceRecognitionService {
           'q=${frameQuality.toStringAsFixed(3)} '
           'auto(close=${autoCloseSeverity.toStringAsFixed(2)} '
           'signal=${autoSignalSeverity.toStringAsFixed(2)}) '
-          'singleFace=$singleFaceInFrame '
           'candidates=${candidates.length} '
           'indexed=$usedIndexedPruning',
         );
@@ -5453,40 +6107,6 @@ class FaceRecognitionService {
           'probe=${_vectorStats(vector)} probeHead=${_vectorPreview(vector)} '
           'bestPerson=${best.template.person.name} best=${_vectorStats(best.template.vector)} '
           'bestHead=${_vectorPreview(best.template.vector)}',
-        );
-      }
-
-      final singleFaceSoftReturn =
-          singleFaceInFrame &&
-          frameQuality >= 0.80 &&
-          best.templateScore >= 0.940 &&
-          best.partialCoverage >= 0.95 &&
-          best.centroidScore >= 0.930 &&
-          (rejectionReason == 'calibrated' || rejectionReason == 'ambiguous') &&
-          (!hasCompetition ||
-              top2.bucket.person.id == best.bucket.person.id ||
-              (best.templateScore - top2.templateScore) >= 0.020 ||
-              margin >= 0.070);
-      if (singleFaceSoftReturn) {
-        return _MatchResult(
-          template: best.template,
-          score: bestDecision,
-          calibratedScore: best.calibratedScore,
-          margin: margin,
-          templateScore: best.templateScore,
-          globalScore:
-              (best.templateScore * 0.55 +
-                      best.multiPoseScore * 0.30 +
-                      best.centroidScore * 0.15)
-                  .clamp(-1.0, 1.0)
-                  .toDouble(),
-          partialScore: best.partialScore,
-          partialCoverage: best.partialCoverage,
-          eyeWeight: probePartials.eyeWeight,
-          noseWeight: probePartials.noseWeight,
-          mouthWeight: probePartials.mouthWeight,
-          centroidScore: best.centroidScore,
-          dualConsensus: dualConsensus,
         );
       }
 
@@ -5509,7 +6129,6 @@ class FaceRecognitionService {
         'q=${frameQuality.toStringAsFixed(3)} '
         'auto(close=${autoCloseSeverity.toStringAsFixed(2)} '
         'signal=${autoSignalSeverity.toStringAsFixed(2)}) '
-        'singleFace=$singleFaceInFrame '
         'personId=${best.template.person.id} '
         'person=${best.template.person.name} '
         'candidates=${candidates.length} '
@@ -5563,238 +6182,6 @@ class FaceRecognitionService {
     }
     scored.sort((a, b) => b.$2.compareTo(a.$2));
     return scored.take(limit).map((e) => e.$1).toSet();
-  }
-
-  bool _isKnownAfterTemporalVoting({
-    required String cameraId,
-    required String faceLogKey,
-    required _MatchResult? match,
-    required double frameQuality,
-    required bool singleFaceInFrame,
-    required int nowMs,
-    _AutoTuneRuntimeProfile? autoTuneProfile,
-  }) {
-    final trackKey = '$cameraId|$faceLogKey';
-    final trackVotes = _votesByTrack.putIfAbsent(
-      trackKey,
-      () => <_TrackVote>[],
-    );
-    trackVotes.removeWhere((vote) => nowMs - vote.atMs > _voteMaxAgeMs);
-
-    final useCameraVotes =
-        singleFaceInFrame && _templatesByPersonId.length <= 3;
-    final cameraVotes = useCameraVotes
-        ? _votesBySingleFaceCamera.putIfAbsent(cameraId, () => <_TrackVote>[])
-        : null;
-    cameraVotes?.removeWhere((vote) => nowMs - vote.atMs > _voteMaxAgeMs);
-
-    final votes = cameraVotes ?? trackVotes;
-
-    final softRawThreshold =
-        ((_knownMatchThreshold + 0.01) +
-                (autoTuneProfile?.matchThresholdBoost ?? 0.0))
-            .clamp(0.84, 0.99);
-    final softCalibratedThreshold =
-        ((_knownCalibratedThreshold + 0.02) +
-                (autoTuneProfile?.calibratedThresholdBoost ?? 0.0))
-            .clamp(0.55, 0.99);
-    final singleFacePotential =
-        match != null &&
-        singleFaceInFrame &&
-        frameQuality >= 0.68 &&
-        match.templateScore >= 0.92 &&
-        match.partialCoverage >= 0.90 &&
-        match.centroidScore >= 0.90 &&
-        match.score >= 0.84;
-    final hasPotentialMatch =
-        match != null &&
-        ((match.score >= softRawThreshold &&
-                match.calibratedScore >= softCalibratedThreshold) ||
-            (match.score >= (_knownStrongThreshold - 0.015)) ||
-            (match.templateScore >= 0.915 &&
-                match.partialCoverage >= 0.85 &&
-                frameQuality >= 0.75) ||
-            singleFacePotential);
-
-    if (!hasPotentialMatch) {
-      // Do not hard-reset all votes on one weak frame; keep temporal stability.
-      if (trackVotes.isNotEmpty) {
-        trackVotes.removeAt(0);
-      }
-      if (cameraVotes != null && cameraVotes.isNotEmpty) {
-        cameraVotes.removeAt(0);
-      }
-      return false;
-    }
-
-    final requiredFrameQuality =
-        (_minRealtimeFrameQuality - (autoTuneProfile?.marginBoost ?? 0.0) * 0.5)
-            .clamp(0.20, 1.0);
-    final effectiveRequiredFrameQuality = singleFaceInFrame
-        ? (requiredFrameQuality - 0.06).clamp(0.16, requiredFrameQuality)
-        : requiredFrameQuality;
-    if (frameQuality < effectiveRequiredFrameQuality) {
-      return false;
-    }
-
-    final personId = match.template.person.id;
-    trackVotes.add(_TrackVote(personId: personId, atMs: nowMs));
-    if (trackVotes.length > _voteWindowSize) {
-      trackVotes.removeRange(0, trackVotes.length - _voteWindowSize);
-    }
-    if (cameraVotes != null) {
-      cameraVotes.add(_TrackVote(personId: personId, atMs: nowMs));
-      if (cameraVotes.length > _voteWindowSize) {
-        cameraVotes.removeRange(0, cameraVotes.length - _voteWindowSize);
-      }
-    }
-
-    final strongThreshold =
-        _knownStrongThreshold + (autoTuneProfile?.strongThresholdBoost ?? 0.0);
-    final voteMinCount =
-        (_voteMinCount + (autoTuneProfile?.voteMinCountBoost ?? 0)).clamp(
-          1,
-          _voteWindowSize,
-        );
-    final autoCloseSeverity = autoTuneProfile?.closeFaceSeverity ?? 0.0;
-    final autoSignalSeverity = autoTuneProfile?.signalSeverity ?? 0.0;
-
-    final highConfidenceVisualEvidence =
-        frameQuality >= 0.80 &&
-        match.templateScore >= 0.922 &&
-        match.partialCoverage >= 0.95 &&
-        match.centroidScore >= 0.918 &&
-        match.score >= 0.885 &&
-        (match.margin >= 0.085 ||
-            match.calibratedScore >= (softCalibratedThreshold - 0.06)) &&
-        autoSignalSeverity <= 0.16;
-    if (highConfidenceVisualEvidence) {
-      return true;
-    }
-
-    if (match.score >= 0.965 &&
-        match.calibratedScore >=
-            ((_knownCalibratedThreshold + 0.02) +
-                (autoTuneProfile?.calibratedThresholdBoost ?? 0.0)) &&
-        match.margin >= 0.20 &&
-        frameQuality >= 0.75) {
-      return true;
-    }
-
-    if ((match.score >= strongThreshold && match.dualConsensus) ||
-        match.calibratedScore >=
-            ((_knownCalibratedThreshold + 0.12) +
-                (autoTuneProfile?.calibratedThresholdBoost ?? 0.0))) {
-      return true;
-    }
-
-    var count = 0;
-    for (final vote in votes) {
-      if (vote.personId == personId) {
-        count++;
-      }
-    }
-    var requiredMajority = ((votes.length * 0.6).ceil()).clamp(1, votes.length);
-    var effectiveVoteMin = voteMinCount;
-    if (frameQuality >= 0.78 &&
-        match.templateScore >= 0.915 &&
-        match.partialCoverage >= 0.93 &&
-        autoSignalSeverity <= 0.18) {
-      requiredMajority =
-          ((votes.length * (autoCloseSeverity >= 0.80 ? 0.50 : 0.55)).ceil())
-              .clamp(1, votes.length);
-      effectiveVoteMin = (voteMinCount - 1).clamp(1, _voteWindowSize);
-    }
-    if (cameraVotes != null &&
-        frameQuality >= 0.72 &&
-        match.templateScore >= 0.920 &&
-        match.partialCoverage >= 0.92) {
-      requiredMajority = ((votes.length * 0.55).ceil()).clamp(1, votes.length);
-    }
-    if (singleFaceInFrame &&
-        frameQuality >= 0.68 &&
-        match.templateScore >= 0.92 &&
-        match.partialCoverage >= 0.90) {
-      requiredMajority = ((votes.length * 0.52).ceil()).clamp(1, votes.length);
-    }
-    return count >= effectiveVoteMin && count >= requiredMajority;
-  }
-
-  bool _applySingleFaceIdentityLock({
-    required String cameraId,
-    required bool singleFaceInFrame,
-    required _MatchResult? match,
-    required bool isKnownByVoting,
-    required double frameQuality,
-    required int nowMs,
-  }) {
-    final lock = _singleFaceLockByCameraId[cameraId];
-    if (lock != null && nowMs - lock.lastSeenAtMs > 3500) {
-      _singleFaceLockByCameraId.remove(cameraId);
-    }
-
-    if (!singleFaceInFrame) {
-      if (isKnownByVoting && match != null) {
-        _singleFaceLockByCameraId[cameraId] = _SingleFaceIdentityLock(
-          personId: match.template.person.id,
-          lastSeenAtMs: nowMs,
-          confidence: match.score,
-        );
-      }
-      return isKnownByVoting;
-    }
-
-    final activeLock = _singleFaceLockByCameraId[cameraId];
-    if (isKnownByVoting && match != null) {
-      if (activeLock != null &&
-          activeLock.personId != match.template.person.id) {
-        final weakSwitch =
-            frameQuality >= 0.60 &&
-            match.templateScore < 0.935 &&
-            match.margin < 0.10;
-        if (weakSwitch) {
-          return false;
-        }
-      }
-
-      final stableEvidence =
-          frameQuality >= 0.70 &&
-          match.templateScore >= 0.930 &&
-          match.partialCoverage >= 0.93 &&
-          match.margin >= 0.06;
-      if (stableEvidence || activeLock == null) {
-        _singleFaceLockByCameraId[cameraId] = _SingleFaceIdentityLock(
-          personId: match.template.person.id,
-          lastSeenAtMs: nowMs,
-          confidence: match.score,
-        );
-      }
-      return true;
-    }
-
-    if (activeLock == null || match == null) {
-      return false;
-    }
-
-    final sameIdentity = match.template.person.id == activeLock.personId;
-    if (!sameIdentity) {
-      return false;
-    }
-
-    final recoverKnown =
-        frameQuality >= 0.68 &&
-        match.templateScore >= 0.925 &&
-        match.partialCoverage >= 0.92 &&
-        match.score >= 0.86;
-    if (!recoverKnown) {
-      return false;
-    }
-
-    activeLock.lastSeenAtMs = nowMs;
-    activeLock.confidence = (activeLock.confidence * 0.6 + match.score * 0.4)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    return true;
   }
 
   void _startCameraCalibrationWindow(String cameraId) {
@@ -6347,9 +6734,14 @@ class FaceRecognitionService {
       return const _PartialEmbeddingBundle();
     }
 
-    final eyeCrop = _cropNormalized(square, 0.10, 0.11, 0.80, 0.34);
-    final noseCrop = _cropNormalized(square, 0.30, 0.34, 0.40, 0.36);
-    final mouthCrop = _cropNormalized(square, 0.20, 0.60, 0.60, 0.30);
+    final foreheadCrop = _cropNormalized(square, 0.18, 0.02, 0.64, 0.18);
+    final leftEyeCrop = _cropNormalized(square, 0.06, 0.10, 0.32, 0.22);
+    final rightEyeCrop = _cropNormalized(square, 0.62, 0.10, 0.32, 0.22);
+    final noseCrop = _cropNormalized(square, 0.30, 0.28, 0.40, 0.30);
+    final leftCheekCrop = _cropNormalized(square, 0.04, 0.28, 0.28, 0.30);
+    final rightCheekCrop = _cropNormalized(square, 0.68, 0.28, 0.28, 0.30);
+    final mouthCrop = _cropNormalized(square, 0.22, 0.56, 0.56, 0.22);
+    final chinCrop = _cropNormalized(square, 0.28, 0.74, 0.44, 0.18);
 
     Future<(List<double>?, double)> buildRegion(
       img.Image? region,
@@ -6385,23 +6777,73 @@ class FaceRecognitionService {
       return (vector, weight);
     }
 
-    final eye = await buildRegion(eyeCrop, 0.36, _eyeRegionMinQuality);
-    final nose = await buildRegion(noseCrop, 0.34, _noseRegionMinQuality);
-    final mouth = await buildRegion(mouthCrop, 0.30, _mouthRegionMinQuality);
+    final forehead = await buildRegion(foreheadCrop, 0.10, 0.18);
+    final leftEye = await buildRegion(leftEyeCrop, 0.12, _eyeRegionMinQuality);
+    final rightEye = await buildRegion(rightEyeCrop, 0.12, _eyeRegionMinQuality);
+    final nose = await buildRegion(noseCrop, 0.16, _noseRegionMinQuality);
+    final leftCheek = await buildRegion(leftCheekCrop, 0.11, 0.20);
+    final rightCheek = await buildRegion(rightCheekCrop, 0.11, 0.20);
+    final mouth = await buildRegion(mouthCrop, 0.15, _mouthRegionMinQuality);
+    final chin = await buildRegion(chinCrop, 0.13, 0.20);
 
-    final total = (eye.$2 + nose.$2 + mouth.$2).clamp(0.0, 3.0);
+    final eyeVector = _averageVectors(<List<double>?>[leftEye.$1, rightEye.$1]);
+    final eyeWeight = (leftEye.$2 + rightEye.$2).clamp(0.0, 1.0).toDouble();
+
+    final total = (
+      forehead.$2 +
+      leftEye.$2 +
+      rightEye.$2 +
+      nose.$2 +
+      leftCheek.$2 +
+      rightCheek.$2 +
+      mouth.$2 +
+      chin.$2
+    ).clamp(0.0, 8.0);
     if (total <= 0) {
       return const _PartialEmbeddingBundle();
     }
 
     return _PartialEmbeddingBundle(
-      eyeVector: eye.$1,
+      eyeVector: eyeVector,
+      leftEyeVector: leftEye.$1,
+      rightEyeVector: rightEye.$1,
       noseVector: nose.$1,
       mouthVector: mouth.$1,
-      eyeWeight: eye.$2 / total,
+      foreheadVector: forehead.$1,
+      leftCheekVector: leftCheek.$1,
+      rightCheekVector: rightCheek.$1,
+      chinVector: chin.$1,
+      eyeWeight: eyeWeight / total,
+      leftEyeWeight: leftEye.$2 / total,
+      rightEyeWeight: rightEye.$2 / total,
       noseWeight: nose.$2 / total,
       mouthWeight: mouth.$2 / total,
+      foreheadWeight: forehead.$2 / total,
+      leftCheekWeight: leftCheek.$2 / total,
+      rightCheekWeight: rightCheek.$2 / total,
+      chinWeight: chin.$2 / total,
     );
+  }
+
+  List<double>? _averageVectors(List<List<double>?> vectors) {
+    final present = vectors.whereType<List<double>>().toList(growable: false);
+    if (present.isEmpty) return null;
+    final length = present.first.length;
+    if (length <= 0) return null;
+    final sum = List<double>.filled(length, 0.0);
+    var count = 0;
+    for (final vector in present) {
+      final limit = math.min(length, vector.length);
+      for (var i = 0; i < limit; i++) {
+        sum[i] += vector[i];
+      }
+      count++;
+    }
+    if (count <= 0) return null;
+    for (var i = 0; i < sum.length; i++) {
+      sum[i] /= count;
+    }
+    return _normalizeVector(sum);
   }
 
   img.Image? _cropNormalized(
@@ -6637,9 +7079,6 @@ class FaceRecognitionService {
     _processorsByCameraId.clear();
     _overlaysByCameraId.clear();
     _overlayTracksByCameraId.clear();
-    _votesByTrack.clear();
-    _votesBySingleFaceCamera.clear();
-    _singleFaceLockByCameraId.clear();
     _realtimeEventCache.clear();
     _pendingDbEvents.clear();
     _arcFaceSession?.close();

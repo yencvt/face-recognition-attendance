@@ -92,10 +92,23 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _bootstrap();
   }
 
+  Future<void> _ensureRecognitionForSelectedSafe({bool forceStart = false}) async {
+    try {
+      await _ensureRecognitionForSelected(forceStart: forceStart);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Khong khoi dong duoc nhan dien: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   Future<void> _bootstrap() async {
     _snapshot = _streamService.current;
     await _loadZone();
-    await _ensureRecognitionForSelected();
     await _refreshPersonAvatars();
     final sum = await FaceAttendanceRepository.getSummary();
     final events = await FaceAttendanceRepository.getRecentEvents(limit: 40);
@@ -109,6 +122,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ..clear()
         ..addAll(events);
     });
+
+    // Start recognition after rendering summary/logs so UI stays usable
+    // even when camera processor startup fails.
+    await _ensureRecognitionForSelectedSafe();
 
     _summaryRefreshTimer?.cancel();
     _summaryRefreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -128,7 +145,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         });
       }
       unawaited(_loadZone());
-      unawaited(_ensureRecognitionForSelected());
+      unawaited(_ensureRecognitionForSelectedSafe());
     });
 
     _frameSub = _recognitionService.frameQueue.listen((packet) {
@@ -814,7 +831,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             });
                             await _streamService.selectCamera(id);
                             if (!isIpMode) {
-                              await _ensureRecognitionForSelected(forceStart: true);
+                              await _ensureRecognitionForSelectedSafe(
+                                forceStart: true,
+                              );
                             }
                             if (!context.mounted) return;
                             Navigator.of(context).pop();

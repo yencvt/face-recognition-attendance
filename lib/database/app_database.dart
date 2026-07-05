@@ -15,7 +15,7 @@ class AppDatabase {
 
     _db = await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE users(
@@ -102,6 +102,12 @@ class AppDatabase {
             eye_vector_blob BLOB,
             nose_vector_blob BLOB,
             mouth_vector_blob BLOB,
+            forehead_vector_blob BLOB,
+            left_eye_vector_blob BLOB,
+            right_eye_vector_blob BLOB,
+            left_cheek_vector_blob BLOB,
+            right_cheek_vector_blob BLOB,
+            chin_vector_blob BLOB,
             quality REAL NOT NULL,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -295,6 +301,27 @@ class AppDatabase {
             where: 'username = ?',
             whereArgs: ['admin'],
           );
+        }
+
+        if (oldVersion < 12) {
+          try {
+            await db.execute('ALTER TABLE face_vector_cache ADD COLUMN forehead_vector_blob BLOB');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE face_vector_cache ADD COLUMN left_eye_vector_blob BLOB');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE face_vector_cache ADD COLUMN right_eye_vector_blob BLOB');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE face_vector_cache ADD COLUMN left_cheek_vector_blob BLOB');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE face_vector_cache ADD COLUMN right_cheek_vector_blob BLOB');
+          } catch (_) {}
+          try {
+            await db.execute('ALTER TABLE face_vector_cache ADD COLUMN chin_vector_blob BLOB');
+          } catch (_) {}
         }
       },
     );

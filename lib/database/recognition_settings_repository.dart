@@ -54,6 +54,9 @@ class RecognitionRuntimeConfig {
     this.realtimeInputGamma = 1.0,
     this.realtimeInputSaturation = 1.0,
     this.realtimeInputGrayscale = false,
+    this.autoTuneMaxSharpenAmount = 1.0,
+    this.autoTuneLowLightThreshold = 0.40,
+    this.autoTuneOverExposureThreshold = 0.74,
   });
 
   final double knownMatchThreshold;
@@ -103,6 +106,9 @@ class RecognitionRuntimeConfig {
   final double realtimeInputGamma;
   final double realtimeInputSaturation;
   final bool realtimeInputGrayscale;
+  final double autoTuneMaxSharpenAmount;
+  final double autoTuneLowLightThreshold;
+  final double autoTuneOverExposureThreshold;
 
   RecognitionRuntimeConfig copyWith({
     double? knownMatchThreshold,
@@ -152,6 +158,9 @@ class RecognitionRuntimeConfig {
     double? realtimeInputGamma,
     double? realtimeInputSaturation,
     bool? realtimeInputGrayscale,
+    double? autoTuneMaxSharpenAmount,
+    double? autoTuneLowLightThreshold,
+    double? autoTuneOverExposureThreshold,
   }) {
     return RecognitionRuntimeConfig(
       knownMatchThreshold: knownMatchThreshold ?? this.knownMatchThreshold,
@@ -223,6 +232,12 @@ class RecognitionRuntimeConfig {
           realtimeInputSaturation ?? this.realtimeInputSaturation,
       realtimeInputGrayscale:
           realtimeInputGrayscale ?? this.realtimeInputGrayscale,
+        autoTuneMaxSharpenAmount:
+          autoTuneMaxSharpenAmount ?? this.autoTuneMaxSharpenAmount,
+        autoTuneLowLightThreshold:
+          autoTuneLowLightThreshold ?? this.autoTuneLowLightThreshold,
+        autoTuneOverExposureThreshold:
+          autoTuneOverExposureThreshold ?? this.autoTuneOverExposureThreshold,
     );
   }
 
@@ -275,6 +290,9 @@ class RecognitionRuntimeConfig {
       'realtimeInputGamma': realtimeInputGamma,
       'realtimeInputSaturation': realtimeInputSaturation,
       'realtimeInputGrayscale': realtimeInputGrayscale,
+      'autoTuneMaxSharpenAmount': autoTuneMaxSharpenAmount,
+      'autoTuneLowLightThreshold': autoTuneLowLightThreshold,
+      'autoTuneOverExposureThreshold': autoTuneOverExposureThreshold,
     };
   }
 
@@ -353,6 +371,9 @@ class RecognitionRuntimeConfig {
       realtimeInputGamma: d('realtimeInputGamma', 1.0),
       realtimeInputSaturation: d('realtimeInputSaturation', 1.0),
       realtimeInputGrayscale: b('realtimeInputGrayscale', false),
+      autoTuneMaxSharpenAmount: d('autoTuneMaxSharpenAmount', 1.0),
+      autoTuneLowLightThreshold: d('autoTuneLowLightThreshold', 0.40),
+      autoTuneOverExposureThreshold: d('autoTuneOverExposureThreshold', 0.74),
     );
   }
 

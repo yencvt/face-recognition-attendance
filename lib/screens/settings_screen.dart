@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../database/report_settings_repository.dart';
 import '../database/recognition_settings_repository.dart';
 import '../database/settings_repository.dart';
+import 'image_recognition_test_screen.dart';
 import 'people_management_screen.dart';
 import 'user_management_screen.dart';
 
@@ -63,6 +64,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'realtimeInputGamma': 'Xu ly input: gamma (0.7..1.4)',
     'realtimeInputSaturation': 'Xu ly input: do bao hoa (0.0..1.3)',
     'realtimeInputGrayscale': 'Xu ly input: ep den trang',
+    'autoTuneMaxSharpenAmount': 'Auto tune anh: sharpen toi da (0.0..1.0)',
+    'autoTuneLowLightThreshold': 'Auto tune anh: nguong low-light (0.25..0.60)',
+    'autoTuneOverExposureThreshold':
+        'Auto tune anh: nguong over-exposure (0.55..0.90)',
   };
 
   static const Map<String, String> _recognitionParameterNotes = {
@@ -148,6 +153,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'He so bao hoa cho anh dau vao realtime (0 la xam).',
     'realtimeInputGrayscale':
         'Chuyen anh dau vao realtime sang den trang truoc khi nhan dien.',
+    'autoTuneMaxSharpenAmount':
+        'Gioi han muc sharpen toi da cua auto tune anh realtime.',
+    'autoTuneLowLightThreshold':
+        'Nguong sang de xac dinh frame toi (thap hon nguong se duoc tang sang).',
+    'autoTuneOverExposureThreshold':
+        'Nguong sang de xac dinh frame bi chay sang (cao hon nguong se duoc giam/chinh gamma).',
   };
 
   late TextEditingController _signalingServerController;
@@ -198,6 +209,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _realtimeInputContrastController;
   late TextEditingController _realtimeInputGammaController;
   late TextEditingController _realtimeInputSaturationController;
+  late TextEditingController _autoTuneMaxSharpenAmountController;
+  late TextEditingController _autoTuneLowLightThresholdController;
+  late TextEditingController _autoTuneOverExposureThresholdController;
   late TextEditingController _reportExportDirectoryController;
   late TextEditingController _reportExportTimeController;
   late TextEditingController _reportApiHostController;
@@ -295,6 +309,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _realtimeInputContrastController = TextEditingController();
     _realtimeInputGammaController = TextEditingController();
     _realtimeInputSaturationController = TextEditingController();
+    _autoTuneMaxSharpenAmountController = TextEditingController();
+    _autoTuneLowLightThresholdController = TextEditingController();
+    _autoTuneOverExposureThresholdController = TextEditingController();
     _reportExportDirectoryController = TextEditingController();
     _reportExportTimeController = TextEditingController();
     _reportApiHostController = TextEditingController();
@@ -431,6 +448,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             .toString();
         _realtimeInputSaturationController.text = recognitionConfig
             .realtimeInputSaturation
+            .toString();
+        _autoTuneMaxSharpenAmountController.text = recognitionConfig
+            .autoTuneMaxSharpenAmount
+            .toString();
+        _autoTuneLowLightThresholdController.text = recognitionConfig
+            .autoTuneLowLightThreshold
+            .toString();
+        _autoTuneOverExposureThresholdController.text = recognitionConfig
+            .autoTuneOverExposureThreshold
             .toString();
         _autoTuneRecognitionParameters =
             recognitionConfig.autoTuneRecognitionParameters;
@@ -690,6 +716,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'realtimeInputSaturation',
         ),
         realtimeInputGrayscale: _realtimeInputGrayscale,
+        autoTuneMaxSharpenAmount: parseDouble(
+          _autoTuneMaxSharpenAmountController,
+          'autoTuneMaxSharpenAmount',
+        ),
+        autoTuneLowLightThreshold: parseDouble(
+          _autoTuneLowLightThresholdController,
+          'autoTuneLowLightThreshold',
+        ),
+        autoTuneOverExposureThreshold: parseDouble(
+          _autoTuneOverExposureThresholdController,
+          'autoTuneOverExposureThreshold',
+        ),
       );
       await RecognitionSettingsRepository.saveConfig(recognitionConfig);
 
@@ -815,6 +853,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .toString();
     _realtimeInputGammaController.text = config.realtimeInputGamma.toString();
     _realtimeInputSaturationController.text = config.realtimeInputSaturation
+        .toString();
+    _autoTuneMaxSharpenAmountController.text = config.autoTuneMaxSharpenAmount
+        .toString();
+    _autoTuneLowLightThresholdController.text = config.autoTuneLowLightThreshold
+        .toString();
+    _autoTuneOverExposureThresholdController.text = config
+        .autoTuneOverExposureThreshold
         .toString();
     _autoTuneRecognitionParameters = config.autoTuneRecognitionParameters;
     _debugRealtimeOverlay = config.debugRealtimeOverlay;
@@ -1170,6 +1215,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _realtimeInputContrastController.dispose();
     _realtimeInputGammaController.dispose();
     _realtimeInputSaturationController.dispose();
+    _autoTuneMaxSharpenAmountController.dispose();
+    _autoTuneLowLightThresholdController.dispose();
+    _autoTuneOverExposureThresholdController.dispose();
     _reportExportDirectoryController.dispose();
     _reportExportTimeController.dispose();
     _reportApiHostController.dispose();
@@ -1285,6 +1333,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             onPressed: _testConnection,
                             icon: const Icon(Icons.cloud_queue),
                             label: const Text('Kiểm tra kết nối'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Card(
+                    elevation: 1,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.fact_check_outlined,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Module test nhan dien bang anh',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Upload anh, chon danh sach doi tuong can nhan dien, sau do bam Kiem tra de danh gia PASS/FAILED doc lap voi luong camera.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ImageRecognitionTestScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.image_search),
+                            label: const Text('Mo module test anh'),
                           ),
                         ],
                       ),
@@ -1802,6 +1893,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       'realtimeInputSaturation',
                                     ),
                                     parameterKey: 'realtimeInputSaturation',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _autoTuneMaxSharpenAmountController,
+                                    label: _recognitionLabel(
+                                      'autoTuneMaxSharpenAmount',
+                                    ),
+                                    parameterKey: 'autoTuneMaxSharpenAmount',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _autoTuneLowLightThresholdController,
+                                    label: _recognitionLabel(
+                                      'autoTuneLowLightThreshold',
+                                    ),
+                                    parameterKey: 'autoTuneLowLightThreshold',
+                                  ),
+                                  _buildRecognitionTextField(
+                                    controller:
+                                        _autoTuneOverExposureThresholdController,
+                                    label: _recognitionLabel(
+                                      'autoTuneOverExposureThreshold',
+                                    ),
+                                    parameterKey:
+                                        'autoTuneOverExposureThreshold',
                                   ),
                                 ],
                               ),
