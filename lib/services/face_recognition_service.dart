@@ -4722,149 +4722,46 @@ class FaceRecognitionService {
 
   img.Image _prepareFaceForEmbedding(img.Image source) {
     final square = _centerCropSquare(source);
-    final normalized = _normalizeFaceIllumination(square);
-    return _enhanceFaceForEmbedding(normalized);
+    final monochrome = img.grayscale(square);
+    final sharpness = _imageSharpness(monochrome);
+    final sharpenAmount = sharpness < 18.0
+        ? 0.60
+        : sharpness < 28.0
+        ? 0.30
+        : 0.0;
+    final processed = sharpenAmount > 0.0
+        ? _sharpenFaceCrop(monochrome, sharpenAmount)
+        : monochrome;
+    return _materializeRgba8Image(processed);
   }
 
-  img.Image _normalizeFaceIllumination(img.Image source) {
-    final meanLuma = _averageLuma(source);
-    final stdLuma = _lumaStdDev(source, meanLuma);
-
-    final alreadyBalanced =
-        meanLuma >= 0.42 &&
-        meanLuma <= 0.66 &&
-        stdLuma >= 0.12 &&
-        stdLuma <= 0.30;
-    if (alreadyBalanced) {
-      return source;
-    }
-
-    // Keep exposure normalization conservative on already bright crops so we do
-    // not wash out facial texture in debug/output images.
-    final brightFace = meanLuma >= 0.70;
-    final targetMean = brightFace ? 0.60 : 0.54;
-    final targetStd = brightFace ? 0.18 : 0.20;
-    final minGain = brightFace ? 0.94 : 0.90;
-    final maxGain = brightFace ? 1.04 : 1.12;
-    final maxBias = brightFace ? 4.0 : 10.0;
-    final gain = (targetStd / math.max(0.06, stdLuma)).clamp(minGain, maxGain);
-    final bias = ((targetMean - meanLuma) * 255.0).clamp(-maxBias, maxBias);
-
-    var adjusted = img.adjustColor(
-      source,
-      contrast: gain.toDouble(),
-      brightness: bias.round(),
-      gamma: meanLuma < 0.45 ? 0.97 : (brightFace ? 1.01 : 1.0),
-      saturation: 1.0,
-    );
-
-    if (meanLuma > 0.78) {
-      adjusted = img.adjustColor(
-        adjusted,
-        contrast: 0.96,
-        gamma: 1.04,
-        brightness: -2,
-        saturation: 1.0,
-      );
-    }
-
-    return adjusted;
-  }
-
-  img.Image _enhanceFaceForEmbedding(img.Image source) {
-    final luma = _averageLuma(source);
-    final sharpness = _imageSharpness(source);
-    final lowLight = luma < 0.38;
-    final lowSharpness = sharpness < 20.0;
-
-    if (!lowLight && !lowSharpness) {
-      return source;
-    }
-
-    if (lowLight && lowSharpness) {
-      return img.adjustColor(
-        source,
-        contrast: 1.28,
-        gamma: 0.86,
-        saturation: 1.02,
-        brightness: 8,
-      );
-    }
-
-    if (!lowLight && lowSharpness) {
-      if (luma >= 0.70) {
-        return img.adjustColor(
-          source,
-          contrast: 1.03,
-          gamma: 1.01,
-          saturation: 1.0,
-          brightness: -1,
+  img.Image _materializeRgba8Image(img.Image source) {
+    final rgba = source.getBytes(order: img.ChannelOrder.rgba);
+    final output = img.Image(width: source.width, height: source.height);
+    var index = 0;
+    for (var y = 0; y < source.height; y++) {
+      for (var x = 0; x < source.width; x++) {
+        output.setPixelRgba(
+          x,
+          y,
+          rgba[index],
+          rgba[index + 1],
+          rgba[index + 2],
+          rgba[index + 3],
         );
+        index += 4;
       }
-
-      return img.adjustColor(
-        source,
-        contrast: 1.08,
-        gamma: 0.99,
-        saturation: 1.0,
-        brightness: 0,
-      );
     }
-
-    return img.adjustColor(
-      source,
-      contrast: 1.14,
-      gamma: lowLight ? 0.93 : 0.97,
-      saturation: 1.0,
-      brightness: lowLight ? 4 : 0,
-    );
+    return output;
   }
 
   img.Image _boostRealtimeFaceExposure(img.Image source, double luminance) {
-    if (luminance >= 0.34) {
-      return source;
-    }
-
-    final lift = (0.46 - luminance).clamp(0.0, 0.20).toDouble();
-    final brightness = (2 + lift * 36).round().clamp(2, 12);
-    final contrast = (1.02 + lift * 0.42).clamp(1.02, 1.12).toDouble();
-    final gamma = (1.0 - lift * 0.40).clamp(0.86, 0.98).toDouble();
-
-    return img.adjustColor(
-      source,
-      contrast: contrast,
-      gamma: gamma,
-      saturation: 1.0,
-      brightness: brightness,
-    );
+    return source;
   }
 
   img.Image _applyRealtimeInputProcessing(img.Image source) {
-    var adjusted = source;
-    if (_realtimeInputGrayscale) {
-      adjusted = img.grayscale(adjusted);
-    }
-
-    final brightness = _realtimeInputBrightness.clamp(-48, 48);
-    final contrast = _realtimeInputContrast.clamp(0.7, 1.4).toDouble();
-    final gamma = _realtimeInputGamma.clamp(0.7, 1.4).toDouble();
-    final saturation = _realtimeInputSaturation.clamp(0.0, 1.3).toDouble();
-    final needsAdjust =
-        brightness != 0 ||
-        (contrast - 1.0).abs() > 0.001 ||
-        (gamma - 1.0).abs() > 0.001 ||
-        (saturation - 1.0).abs() > 0.001;
-    if (!needsAdjust) {
-      return adjusted;
-    }
-
-    return img.adjustColor(
-      adjusted,
-      brightness: brightness,
-      contrast: contrast,
-      gamma: gamma,
-      saturation: saturation,
-    );
+    final adjusted = img.grayscale(source);
+    return _materializeRgba8Image(adjusted);
   }
 
   img.Image _applyAutoTuneRealtimeInputProcessing(
@@ -4875,34 +4772,15 @@ class FaceRecognitionService {
       return source;
     }
 
-    final brightness = profile.autoBrightnessDelta.clamp(-24, 24);
-    final contrast = profile.autoContrastMultiplier
-        .clamp(0.85, 1.28)
-        .toDouble();
-    final gamma = profile.autoGammaMultiplier.clamp(0.80, 1.26).toDouble();
-    final needsToneAdjust =
-        brightness != 0 ||
-        (contrast - 1.0).abs() > 0.001 ||
-        (gamma - 1.0).abs() > 0.001;
-
-    var adjusted = source;
-    if (needsToneAdjust) {
-      adjusted = img.adjustColor(
-        adjusted,
-        brightness: brightness,
-        contrast: contrast,
-        gamma: gamma,
-        saturation: 1.0,
-      );
-    }
+    final adjusted = img.grayscale(source);
 
     final sharpenAmount = profile.autoSharpenAmount
         .clamp(0.0, _autoTuneMaxSharpenAmount.clamp(0.0, 1.0))
         .toDouble();
     if (sharpenAmount <= 0.01) {
-      return adjusted;
+      return _materializeRgba8Image(adjusted);
     }
-    return _sharpenFaceCrop(adjusted, sharpenAmount);
+    return _materializeRgba8Image(_sharpenFaceCrop(adjusted, sharpenAmount));
   }
 
   img.Image _sharpenFaceCrop(img.Image source, double amount) {
