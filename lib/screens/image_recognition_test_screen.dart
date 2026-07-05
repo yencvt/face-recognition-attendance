@@ -36,6 +36,8 @@ class _RecognitionSectionDef {
   final List<String> switchKeys;
 }
 
+enum _GalleryCompareMode { selectedPeople, fullGallery }
+
 class ImageRecognitionTestScreen extends StatefulWidget {
   const ImageRecognitionTestScreen({super.key});
 
@@ -321,6 +323,7 @@ class _ImageRecognitionTestScreenState
   bool _enableTraceLogs = false;
   bool _enablePerfLogs = false;
   bool _realtimeInputGrayscale = false;
+  _GalleryCompareMode _galleryCompareMode = _GalleryCompareMode.selectedPeople;
   double _matchThreshold = 0.55;
   UploadedImageRecognitionResult? _result;
 
@@ -358,6 +361,7 @@ class _ImageRecognitionTestScreenState
   }
 
   void _fillConfigControllers(RecognitionRuntimeConfig config) {
+    _matchThreshold = config.knownMatchThreshold;
     _configControllers['knownMatchThreshold']!.text = config.knownMatchThreshold
         .toString();
     _configControllers['knownStrongThreshold']!.text = config
@@ -667,6 +671,11 @@ class _ImageRecognitionTestScreenState
         ),
       );
 
+      setState(() {
+        _matchThreshold = config.knownMatchThreshold;
+      });
+      onStateChanged?.call();
+
       await RecognitionSettingsRepository.saveConfig(config);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -790,6 +799,8 @@ class _ImageRecognitionTestScreenState
             imageBytes: _originalImageBytes!,
             selectedPeople: selectedPeople,
             matchThreshold: _matchThreshold,
+            compareAgainstWholeGallery:
+                _galleryCompareMode == _GalleryCompareMode.fullGallery,
           )
           .timeout(const Duration(seconds: 30));
       if (!mounted) return;
@@ -1132,6 +1143,8 @@ class _ImageRecognitionTestScreenState
               : (value) {
                   setState(() {
                     _matchThreshold = value;
+                    _configControllers['knownMatchThreshold']!.text = value
+                        .toStringAsFixed(3);
                   });
                 },
         ),
@@ -1421,6 +1434,37 @@ class _ImageRecognitionTestScreenState
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
+                Text(
+                  'Che do so khop',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<_GalleryCompareMode>(
+                  segments: const [
+                    ButtonSegment<_GalleryCompareMode>(
+                      value: _GalleryCompareMode.selectedPeople,
+                      label: Text('Selected people'),
+                    ),
+                    ButtonSegment<_GalleryCompareMode>(
+                      value: _GalleryCompareMode.fullGallery,
+                      label: Text('Toan bo gallery'),
+                    ),
+                  ],
+                  selected: <_GalleryCompareMode>{_galleryCompareMode},
+                  onSelectionChanged: (selection) {
+                    setState(() {
+                      _galleryCompareMode = selection.first;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _galleryCompareMode == _GalleryCompareMode.selectedPeople
+                      ? 'Chi so khop trong danh sach da chon, phu hop de test tap hep.'
+                      : 'So khop voi toan bo gallery nhu realtime, nhung van danh gia PASS/FAILED theo danh sach da chon.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
                 if (_people.isEmpty)
                   const Text('Danh sach nguoi trong he thong dang trong.')
                 else

@@ -1216,30 +1216,18 @@ class FaceRecognitionService {
     }
 
     try {
-      await _ensureFallbackDetectorReady();
-      final detectorInput = Uint8List.fromList(
-        img.encodeJpg(decoded, quality: 92),
-      );
-      final faces = await _fallbackFaceDetector.detectFaces(
-        detectorInput,
-        mode: tfl.FaceDetectionMode.standard,
+      final detections = await _detectFacesForStaticRecognition(
+        decoded,
+        contextKey: 'enrollment-image',
       );
 
-      final rects = faces
-          .map(
-            (face) =>
-                _extractFallbackFaceRect(face, decoded.width, decoded.height),
-          )
-          .whereType<Rect>()
-          .toList(growable: false);
-
-      if (rects.isEmpty) {
+      if (detections.isEmpty) {
         return EnrollmentFaceCropResult(
           ok: false,
           message: _poseError(poseLabel, 'Khong phat hien khuon mat.'),
         );
       }
-      if (rects.length > 1) {
+      if (detections.length > 1) {
         return EnrollmentFaceCropResult(
           ok: false,
           message: _poseError(
@@ -1249,7 +1237,8 @@ class FaceRecognitionService {
         );
       }
 
-      final rect = rects.first;
+      final detectedFace = detections.first;
+      final rect = detectedFace.rect;
       final faceAreaRatio =
           (rect.width * rect.height) / (decoded.width * decoded.height);
       final faceAspectRatio = rect.width / rect.height;
@@ -1304,13 +1293,11 @@ class FaceRecognitionService {
         );
       }
 
-      final padded = _expandRect(
-        rect,
-        imageWidth: decoded.width,
-        imageHeight: decoded.height,
-        paddingRatio: 0.18,
+      final crop = _selectRecognitionCrop(
+        source: decoded,
+        rect: rect,
+        detectedFace: detectedFace,
       );
-      final crop = _cropFace(decoded, padded);
       if (crop == null) {
         return EnrollmentFaceCropResult(
           ok: false,
@@ -1355,6 +1342,7 @@ class FaceRecognitionService {
     required Uint8List imageBytes,
     required List<FacePerson> selectedPeople,
     double matchThreshold = 0.55,
+    bool compareAgainstWholeGallery = false,
   }) async {
     if (selectedPeople.isEmpty) {
       return UploadedImageRecognitionResult(
@@ -1404,14 +1392,18 @@ class FaceRecognitionService {
       );
     }
 
+    final referencePeople = compareAgainstWholeGallery
+        ? await FaceAttendanceRepository.getPeople()
+        : selectedPeople;
     final referenceTemplates = await _loadReferenceTemplatesForPeople(
-      selectedPeople,
+      referencePeople,
     );
     if (referenceTemplates.isEmpty) {
       return UploadedImageRecognitionResult(
         pass: false,
-        message:
-            'Khong co vector cache hop le cho doi tuong da chon. Hay rebuild vector cache truoc khi test.',
+        message: compareAgainstWholeGallery
+            ? 'Khong co vector cache hop le trong gallery. Hay rebuild vector cache truoc khi test.'
+            : 'Khong co vector cache hop le cho doi tuong da chon. Hay rebuild vector cache truoc khi test.',
         annotatedImageBytes: imageBytes,
         matches: const <UploadedImageRecognitionFaceMatch>[],
         faceDebugInfos: const <UploadedImageRecognitionFaceDebugInfo>[],
@@ -1449,7 +1441,11 @@ class FaceRecognitionService {
         continue;
       }
 
-      final originalCrop = _cropFaceTight(decoded, rect);
+      final originalCrop = _selectRecognitionCrop(
+        source: decoded,
+        rect: rect,
+        detectedFace: detectedFace,
+      );
       if (originalCrop == null) {
         continue;
       }
@@ -1568,75 +1564,196 @@ class FaceRecognitionService {
     _PartialEmbeddingBundle? partialBundle,
     int maxItems = 3,
   }) {
-    final bestByPerson = <String, UploadedImageRecognitionCandidateScore>{};
+    final bucketsByPerson = <String, _PersonScoreBucket>{};
     for (final template in templates) {
-      final templateScore =
-          _debiasedCosine(query, template.vector) *
-          (0.80 + template.quality * 0.20);
+      final bucket = bucketsByPerson.putIfAbsent(
+        template.person.id,
+        () => _PersonScoreBucket(person: template.person),
+      );
+      bucket.addTemplate(template);
+    }
+    for (final bucket in bucketsByPerson.values) {
+      bucket.finalize();
+    }
+
+    final ranked = _scoreCandidateBuckets(
+      query,
+      buckets: bucketsByPerson.values,
+      partialBundle: partialBundle,
+      frameQuality: 1.0,
+    )..sort((a, b) => b.blendedScore.compareTo(a.blendedScore));
+    final mapped = ranked
+        .map(
+          (candidate) => UploadedImageRecognitionCandidateScore(
+            personId: candidate.bucket.person.id,
+            personName: candidate.bucket.person.name,
+            score: candidate.blendedScore,
+          ),
+        )
+        .toList(growable: false);
+    if (mapped.length <= maxItems) {
+      return mapped;
+    }
+    return mapped.take(maxItems).toList(growable: false);
+  }
+
+  List<_CandidateScore> _scoreCandidateBuckets(
+    List<double> vector, {
+    required Iterable<_PersonScoreBucket> buckets,
+    _PartialEmbeddingBundle? partialBundle,
+    double frameQuality = 1.0,
+  }) {
+    final candidates = <_CandidateScore>[];
+    final probePartials = partialBundle ?? const _PartialEmbeddingBundle();
+
+    for (final bucket in buckets) {
+      if (bucket.templates.isEmpty) continue;
+
+      _FaceTemplate bestTemplate = bucket.templates.first;
+      var templateScore = -1.0;
+      final templateScores = <double>[];
+      for (final template in bucket.templates) {
+        final score =
+            _debiasedCosine(vector, template.vector) *
+            (0.80 + template.quality * 0.20);
+        templateScores.add(score);
+        if (score > templateScore) {
+          templateScore = score;
+          bestTemplate = template;
+        }
+      }
+
+      templateScores.sort((a, b) => b.compareTo(a));
+      final topCount = math.min(3, templateScores.length);
+      var multiPoseScore = templateScore;
+      if (topCount > 0) {
+        var sum = 0.0;
+        for (var i = 0; i < topCount; i++) {
+          sum += templateScores[i];
+        }
+        multiPoseScore = sum / topCount;
+        if (templateScores.length >= 5) {
+          final fifth = templateScores[4];
+          multiPoseScore = (multiPoseScore * 0.87) + (fifth * 0.13);
+        }
+      }
+
+      final centroidVector = bucket.centroid;
+      final centroidScore = centroidVector == null || centroidVector.isEmpty
+          ? 0.0
+          : _debiasedCosine(vector, centroidVector);
       var partialWeightedSum = 0.0;
       var partialWeightTotal = 0.0;
 
-      void addPartial(List<double>? probe, List<double>? ref, double weight) {
-        if (probe == null || ref == null || weight <= 0) return;
-        partialWeightedSum += _debiasedCosine(probe, ref) * weight;
+      void addPartial(
+        List<double>? probeVector,
+        List<double>? templateVector,
+        double weight,
+      ) {
+        if (probeVector == null || templateVector == null || weight <= 0) {
+          return;
+        }
+        final sim = _debiasedCosine(probeVector, templateVector);
+        partialWeightedSum += sim * weight;
         partialWeightTotal += weight;
       }
 
-      final parts = partialBundle ?? const _PartialEmbeddingBundle();
-      addPartial(parts.eyeVector, template.eyeVector, parts.eyeWeight);
       addPartial(
-        parts.leftEyeVector,
-        template.leftEyeVector,
-        parts.leftEyeWeight,
+        probePartials.eyeVector,
+        bestTemplate.eyeVector,
+        probePartials.eyeWeight,
       );
       addPartial(
-        parts.rightEyeVector,
-        template.rightEyeVector,
-        parts.rightEyeWeight,
-      );
-      addPartial(parts.noseVector, template.noseVector, parts.noseWeight);
-      addPartial(parts.mouthVector, template.mouthVector, parts.mouthWeight);
-      addPartial(
-        parts.foreheadVector,
-        template.foreheadVector,
-        parts.foreheadWeight,
+        probePartials.leftEyeVector,
+        bestTemplate.leftEyeVector,
+        probePartials.leftEyeWeight,
       );
       addPartial(
-        parts.leftCheekVector,
-        template.leftCheekVector,
-        parts.leftCheekWeight,
+        probePartials.rightEyeVector,
+        bestTemplate.rightEyeVector,
+        probePartials.rightEyeWeight,
       );
       addPartial(
-        parts.rightCheekVector,
-        template.rightCheekVector,
-        parts.rightCheekWeight,
+        probePartials.noseVector,
+        bestTemplate.noseVector,
+        probePartials.noseWeight,
       );
-      addPartial(parts.chinVector, template.chinVector, parts.chinWeight);
+      addPartial(
+        probePartials.mouthVector,
+        bestTemplate.mouthVector,
+        probePartials.mouthWeight,
+      );
+      addPartial(
+        probePartials.foreheadVector,
+        bestTemplate.foreheadVector,
+        probePartials.foreheadWeight,
+      );
+      addPartial(
+        probePartials.leftCheekVector,
+        bestTemplate.leftCheekVector,
+        probePartials.leftCheekWeight,
+      );
+      addPartial(
+        probePartials.rightCheekVector,
+        bestTemplate.rightCheekVector,
+        probePartials.rightCheekWeight,
+      );
+      addPartial(
+        probePartials.chinVector,
+        bestTemplate.chinVector,
+        probePartials.chinWeight,
+      );
 
+      final partialCoverage = probePartials.totalWeight <= 0
+          ? 0.0
+          : (partialWeightTotal / probePartials.totalWeight)
+                .clamp(0.0, 1.0)
+                .toDouble();
       final partialScore = partialWeightTotal > 0
-          ? partialWeightedSum / partialWeightTotal
+          ? (partialWeightedSum / partialWeightTotal)
           : templateScore;
-      final score = (templateScore * 0.68 + partialScore * 0.32)
-          .clamp(-1.0, 1.0)
-          .toDouble();
 
-      final current = bestByPerson[template.person.id];
-      if (current == null || score > current.score) {
-        bestByPerson[template.person.id] =
-            UploadedImageRecognitionCandidateScore(
-              personId: template.person.id,
-              personName: template.person.name,
-              score: score,
-            );
-      }
+      final structuralScore =
+          (templateScore * 0.55 + multiPoseScore * 0.30 + centroidScore * 0.15)
+              .clamp(-1.0, 1.0)
+              .toDouble();
+      final partialMix = (0.32 * partialCoverage).clamp(0.0, 0.32).toDouble();
+      final score =
+          (structuralScore * (1.0 - partialMix) + partialScore * partialMix)
+              .clamp(-1.0, 1.0)
+              .toDouble();
+      final calibrated = bucket.calibrate(score);
+      candidates.add(
+        _CandidateScore(
+          bucket: bucket,
+          template: bestTemplate,
+          templateScore: templateScore,
+          multiPoseScore: multiPoseScore,
+          partialScore: partialScore,
+          partialCoverage: partialCoverage,
+          centroidScore: centroidScore,
+          blendedScore: score,
+          calibratedScore: calibrated,
+          decisionScore: _candidateDecisionScore(
+            _CandidateScore(
+              bucket: bucket,
+              template: bestTemplate,
+              templateScore: templateScore,
+              multiPoseScore: multiPoseScore,
+              partialScore: partialScore,
+              partialCoverage: partialCoverage,
+              centroidScore: centroidScore,
+              blendedScore: score,
+              calibratedScore: calibrated,
+              decisionScore: 0.0,
+            ),
+            frameQuality: frameQuality,
+          ),
+        ),
+      );
     }
 
-    final ranked = bestByPerson.values.toList(growable: false)
-      ..sort((a, b) => b.score.compareTo(a.score));
-    if (ranked.length <= maxItems) {
-      return ranked;
-    }
-    return ranked.take(maxItems).toList(growable: false);
+    return candidates;
   }
 
   Future<List<_FaceTemplate>> _loadReferenceTemplatesForPeople(
@@ -2374,7 +2491,46 @@ class FaceRecognitionService {
       final decoded = img.decodeImage(bytes);
       if (decoded == null) return null;
 
-      final prepared = _prepareFaceForEmbedding(decoded);
+      final detections = await _detectFacesForStaticRecognition(
+        decoded,
+        contextKey: 'vector-cache-$personId-$sourceType',
+      );
+      if (detections.isEmpty) {
+        if (_detailedScoreVectorLogging) {
+          _log.debug(
+            'VectorBuild skipped personId=$personId sourceId=$sourceId sourceType=$sourceType '
+            'reason=no_face_detected',
+          );
+        }
+        return null;
+      }
+      if (detections.length > 1) {
+        if (_detailedScoreVectorLogging) {
+          _log.debug(
+            'VectorBuild skipped personId=$personId sourceId=$sourceId sourceType=$sourceType '
+            'reason=multiple_faces count=${detections.length}',
+          );
+        }
+        return null;
+      }
+
+      final detectedFace = detections.first;
+      final faceCrop = _selectRecognitionCrop(
+        source: decoded,
+        rect: detectedFace.rect,
+        detectedFace: detectedFace,
+      );
+      if (faceCrop == null) {
+        if (_detailedScoreVectorLogging) {
+          _log.debug(
+            'VectorBuild skipped personId=$personId sourceId=$sourceId sourceType=$sourceType '
+            'reason=crop_failed',
+          );
+        }
+        return null;
+      }
+
+      final prepared = _prepareFaceForEmbedding(faceCrop);
       final sharpness = _imageSharpness(prepared);
       final templateSharpnessFloor = (_minTemplateSharpness * 0.70).clamp(
         16.0,
@@ -2585,8 +2741,7 @@ class FaceRecognitionService {
             minFacePixels,
             nowMs,
           );
-          final crop =
-              _alignedCropFromMesh(rgb, f) ?? _cropFaceTight(rgb, rect);
+          final crop = _selectRecognitionCrop(source: rgb, rect: rect, mesh: f);
           if (crop == null) continue;
 
           var workingCrop = crop;
@@ -2646,76 +2801,6 @@ class FaceRecognitionService {
             profile: autoTuneProfile,
             adaptiveFarDistance: adaptiveFarDistance,
           );
-          final effectiveFaceAreaRatio = autoTuneProfile.faceAreaRatioFloor;
-          final effectiveFacePixels = autoTuneProfile.facePixelsFloor;
-          final adjustedFaceAreaRatioFloor = adaptiveFarDistance
-              ? (effectiveFaceAreaRatio * 0.75).clamp(
-                  _adaptiveFarDistanceFaceAreaRatio,
-                  effectiveFaceAreaRatio,
-                )
-              : effectiveFaceAreaRatio;
-          final adjustedFacePixelsFloor = adaptiveFarDistance
-              ? (effectiveFacePixels * 0.78).round().clamp(
-                  _adaptiveFarDistanceFacePixels,
-                  effectiveFacePixels,
-                )
-              : effectiveFacePixels;
-          if (faceAreaRatio < adjustedFaceAreaRatioFloor) {
-            _logRealtimeGateSkip(
-              cameraId: cameraId,
-              stage: 'native',
-              reason: 'face_area',
-              faceAreaRatio: faceAreaRatio,
-              minFacePixels: minFacePixels,
-              profile: autoTuneProfile,
-              frameQuality: frameQuality,
-              luminance: luminance,
-              adaptiveFarDistance: adaptiveFarDistance,
-            );
-            continue;
-          }
-          if (minFacePixels < adjustedFacePixelsFloor) {
-            _logRealtimeGateSkip(
-              cameraId: cameraId,
-              stage: 'native',
-              reason: 'face_pixels',
-              faceAreaRatio: faceAreaRatio,
-              minFacePixels: minFacePixels,
-              profile: autoTuneProfile,
-              frameQuality: frameQuality,
-              luminance: luminance,
-              adaptiveFarDistance: adaptiveFarDistance,
-            );
-            continue;
-          }
-          final frameQualityFloor = autoTuneProfile.frameQualityFloor;
-          final luminanceFloor = autoTuneProfile.luminanceFloor;
-          final farQualityRelax = adaptiveFarDistance ? 0.08 : 0.0;
-          final farLuminanceRelax = adaptiveFarDistance ? 0.06 : 0.0;
-          final effectiveFrameQualityFloor =
-              (frameQualityFloor - farQualityRelax).clamp(
-                0.12,
-                frameQualityFloor,
-              );
-          final effectiveLuminanceFloor = (luminanceFloor - farLuminanceRelax)
-              .clamp(0.12, luminanceFloor);
-          if (frameQuality < effectiveFrameQualityFloor ||
-              luminance < effectiveLuminanceFloor) {
-            _logRealtimeGateSkip(
-              cameraId: cameraId,
-              stage: 'native',
-              reason: frameQuality < effectiveFrameQualityFloor
-                  ? 'frame_quality'
-                  : 'luminance',
-              faceAreaRatio: faceAreaRatio,
-              minFacePixels: minFacePixels,
-              profile: autoTuneProfile,
-              frameQuality: frameQuality,
-              luminance: luminance,
-              adaptiveFarDistance: adaptiveFarDistance,
-            );
-            continue;
-          }
           final spoofAssessment = _assessSpoof(
             cameraId,
             '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}',
@@ -2772,31 +2857,18 @@ class FaceRecognitionService {
             );
             continue;
           }
-          final useRobustEmbedding = _shouldUseRobustRealtimeEmbedding(
-            minFacePixels: minFacePixels,
-            faceAreaRatio: faceAreaRatio,
-            frameQuality: frameQuality,
-            adaptiveFarDistance: adaptiveFarDistance,
-          );
           final vector = _alignVectorDimension(
-            await _embeddingFromImage(workingCrop, robust: useRobustEmbedding),
+            await _embeddingFromImage(workingCrop, robust: false),
             _templateVectorDimension,
           );
           if (vector.isEmpty) continue;
-          final usePartials = _shouldComputeRealtimePartials(
-            minFacePixels: minFacePixels,
-            faceAreaRatio: faceAreaRatio,
+          final partialBundle = await _buildPartialEmbeddingsFromFace(
+            workingCrop,
+            targetDimension: _templateVectorDimension,
             frameQuality: frameQuality,
-            adaptiveFarDistance: adaptiveFarDistance,
+            forRealtime: false,
+            faceAlreadyPrepared: true,
           );
-          final partialBundle = usePartials
-              ? await _buildPartialEmbeddingsFromFace(
-                  workingCrop,
-                  targetDimension: _templateVectorDimension,
-                  frameQuality: frameQuality,
-                  forRealtime: true,
-                )
-              : const _PartialEmbeddingBundle();
           final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
           final assignedKnownIds = nextTracks.values
               .map((track) => track.event.personId)
@@ -2950,7 +3022,11 @@ class FaceRecognitionService {
 
           if (!_isInsideZone(ratio, zone)) continue;
 
-          final crop = detected.alignedCrop ?? _cropFaceTight(rgb, rect);
+          final crop = _selectRecognitionCrop(
+            source: rgb,
+            rect: rect,
+            detectedFace: detected,
+          );
           if (crop == null) continue;
 
           var workingCrop = crop;
@@ -3010,82 +3086,6 @@ class FaceRecognitionService {
             profile: autoTuneProfile,
             adaptiveFarDistance: adaptiveFarDistance,
           );
-          final effectiveFaceAreaRatio = autoTuneProfile.faceAreaRatioFloor;
-          final effectiveFacePixels = autoTuneProfile.facePixelsFloor;
-          final adjustedFaceAreaRatioFloor = adaptiveFarDistance
-              ? (effectiveFaceAreaRatio * 0.72).clamp(
-                  _adaptiveFarDistanceFaceAreaRatio,
-                  effectiveFaceAreaRatio,
-                )
-              : effectiveFaceAreaRatio;
-          final adjustedFacePixelsFloor = adaptiveFarDistance
-              ? (effectiveFacePixels * 0.74).round().clamp(
-                  _adaptiveFarDistanceFacePixels,
-                  effectiveFacePixels,
-                )
-              : effectiveFacePixels;
-          if (faceAreaRatio < adjustedFaceAreaRatioFloor) {
-            _logRealtimeGateSkip(
-              cameraId: cameraId,
-              stage: 'fallback',
-              reason: 'face_area',
-              faceAreaRatio: faceAreaRatio,
-              minFacePixels: minFacePixels,
-              profile: autoTuneProfile,
-              frameQuality: frameQuality,
-              luminance: luminance,
-              adaptiveFarDistance: adaptiveFarDistance,
-            );
-            if (_traceLogsEnabled) {
-              _log.debug(
-                'GateSkipDetail camera=$cameraId stage=fallback face_area_floor='
-                '${adjustedFaceAreaRatioFloor.toStringAsFixed(4)}',
-              );
-            }
-            continue;
-          }
-          if (minFacePixels < adjustedFacePixelsFloor) {
-            _logRealtimeGateSkip(
-              cameraId: cameraId,
-              stage: 'fallback',
-              reason: 'face_pixels',
-              faceAreaRatio: faceAreaRatio,
-              minFacePixels: minFacePixels,
-              profile: autoTuneProfile,
-              frameQuality: frameQuality,
-              luminance: luminance,
-              adaptiveFarDistance: adaptiveFarDistance,
-            );
-            continue;
-          }
-          final frameQualityFloor = autoTuneProfile.frameQualityFloor;
-          final luminanceFloor = autoTuneProfile.luminanceFloor;
-          final farQualityRelax = adaptiveFarDistance ? 0.08 : 0.0;
-          final farLuminanceRelax = adaptiveFarDistance ? 0.06 : 0.0;
-          final effectiveFrameQualityFloor =
-              (frameQualityFloor - farQualityRelax).clamp(
-                0.12,
-                frameQualityFloor,
-              );
-          final effectiveLuminanceFloor = (luminanceFloor - farLuminanceRelax)
-              .clamp(0.12, luminanceFloor);
-          if (frameQuality < effectiveFrameQualityFloor ||
-              luminance < effectiveLuminanceFloor) {
-            _logRealtimeGateSkip(
-              cameraId: cameraId,
-              stage: 'fallback',
-              reason: frameQuality < effectiveFrameQualityFloor
-                  ? 'frame_quality'
-                  : 'luminance',
-              faceAreaRatio: faceAreaRatio,
-              minFacePixels: minFacePixels,
-              profile: autoTuneProfile,
-              frameQuality: frameQuality,
-              luminance: luminance,
-              adaptiveFarDistance: adaptiveFarDistance,
-            );
-            continue;
-          }
           final spoofAssessment = _assessSpoof(
             cameraId,
             '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}',
@@ -3142,31 +3142,18 @@ class FaceRecognitionService {
             );
             continue;
           }
-          final useRobustEmbedding = _shouldUseRobustRealtimeEmbedding(
-            minFacePixels: minFacePixels,
-            faceAreaRatio: faceAreaRatio,
-            frameQuality: frameQuality,
-            adaptiveFarDistance: adaptiveFarDistance,
-          );
           final vector = _alignVectorDimension(
-            await _embeddingFromImage(workingCrop, robust: useRobustEmbedding),
+            await _embeddingFromImage(workingCrop, robust: false),
             _templateVectorDimension,
           );
           if (vector.isEmpty) continue;
-          final usePartials = _shouldComputeRealtimePartials(
-            minFacePixels: minFacePixels,
-            faceAreaRatio: faceAreaRatio,
+          final partialBundle = await _buildPartialEmbeddingsFromFace(
+            workingCrop,
+            targetDimension: _templateVectorDimension,
             frameQuality: frameQuality,
-            adaptiveFarDistance: adaptiveFarDistance,
+            forRealtime: false,
+            faceAlreadyPrepared: true,
           );
-          final partialBundle = usePartials
-              ? await _buildPartialEmbeddingsFromFace(
-                  workingCrop,
-                  targetDimension: _templateVectorDimension,
-                  frameQuality: frameQuality,
-                  forRealtime: true,
-                )
-              : const _PartialEmbeddingBundle();
           final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
           final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
           final assignedKnownIds = nextTracks.values
@@ -3371,6 +3358,25 @@ class FaceRecognitionService {
       results.add(_DetectedFace(rect: rect));
     }
     return results;
+  }
+
+  Future<List<_DetectedFace>> _detectFacesForStaticRecognition(
+    img.Image source, {
+    required String contextKey,
+  }) async {
+    await _ensureFallbackDetectorReady();
+    final detections = await _detectFacesForFallback(source, contextKey);
+    if (detections.isEmpty) {
+      return const <_DetectedFace>[];
+    }
+
+    final sorted = [...detections]
+      ..sort((a, b) {
+        final areaA = a.rect.width * a.rect.height * a.score;
+        final areaB = b.rect.width * b.rect.height * b.score;
+        return areaB.compareTo(areaA);
+      });
+    return sorted;
   }
 
   Future<List<_DetectedFace>> _detectWithScrfd(img.Image source) async {
@@ -3840,24 +3846,20 @@ class FaceRecognitionService {
     required double frameQuality,
     double? spoofScore,
   }) {
+    final threshold = _knownMatchThreshold.toStringAsFixed(2);
     if (match == null) {
       final spoofText = spoofScore == null
           ? ''
           : ' s:${spoofScore.toStringAsFixed(2)}';
-      return 'g:- p:- w e/n/m:-/-/- q:${frameQuality.toStringAsFixed(2)}$spoofText';
+      return 'top1:- th:$threshold q:${frameQuality.toStringAsFixed(2)}$spoofText';
     }
 
-    final global = match.globalScore.toStringAsFixed(3);
-    final partial = match.partialScore.toStringAsFixed(3);
-    final partialCov = match.partialCoverage.toStringAsFixed(2);
+    final top1 = match.score.toStringAsFixed(3);
     final margin = match.margin.toStringAsFixed(3);
-    final eye = match.eyeWeight.toStringAsFixed(2);
-    final nose = match.noseWeight.toStringAsFixed(2);
-    final mouth = match.mouthWeight.toStringAsFixed(2);
     final spoofText = spoofScore == null
         ? ''
         : ' s:${spoofScore.toStringAsFixed(2)}';
-    return 'g:$global p:$partial c:$partialCov m:$margin w $eye/$nose/$mouth q:${frameQuality.toStringAsFixed(2)}$spoofText';
+    return 'top1:$top1 th:$threshold m:$margin q:${frameQuality.toStringAsFixed(2)}$spoofText';
   }
 
   RecognitionEvent _buildEventWithSnapshot(
@@ -5557,15 +5559,9 @@ class FaceRecognitionService {
       }
     }
 
-    _CandidateScore? best;
-    _CandidateScore? secondBest;
-    _CandidateScore? bestByTemplate;
-    _CandidateScore? bestByCentroid;
-    final candidates = <_CandidateScore>[];
     final excluded = excludedPersonIds ?? const <String>{};
     final indexedTemplates =
         _vectorIndex?.query(vector) ?? const <_FaceTemplate>[];
-    final probePartials = partialBundle ?? const _PartialEmbeddingBundle();
     final totalPersons = _templatesByPersonId.length;
 
     Set<String>? candidatePersonIds;
@@ -5602,304 +5598,37 @@ class FaceRecognitionService {
         : candidatePersonIds
               .map((id) => _templatesByPersonId[id])
               .whereType<_PersonScoreBucket>();
+      final probePartials = partialBundle ?? const _PartialEmbeddingBundle();
+    final scoredBuckets = searchBuckets.where(
+      (bucket) =>
+          bucket.templates.isNotEmpty && !excluded.contains(bucket.person.id),
+    );
+    final candidates = _scoreCandidateBuckets(
+      vector,
+      buckets: scoredBuckets,
+      partialBundle: partialBundle,
+      frameQuality: frameQuality,
+    );
 
-    for (final bucket in searchBuckets) {
-      if (bucket.templates.isEmpty) continue;
-      if (excluded.contains(bucket.person.id)) continue;
+    if (candidates.isEmpty) return null;
 
-      _FaceTemplate bestTemplate = bucket.templates.first;
-      var templateScore = -1.0;
-      final templateScores = <double>[];
-      for (final template in bucket.templates) {
-        final score =
-            _debiasedCosine(vector, template.vector) *
-            (0.80 + template.quality * 0.20);
-        templateScores.add(score);
-        if (score > templateScore) {
-          templateScore = score;
-          bestTemplate = template;
-        }
-      }
-
-      templateScores.sort((a, b) => b.compareTo(a));
-      final topCount = math.min(3, templateScores.length);
-      var multiPoseScore = templateScore;
-      if (topCount > 0) {
-        var sum = 0.0;
-        for (var i = 0; i < topCount; i++) {
-          sum += templateScores[i];
-        }
-        multiPoseScore = sum / topCount;
-        if (templateScores.length >= 5) {
-          final fifth = templateScores[4];
-          multiPoseScore = (multiPoseScore * 0.87) + (fifth * 0.13);
-        }
-      }
-
-      final centroidVector = bucket.centroid;
-      final centroidScore = centroidVector == null || centroidVector.isEmpty
-          ? 0.0
-          : _debiasedCosine(vector, centroidVector);
-      var partialWeightedSum = 0.0;
-      var partialWeightTotal = 0.0;
-
-      void addPartial(
-        List<double>? probeVector,
-        List<double>? templateVector,
-        double weight,
-      ) {
-        if (probeVector == null || templateVector == null || weight <= 0) {
-          return;
-        }
-        final sim = _debiasedCosine(probeVector, templateVector);
-        partialWeightedSum += sim * weight;
-        partialWeightTotal += weight;
-      }
-
-      addPartial(
-        probePartials.eyeVector,
-        bestTemplate.eyeVector,
-        probePartials.eyeWeight,
-      );
-      addPartial(
-        probePartials.leftEyeVector,
-        bestTemplate.leftEyeVector,
-        probePartials.leftEyeWeight,
-      );
-      addPartial(
-        probePartials.rightEyeVector,
-        bestTemplate.rightEyeVector,
-        probePartials.rightEyeWeight,
-      );
-      addPartial(
-        probePartials.noseVector,
-        bestTemplate.noseVector,
-        probePartials.noseWeight,
-      );
-      addPartial(
-        probePartials.mouthVector,
-        bestTemplate.mouthVector,
-        probePartials.mouthWeight,
-      );
-      addPartial(
-        probePartials.foreheadVector,
-        bestTemplate.foreheadVector,
-        probePartials.foreheadWeight,
-      );
-      addPartial(
-        probePartials.leftCheekVector,
-        bestTemplate.leftCheekVector,
-        probePartials.leftCheekWeight,
-      );
-      addPartial(
-        probePartials.rightCheekVector,
-        bestTemplate.rightCheekVector,
-        probePartials.rightCheekWeight,
-      );
-      addPartial(
-        probePartials.chinVector,
-        bestTemplate.chinVector,
-        probePartials.chinWeight,
-      );
-
-      final partialCoverage = probePartials.totalWeight <= 0
-          ? 0.0
-          : (partialWeightTotal / probePartials.totalWeight)
-                .clamp(0.0, 1.0)
-                .toDouble();
-      final partialScore = partialWeightTotal > 0
-          ? (partialWeightedSum / partialWeightTotal)
-          : templateScore;
-
-      final structuralScore =
-          (templateScore * 0.55 + multiPoseScore * 0.30 + centroidScore * 0.15)
-              .clamp(-1.0, 1.0)
-              .toDouble();
-      final partialMix = (0.32 * partialCoverage).clamp(0.0, 0.32).toDouble();
-      final score =
-          (structuralScore * (1.0 - partialMix) + partialScore * partialMix)
-              .clamp(-1.0, 1.0)
-              .toDouble();
-      final calibrated = bucket.calibrate(score);
-      final candidate = _CandidateScore(
-        bucket: bucket,
-        template: bestTemplate,
-        templateScore: templateScore,
-        multiPoseScore: multiPoseScore,
-        partialScore: partialScore,
-        partialCoverage: partialCoverage,
-        centroidScore: centroidScore,
-        blendedScore: score,
-        calibratedScore: calibrated,
-        decisionScore: _candidateDecisionScore(
-          _CandidateScore(
-            bucket: bucket,
-            template: bestTemplate,
-            templateScore: templateScore,
-            multiPoseScore: multiPoseScore,
-            partialScore: partialScore,
-            partialCoverage: partialCoverage,
-            centroidScore: centroidScore,
-            blendedScore: score,
-            calibratedScore: calibrated,
-            decisionScore: 0.0,
-          ),
-          frameQuality: frameQuality,
-        ),
-      );
-      candidates.add(candidate);
-
-      if (bestByTemplate == null ||
-          candidate.templateScore > bestByTemplate.templateScore) {
-        bestByTemplate = candidate;
-      }
-
-      if (bestByCentroid == null ||
-          candidate.centroidScore > bestByCentroid.centroidScore) {
-        bestByCentroid = candidate;
-      }
-
-      if (best == null || candidate.decisionScore > best.decisionScore) {
-        secondBest = best;
-        best = candidate;
-      } else if (secondBest == null ||
-          candidate.decisionScore > secondBest.decisionScore) {
-        secondBest = candidate;
-      }
-    }
-
-    if (best == null || candidates.isEmpty) return null;
-
-    var topTemplateScore = -1.0;
-    var secondTemplateScore = -1.0;
-    String? topTemplatePersonId;
-    var topCentroidScore = -1.0;
-    var secondCentroidScore = -1.0;
-    String? topCentroidPersonId;
-    for (final candidate in candidates) {
-      final templateScore = candidate.templateScore;
-      final personId = candidate.bucket.person.id;
-      if (templateScore > topTemplateScore) {
-        secondTemplateScore = topTemplateScore;
-        topTemplateScore = templateScore;
-        topTemplatePersonId = personId;
-      } else if (templateScore > secondTemplateScore) {
-        secondTemplateScore = templateScore;
-      }
-
-      final centroidScore = candidate.centroidScore;
-      if (centroidScore > topCentroidScore) {
-        secondCentroidScore = topCentroidScore;
-        topCentroidScore = centroidScore;
-        topCentroidPersonId = personId;
-      } else if (centroidScore > secondCentroidScore) {
-        secondCentroidScore = centroidScore;
-      }
-    }
-
-    final effectiveDecisionByPersonId = <String, double>{};
-    for (final candidate in candidates) {
-      final personId = candidate.bucket.person.id;
-      final nearestTemplate = topTemplatePersonId == personId
-          ? secondTemplateScore
-          : topTemplateScore;
-      final nearestCentroid = topCentroidPersonId == personId
-          ? secondCentroidScore
-          : topCentroidScore;
-
-      final templateContrast = nearestTemplate <= -0.5
-          ? 0.0
-          : (candidate.templateScore - nearestTemplate);
-      final centroidContrast = nearestCentroid <= -0.5
-          ? 0.0
-          : (candidate.centroidScore - nearestCentroid);
-
-      final templateWeight = totalPersons <= 3 ? 0.52 : 0.34;
-      final centroidWeight = totalPersons <= 3 ? 0.22 : 0.12;
-      final contrastBoost =
-          (templateContrast * templateWeight +
-                  centroidContrast * centroidWeight)
-              .clamp(-0.14, 0.14)
-              .toDouble();
-
-      final effectiveDecision = (candidate.decisionScore + contrastBoost)
-          .clamp(-0.98, 0.98)
-          .toDouble();
-      effectiveDecisionByPersonId[personId] = effectiveDecision;
-    }
-
-    double decisionOf(_CandidateScore c) =>
-        effectiveDecisionByPersonId[c.bucket.person.id] ?? c.decisionScore;
-
-    final profile = cameraId == null
-        ? null
-        : _cameraThresholdProfiles[cameraId];
-    final baseMatchThreshold = profile?.matchThreshold ?? _knownMatchThreshold;
-    final baseCalibratedThreshold =
-        profile?.calibratedThreshold ?? _knownCalibratedThreshold;
-    final strongThreshold = profile?.strongThreshold ?? _knownStrongThreshold;
-    final marginThreshold = profile?.marginThreshold ?? _knownMatchMargin;
-    final tunedMatchThreshold =
-        baseMatchThreshold + (autoTuneProfile?.matchThresholdBoost ?? 0.0);
-    final tunedCalibratedThreshold =
-        baseCalibratedThreshold +
-        (autoTuneProfile?.calibratedThresholdBoost ?? 0.0);
-    final tunedStrongThreshold =
-        strongThreshold + (autoTuneProfile?.strongThresholdBoost ?? 0.0);
-    final tunedMarginThreshold =
-        marginThreshold + (autoTuneProfile?.marginBoost ?? 0.0);
-
-    final qualityPenalty = ((0.55 - frameQuality).clamp(0.0, 0.55)) * 0.20;
-    final evidenceRelax =
-        ((best.templateScore - 0.88).clamp(0.0, 0.08) * 0.70) +
-        ((best.partialCoverage - 0.80).clamp(0.0, 0.20) * 0.25);
-    var matchThreshold = (tunedMatchThreshold + qualityPenalty - evidenceRelax)
-        .clamp(0.62, 0.99)
-        .toDouble();
-    final autoCloseSeverity = autoTuneProfile?.closeFaceSeverity ?? 0.0;
-    final autoSignalSeverity = autoTuneProfile?.signalSeverity ?? 0.0;
-    final closeQualityReliability =
-        (autoCloseSeverity * frameQuality * (1.0 - autoSignalSeverity * 0.85))
-            .clamp(0.0, 1.0)
-            .toDouble();
-    final closeCalibratedRelax = (closeQualityReliability * 0.18)
-        .clamp(0.0, 0.18)
-        .toDouble();
-    var calibratedThreshold =
-        (tunedCalibratedThreshold +
-                qualityPenalty * 1.2 -
-                evidenceRelax * 0.70 -
-                closeCalibratedRelax)
-            .clamp(0.64, 0.99)
-            .toDouble();
-    var effectiveMarginThreshold =
-        (tunedMarginThreshold - closeQualityReliability * 0.08)
-            .clamp(0.10, 0.35)
-            .toDouble();
-    if (totalPersons <= 3) {
-      // Small galleries are naturally tight; keep ambiguity guard but avoid
-      // requiring unrealistically large top1-top2 margins.
-      effectiveMarginThreshold = effectiveMarginThreshold.clamp(0.06, 0.12);
-    }
+    final bestByTemplate = candidates.reduce(
+      (a, b) => a.templateScore >= b.templateScore ? a : b,
+    );
+    final bestByCentroid = candidates.reduce(
+      (a, b) => a.centroidScore >= b.centroidScore ? a : b,
+    );
 
     final sorted = [...candidates]
-      ..sort((a, b) => decisionOf(b).compareTo(decisionOf(a)));
+      ..sort((a, b) => b.blendedScore.compareTo(a.blendedScore));
     final top1 = sorted.first;
     final top2 = sorted.length > 1 ? sorted[1] : null;
-    best = top1;
-    secondBest = top2;
-    final bestDecision = decisionOf(best);
-    final secondDecision = secondBest == null ? 0.0 : decisionOf(secondBest);
-    final hasCompetition = top2 != null;
-    final strictCompetition = hasCompetition;
-
-    final margin = bestDecision - secondDecision;
-    var rejectionReason = '';
-    if (bestDecision < matchThreshold) {
-      rejectionReason = 'raw';
-    } else if (bestDecision < calibratedThreshold) {
-      rejectionReason = 'calibrated';
-    }
+    final best = top1;
+    final secondBest = top2;
+    final bestScore = best.blendedScore;
+    final secondScore = secondBest == null ? 0.0 : secondBest.blendedScore;
+    final margin = bestScore - secondScore;
+    final matchThreshold = _knownMatchThreshold;
 
     final templateConsensus =
         bestByTemplate != null &&
@@ -5909,174 +5638,25 @@ class FaceRecognitionService {
         bestByCentroid.bucket.person.id == best.bucket.person.id;
     final dualConsensus = templateConsensus && centroidConsensus;
 
-    if (rejectionReason == 'calibrated' &&
-        bestDecision >= tunedStrongThreshold &&
-        dualConsensus &&
-        frameQuality >= ((_minRealtimeFrameQuality - 0.02).clamp(0.0, 1.0))) {
-      rejectionReason = '';
-    }
-
-    if (rejectionReason == 'calibrated' &&
-        autoCloseSeverity >= 0.80 &&
-        frameQuality >= 0.70 &&
-        best.templateScore >= 0.910 &&
-        best.partialCoverage >= 0.90 &&
-        best.centroidScore >= 0.90 &&
-        margin >= (effectiveMarginThreshold * 0.45)) {
-      rejectionReason = '';
-    }
-
-    if (rejectionReason.isEmpty &&
-        hasCompetition &&
-        !dualConsensus &&
-        bestDecision < (tunedStrongThreshold - 0.02)) {
-      rejectionReason = 'consensus';
-    }
-
-    if (rejectionReason.isEmpty &&
-        strictCompetition &&
-        margin <
-            (effectiveMarginThreshold +
-                ((0.60 - frameQuality).clamp(0.0, 0.60) * 0.10)) &&
-        bestDecision < tunedStrongThreshold) {
-      rejectionReason = 'ambiguous';
-    }
-
-    if (rejectionReason == 'ambiguous' &&
-        autoCloseSeverity >= 0.80 &&
-        frameQuality >= 0.72 &&
-        best.templateScore >= 0.915 &&
-        best.partialCoverage >= 0.92 &&
-        (!hasCompetition ||
-            best.templateScore - top2.templateScore >= 0.010 ||
-            margin >= (effectiveMarginThreshold * 0.55))) {
-      rejectionReason = '';
-    }
-
-    if (rejectionReason.isEmpty &&
-        best.templateScore < (matchThreshold - 0.02)) {
-      rejectionReason = 'template';
-    }
-
-    if (rejectionReason.isEmpty && best.templateScore < 0.850) {
-      rejectionReason = 'template-abs';
-    }
-
-    if (rejectionReason.isEmpty && best.centroidScore < 0.830) {
-      rejectionReason = 'centroid-abs';
-    }
-
-    if (rejectionReason.isEmpty &&
-        strictCompetition &&
-        top2.bucket.person.id != best.bucket.person.id &&
-        bestDecision >= (tunedStrongThreshold + 0.01) &&
-        decisionOf(top2) >= (tunedStrongThreshold + 0.01) &&
-        margin < (effectiveMarginThreshold + 0.03)) {
-      rejectionReason = 'strong-tie';
-    }
-
-    if (rejectionReason.isEmpty &&
-        strictCompetition &&
-        top2.bucket.person.id != best.bucket.person.id) {
-      final templateMargin = best.templateScore - top2.templateScore;
-      final centroidMargin = best.centroidScore - top2.centroidScore;
-      final veryStrongMatch =
-          bestDecision >= (tunedStrongThreshold + 0.01) &&
-          best.calibratedScore >= (tunedCalibratedThreshold + 0.10) &&
-          margin >= (effectiveMarginThreshold + 0.04);
-      if (!veryStrongMatch &&
-          templateMargin < 0.022 &&
-          centroidMargin < 0.030 &&
-          margin <
-              (effectiveMarginThreshold +
-                  0.02 +
-                  ((0.60 - frameQuality).clamp(0.0, 0.60) * 0.08))) {
-        rejectionReason = 'near-tie';
-      }
-    }
-
-    if (rejectionReason.isEmpty && totalPersons <= 3 && hasCompetition) {
-      final templateMargin = best.templateScore - top2.templateScore;
-      final centroidMargin = best.centroidScore - top2.centroidScore;
-      final requiredTemplateMargin = frameQuality >= 0.70 ? 0.016 : 0.024;
-      final requiredCentroidMargin = frameQuality >= 0.70 ? 0.010 : 0.015;
-      final requiredDecisionMargin = frameQuality >= 0.70 ? 0.022 : 0.032;
-      final strongSmallGalleryEvidence =
-          best.templateScore >= 0.910 &&
-          best.centroidScore >= 0.885 &&
-          best.calibratedScore >= (tunedCalibratedThreshold - 0.02) &&
-          bestDecision >= (tunedStrongThreshold - 0.01);
-      if (!strongSmallGalleryEvidence &&
-          (templateMargin < requiredTemplateMargin ||
-              centroidMargin < requiredCentroidMargin ||
-              margin < requiredDecisionMargin)) {
-        rejectionReason = 'small-gallery-ambiguous';
-      }
-    }
-
-    if (rejectionReason.isEmpty &&
-        usedIndexedPruning &&
-        !hasCompetition &&
-        bestDecision < (tunedStrongThreshold + 0.015)) {
-      rejectionReason = 'single-pruned';
-    }
-
-    final accepted = rejectionReason.isEmpty;
-    _recordCalibrationSample(
-      cameraId: cameraId,
-      faceLogKey: faceLogKey,
-      top1: top1,
-      top2: top2,
-      margin: margin,
-      frameQuality: frameQuality,
-      accepted: accepted,
-    );
+    final accepted = bestScore >= matchThreshold;
 
     if (!accepted) {
-      if (_traceLogsEnabled && _templatesByPersonId.isNotEmpty) {
-        switch (rejectionReason) {
-          case 'raw':
-            _log.debug(
-              'Match rejected best=${best.blendedScore.toStringAsFixed(3)} cal=${best.calibratedScore.toStringAsFixed(3)} margin=${margin.toStringAsFixed(3)} threshold=${matchThreshold.toStringAsFixed(3)} q=${frameQuality.toStringAsFixed(3)} persons=${_templatesByPersonId.length}',
-            );
-            break;
-          case 'calibrated':
-            _log.debug(
-              'Match rejected calibrated best=${best.blendedScore.toStringAsFixed(3)} cal=${best.calibratedScore.toStringAsFixed(3)} required=${calibratedThreshold.toStringAsFixed(3)} q=${frameQuality.toStringAsFixed(3)} persons=${_templatesByPersonId.length}',
-            );
-            break;
-          case 'consensus':
-            _log.debug(
-              'Match rejected consensus best=${best.blendedScore.toStringAsFixed(3)} cal=${best.calibratedScore.toStringAsFixed(3)} tpl=${bestByTemplate?.bucket.person.name} ctr=${bestByCentroid?.bucket.person.name} strong=${strongThreshold.toStringAsFixed(3)}',
-            );
-            break;
-          default:
-            _log.debug(
-              'Match rejected ambiguous best=${best.blendedScore.toStringAsFixed(3)} cal=${best.calibratedScore.toStringAsFixed(3)} margin=${margin.toStringAsFixed(3)} required=${marginThreshold.toStringAsFixed(3)} strong=${strongThreshold.toStringAsFixed(3)} persons=${_templatesByPersonId.length}',
-            );
-        }
-      }
       if (_traceLogsEnabled) {
         _log.debug(
           'Match decision camera=$cameraId face=${faceLogKey ?? '-'} accepted=false '
-          'reason=${rejectionReason.isEmpty ? 'unknown' : rejectionReason} '
+          'reason=raw '
           'top1=${top1.bucket.person.name}:${top1.templateScore.toStringAsFixed(3)}/'
           '${top1.calibratedScore.toStringAsFixed(3)}/'
           'b${top1.blendedScore.toStringAsFixed(3)}/'
-          'd${decisionOf(top1).toStringAsFixed(3)} '
+          'd${top1.decisionScore.toStringAsFixed(3)} '
           'top2=${top2?.bucket.person.name ?? '-'}:'
           '${top2?.templateScore.toStringAsFixed(3) ?? '-1.000'}/'
           '${top2?.calibratedScore.toStringAsFixed(3) ?? '-1.000'}/'
           'b${top2?.blendedScore.toStringAsFixed(3) ?? '-1.000'}/'
-          'd${top2 == null ? '-1.000' : decisionOf(top2).toStringAsFixed(3)} '
+          'd${top2?.decisionScore.toStringAsFixed(3) ?? '-1.000'} '
           'margin=${margin.toStringAsFixed(3)} '
-          'thresholds(raw=${matchThreshold.toStringAsFixed(3)} '
-          'cal=${calibratedThreshold.toStringAsFixed(3)} '
-          'strong=${tunedStrongThreshold.toStringAsFixed(3)} '
-          'margin=${effectiveMarginThreshold.toStringAsFixed(3)}) '
+          'thresholds(raw=${matchThreshold.toStringAsFixed(3)}) '
           'q=${frameQuality.toStringAsFixed(3)} '
-          'auto(close=${autoCloseSeverity.toStringAsFixed(2)} '
-          'signal=${autoSignalSeverity.toStringAsFixed(2)}) '
           'candidates=${candidates.length} '
           'indexed=$usedIndexedPruning',
         );
@@ -6099,16 +5679,14 @@ class FaceRecognitionService {
         'top1=${top1.bucket.person.name}:${top1.templateScore.toStringAsFixed(3)}/'
         '${top1.calibratedScore.toStringAsFixed(3)}/'
         'b${top1.blendedScore.toStringAsFixed(3)}/'
-        'd${decisionOf(top1).toStringAsFixed(3)} '
+        'd${top1.decisionScore.toStringAsFixed(3)} '
         'top2=${top2?.bucket.person.name ?? '-'}:'
         '${top2?.templateScore.toStringAsFixed(3) ?? '-1.000'}/'
         '${top2?.calibratedScore.toStringAsFixed(3) ?? '-1.000'}/'
         'b${top2?.blendedScore.toStringAsFixed(3) ?? '-1.000'}/'
-        'd${top2 == null ? '-1.000' : decisionOf(top2).toStringAsFixed(3)} '
+        'd${top2?.decisionScore.toStringAsFixed(3) ?? '-1.000'} '
         'margin=${margin.toStringAsFixed(3)} '
         'q=${frameQuality.toStringAsFixed(3)} '
-        'auto(close=${autoCloseSeverity.toStringAsFixed(2)} '
-        'signal=${autoSignalSeverity.toStringAsFixed(2)}) '
         'personId=${best.template.person.id} '
         'person=${best.template.person.name} '
         'candidates=${candidates.length} '
@@ -6126,8 +5704,8 @@ class FaceRecognitionService {
 
     return _MatchResult(
       template: best.template,
-      score: bestDecision,
-      calibratedScore: best.calibratedScore,
+      score: bestScore,
+      calibratedScore: bestScore,
       margin: margin,
       templateScore: best.templateScore,
       globalScore:
@@ -6599,6 +6177,27 @@ class FaceRecognitionService {
     final h = tightRect.height.ceil().clamp(8, source.height - y);
     if (w <= 0 || h <= 0) return null;
     return img.copyCrop(source, x: x, y: y, width: w, height: h);
+  }
+
+  img.Image? _selectRecognitionCrop({
+    required img.Image source,
+    required Rect rect,
+    _DetectedFace? detectedFace,
+    FaceMeshResult? mesh,
+  }) {
+    final alignedFromDetection = detectedFace?.alignedCrop;
+    if (alignedFromDetection != null) {
+      return alignedFromDetection;
+    }
+
+    if (mesh != null) {
+      final alignedFromMesh = _alignedCropFromMesh(source, mesh);
+      if (alignedFromMesh != null) {
+        return alignedFromMesh;
+      }
+    }
+
+    return _cropFaceTight(source, rect);
   }
 
   img.Image? _alignedCropFromMesh(img.Image source, FaceMeshResult mesh) {
