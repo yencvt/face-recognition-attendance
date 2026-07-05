@@ -844,48 +844,6 @@ class _AdaptiveDistanceState {
   bool lastActive = false;
 }
 
-class _AutoTuneRuntimeProfile {
-  const _AutoTuneRuntimeProfile({
-    required this.faceAreaRatioFloor,
-    required this.facePixelsFloor,
-    required this.frameQualityFloor,
-    required this.luminanceFloor,
-    required this.signalSeverity,
-    required this.closeFaceSeverity,
-    required this.matchThresholdBoost,
-    required this.calibratedThresholdBoost,
-    required this.strongThresholdBoost,
-    required this.marginBoost,
-    required this.voteMinCountBoost,
-    required this.autoBrightnessDelta,
-    required this.autoContrastMultiplier,
-    required this.autoGammaMultiplier,
-    required this.autoSharpenAmount,
-    required this.lowLightSeverity,
-    required this.overExposureSeverity,
-    required this.blurSeverity,
-  });
-
-  final double faceAreaRatioFloor;
-  final int facePixelsFloor;
-  final double frameQualityFloor;
-  final double luminanceFloor;
-  final double signalSeverity;
-  final double closeFaceSeverity;
-  final double matchThresholdBoost;
-  final double calibratedThresholdBoost;
-  final double strongThresholdBoost;
-  final double marginBoost;
-  final int voteMinCountBoost;
-  final int autoBrightnessDelta;
-  final double autoContrastMultiplier;
-  final double autoGammaMultiplier;
-  final double autoSharpenAmount;
-  final double lowLightSeverity;
-  final double overExposureSeverity;
-  final double blurSeverity;
-}
-
 class FaceRecognitionService {
   FaceRecognitionService._();
 
@@ -913,7 +871,6 @@ class FaceRecognitionService {
   final Map<String, Map<String, _CameraTrack>> _overlayTracksByCameraId = {};
   final Map<String, int> _fallbackFaceSkipCountByCameraId = {};
   final Map<String, int> _fallbackFaceSkipLogAtByCameraId = {};
-  final Map<String, int> _autoTuneDebugLogAtByCameraId = {};
   final Map<String, RecognitionZone> _zoneByCameraId = {};
   final Map<String, _SpoofState> _spoofStates = {};
   final Map<String, _AdaptiveDistanceState> _adaptiveDistanceStates = {};
@@ -964,7 +921,6 @@ class FaceRecognitionService {
   bool _dbFlushInProgress = false;
 
   double get _knownMatchThreshold => _runtimeConfig.knownMatchThreshold;
-  double get _knownStrongThreshold => _runtimeConfig.knownStrongThreshold;
   double get _knownCalibratedThreshold =>
       _runtimeConfig.knownCalibratedThreshold;
   double get _knownMatchMargin => _runtimeConfig.knownMatchMargin;
@@ -997,7 +953,6 @@ class FaceRecognitionService {
   static const int _realtimePartialModeQualitySize = 0;
   static const int _realtimePartialModeAllFrames = 1;
   static const int _realtimePartialModeDisabled = 2;
-  static const int _autoTuneDebugLogIntervalMs = 1000;
   int get _eventPublishIntervalMs =>
       _runtimeConfig.eventPublishIntervalMs.clamp(1000, 20000).toInt();
   double get _minRealtimeFrameQuality => _runtimeConfig.minRealtimeFrameQuality;
@@ -1043,8 +998,8 @@ class FaceRecognitionService {
   double get _maxEnrollmentFaceAspectRatio =>
       _runtimeConfig.maxEnrollmentFaceAspectRatio;
   int get _minEnrollmentFacePixels => _runtimeConfig.minEnrollmentFacePixels;
-  bool get _autoTuneRecognitionParameters =>
-      _runtimeConfig.autoTuneRecognitionParameters;
+    bool get _enableRealtimeAutoSharpen =>
+      _runtimeConfig.enableRealtimeAutoSharpen;
   static const List<String> _scrfdModelAssets = <String>[
     'assets/models/scrfd_2.5g_bnkps.onnx',
   ];
@@ -1063,19 +1018,10 @@ class FaceRecognitionService {
   double get _mouthRegionMinQuality => _runtimeConfig.mouthRegionMinQuality;
   bool get _debugRealtimeOverlay => _runtimeConfig.debugRealtimeOverlay;
   bool get _traceLogsEnabled => _runtimeConfig.enableTraceLogs;
-  int get _realtimeInputBrightness => _runtimeConfig.realtimeInputBrightness;
-  double get _realtimeInputContrast => _runtimeConfig.realtimeInputContrast;
-  double get _realtimeInputGamma => _runtimeConfig.realtimeInputGamma;
-  double get _realtimeInputSaturation => _runtimeConfig.realtimeInputSaturation;
-  bool get _realtimeInputGrayscale => _runtimeConfig.realtimeInputGrayscale;
   bool get _realtimeCropFacesFromCameraImage =>
       _runtimeConfig.realtimeCropFacesFromCameraImage;
   double get _autoTuneMaxSharpenAmount =>
       _runtimeConfig.autoTuneMaxSharpenAmount;
-  double get _autoTuneLowLightThreshold =>
-      _runtimeConfig.autoTuneLowLightThreshold;
-  double get _autoTuneOverExposureThreshold =>
-      _runtimeConfig.autoTuneOverExposureThreshold;
 
   Stream<RecognitionFramePacket> get frameQueue => _frameQueue.stream;
   Stream<FaceRecognitionNotification> get notificationQueue =>
@@ -1105,7 +1051,6 @@ class FaceRecognitionService {
 
         final thresholdInputsChanged =
             old.knownMatchThreshold != cfg.knownMatchThreshold ||
-            old.knownStrongThreshold != cfg.knownStrongThreshold ||
             old.knownCalibratedThreshold != cfg.knownCalibratedThreshold ||
             old.knownMatchMargin != cfg.knownMatchMargin ||
             old.cameraCalibrationDurationMs !=
@@ -2858,27 +2803,13 @@ class FaceRecognitionService {
               .clamp(0.0, 1.0)
               .toDouble();
           final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
-          final preRegionQuality = _regionQuality(
-            workingCrop,
-            minSharpness:
-                _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45),
-          );
-          final preFrameQuality = math
-              .min(preSharpnessQuality, preRegionQuality)
-              .clamp(0.0, 1.0)
-              .toDouble();
-          final autoTuneProfile = _buildAutoTuneRuntimeProfile(
-            adaptiveFarDistance: adaptiveFarDistance,
-            faceAreaRatio: faceAreaRatio,
-            facePixels: minFacePixels,
-            frameQuality: preFrameQuality,
-            luminance: luminance,
+          final autoSharpenAmount = _computeRealtimeAutoSharpenAmount(
             sharpnessQuality: preSharpnessQuality,
             lumaStdDev: preLumaStdDev,
           );
           workingCrop = _applyAutoTuneRealtimeInputProcessing(
             workingCrop,
-            autoTuneProfile,
+            autoSharpenAmount,
           );
           luminance = _robustFaceLuminance(workingCrop);
           final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
@@ -2893,16 +2824,6 @@ class FaceRecognitionService {
               .min(sharpnessQuality, regionQuality)
               .clamp(0.0, 1.0)
               .toDouble();
-          _logAutoTuneRuntimeProfile(
-            cameraId: cameraId,
-            nowMs: nowMs,
-            faceAreaRatio: faceAreaRatio,
-            minFacePixels: minFacePixels,
-            frameQuality: frameQuality,
-            luminance: luminance,
-            profile: autoTuneProfile,
-            adaptiveFarDistance: adaptiveFarDistance,
-          );
           final spoofAssessment = _assessSpoof(
             cameraId,
             '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}',
@@ -2992,7 +2913,6 @@ class FaceRecognitionService {
             frameQuality: frameQuality,
             cameraId: cameraId,
             faceLogKey: faceLogKey,
-            autoTuneProfile: autoTuneProfile,
           );
           final effectiveKnown = match != null;
           _logRealtimeDecisionTrace(
@@ -3001,7 +2921,6 @@ class FaceRecognitionService {
             match: match,
             isKnown: effectiveKnown,
             frameQuality: frameQuality,
-            profile: autoTuneProfile,
           );
           final acceptedMatch = effectiveKnown ? match : null;
           final debugLabel = _debugRealtimeOverlay
@@ -3158,27 +3077,13 @@ class FaceRecognitionService {
               .clamp(0.0, 1.0)
               .toDouble();
           final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
-          final preRegionQuality = _regionQuality(
-            workingCrop,
-            minSharpness:
-                _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45),
-          );
-          final preFrameQuality = math
-              .min(preSharpnessQuality, preRegionQuality)
-              .clamp(0.0, 1.0)
-              .toDouble();
-          final autoTuneProfile = _buildAutoTuneRuntimeProfile(
-            adaptiveFarDistance: adaptiveFarDistance,
-            faceAreaRatio: faceAreaRatio,
-            facePixels: minFacePixels,
-            frameQuality: preFrameQuality,
-            luminance: luminance,
+          final autoSharpenAmount = _computeRealtimeAutoSharpenAmount(
             sharpnessQuality: preSharpnessQuality,
             lumaStdDev: preLumaStdDev,
           );
           workingCrop = _applyAutoTuneRealtimeInputProcessing(
             workingCrop,
-            autoTuneProfile,
+            autoSharpenAmount,
           );
           luminance = _robustFaceLuminance(workingCrop);
           final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
@@ -3193,16 +3098,6 @@ class FaceRecognitionService {
               .min(sharpnessQuality, regionQuality)
               .clamp(0.0, 1.0)
               .toDouble();
-          _logAutoTuneRuntimeProfile(
-            cameraId: cameraId,
-            nowMs: nowMs,
-            faceAreaRatio: faceAreaRatio,
-            minFacePixels: minFacePixels,
-            frameQuality: frameQuality,
-            luminance: luminance,
-            profile: autoTuneProfile,
-            adaptiveFarDistance: adaptiveFarDistance,
-          );
           final spoofAssessment = _assessSpoof(
             cameraId,
             '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}',
@@ -3293,7 +3188,6 @@ class FaceRecognitionService {
             frameQuality: frameQuality,
             cameraId: cameraId,
             faceLogKey: faceLogKey,
-            autoTuneProfile: autoTuneProfile,
           );
           final effectiveKnown = match != null;
           _logRealtimeDecisionTrace(
@@ -3302,7 +3196,6 @@ class FaceRecognitionService {
             match: match,
             isKnown: effectiveKnown,
             frameQuality: frameQuality,
-            profile: autoTuneProfile,
           );
           final acceptedMatch = effectiveKnown ? match : null;
           final debugLabel = _debugRealtimeOverlay
@@ -4894,21 +4787,39 @@ class FaceRecognitionService {
 
   img.Image _applyAutoTuneRealtimeInputProcessing(
     img.Image source,
-    _AutoTuneRuntimeProfile profile,
+    double autoSharpenAmount,
   ) {
-    if (!_autoTuneRecognitionParameters) {
+    if (!_enableRealtimeAutoSharpen) {
       return source;
     }
 
     final adjusted = img.grayscale(source);
 
-    final sharpenAmount = profile.autoSharpenAmount
+    final sharpenAmount = autoSharpenAmount
         .clamp(0.0, _autoTuneMaxSharpenAmount.clamp(0.0, 1.0))
         .toDouble();
     if (sharpenAmount <= 0.01) {
       return _materializeRgba8Image(adjusted);
     }
     return _materializeRgba8Image(_sharpenFaceCrop(adjusted, sharpenAmount));
+  }
+
+  double _computeRealtimeAutoSharpenAmount({
+    required double sharpnessQuality,
+    required double lumaStdDev,
+  }) {
+    if (!_enableRealtimeAutoSharpen) {
+      return 0.0;
+    }
+    final lowContrastSeverity = ((0.13 - lumaStdDev).clamp(0.0, 0.13) / 0.13)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final blurSeverity = ((0.42 - sharpnessQuality).clamp(0.0, 0.42) / 0.42)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    return (blurSeverity * 0.86 + lowContrastSeverity * 0.22)
+        .clamp(0.0, _autoTuneMaxSharpenAmount.clamp(0.0, 1.0))
+        .toDouble();
   }
 
   img.Image _sharpenFaceCrop(img.Image source, double amount) {
@@ -5317,192 +5228,6 @@ class FaceRecognitionService {
     return active;
   }
 
-  _AutoTuneRuntimeProfile _buildAutoTuneRuntimeProfile({
-    required bool adaptiveFarDistance,
-    required double faceAreaRatio,
-    required int facePixels,
-    required double frameQuality,
-    required double luminance,
-    required double sharpnessQuality,
-    required double lumaStdDev,
-  }) {
-    final cappedRealtimeAreaFloor = _autoTuneRecognitionParameters
-        ? math.min(_minRealtimeFaceAreaRatio, 0.022)
-        : _minRealtimeFaceAreaRatio;
-    final cappedRealtimePixelFloor = _autoTuneRecognitionParameters
-        ? math.min(_minRealtimeFacePixels, 42)
-        : _minRealtimeFacePixels;
-    final baseFaceAreaFloor = adaptiveFarDistance
-        ? _adaptiveFarDistanceFaceAreaRatio
-        : cappedRealtimeAreaFloor;
-    final baseFacePixelsFloor = adaptiveFarDistance
-        ? _adaptiveFarDistanceFacePixels
-        : cappedRealtimePixelFloor;
-    final baseFrameQualityFloor = adaptiveFarDistance
-        ? _adaptiveFarDistanceFrameQuality
-        : math.max(_minRealtimeFrameQuality, 0.34);
-    final baseLuminanceFloor = adaptiveFarDistance ? 0.22 : 0.28;
-
-    if (!_autoTuneRecognitionParameters) {
-      return _AutoTuneRuntimeProfile(
-        faceAreaRatioFloor: baseFaceAreaFloor,
-        facePixelsFloor: baseFacePixelsFloor,
-        frameQualityFloor: baseFrameQualityFloor,
-        luminanceFloor: baseLuminanceFloor,
-        signalSeverity: 0.0,
-        closeFaceSeverity: 0.0,
-        matchThresholdBoost: 0.0,
-        calibratedThresholdBoost: 0.0,
-        strongThresholdBoost: 0.0,
-        marginBoost: 0.0,
-        voteMinCountBoost: 0,
-        autoBrightnessDelta: 0,
-        autoContrastMultiplier: 1.0,
-        autoGammaMultiplier: 1.0,
-        autoSharpenAmount: 0.0,
-        lowLightSeverity: 0.0,
-        overExposureSeverity: 0.0,
-        blurSeverity: 0.0,
-      );
-    }
-
-    final faceSizeRatio = faceAreaRatio <= 0
-        ? 1.0
-        : (faceAreaRatio / baseFaceAreaFloor).clamp(0.0, 2.0).toDouble();
-    final faceSizeSeverity = (1.0 - faceSizeRatio).clamp(0.0, 1.0).toDouble();
-    final closeFaceSeverity = ((faceSizeRatio - 1.20) / 0.80)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    final facePixelSeverity =
-        (baseFacePixelsFloor - facePixels)
-            .clamp(0, baseFacePixelsFloor)
-            .toDouble() /
-        math.max(1, baseFacePixelsFloor);
-    final qualitySeverity = ((0.60 - frameQuality).clamp(0.0, 0.60) / 0.60)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    final lightSeverity = ((0.34 - luminance).clamp(0.0, 0.34) / 0.34)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    final lowLightThreshold = _autoTuneLowLightThreshold.clamp(0.25, 0.60);
-    final overExposureThreshold = _autoTuneOverExposureThreshold.clamp(
-      0.55,
-      0.90,
-    );
-    final lowLightSpan = math.max(lowLightThreshold, 0.06);
-    final overExposureSpan = math.max(1.0 - overExposureThreshold, 0.06);
-
-    final lowLightSeverity =
-        ((lowLightThreshold - luminance).clamp(0.0, lowLightSpan) /
-                lowLightSpan)
-            .clamp(0.0, 1.0)
-            .toDouble();
-    final overExposureSeverity =
-        ((luminance - overExposureThreshold).clamp(0.0, overExposureSpan) /
-                overExposureSpan)
-            .clamp(0.0, 1.0)
-            .toDouble();
-    final lowContrastSeverity = ((0.13 - lumaStdDev).clamp(0.0, 0.13) / 0.13)
-        .clamp(0.0, 1.0)
-        .toDouble();
-    final blurSeverity = ((0.42 - sharpnessQuality).clamp(0.0, 0.42) / 0.42)
-        .clamp(0.0, 1.0)
-        .toDouble();
-
-    final signalSeverity =
-        (faceSizeSeverity * 0.42 +
-                facePixelSeverity * 0.22 +
-                qualitySeverity * 0.24 +
-                lightSeverity * 0.12)
-            .clamp(0.0, 1.0)
-            .toDouble();
-    final closePenalty = (closeFaceSeverity * (0.28 + signalSeverity * 0.18))
-        .clamp(0.0, 0.28)
-        .toDouble();
-
-    final tunedFaceAreaFloor =
-        (baseFaceAreaFloor * (1.0 - signalSeverity * 0.55))
-            .clamp(0.010, baseFaceAreaFloor)
-            .toDouble();
-    final tunedFacePixelsFloor =
-        (baseFacePixelsFloor * (1.0 - signalSeverity * 0.35)).round().clamp(
-          24,
-          baseFacePixelsFloor,
-        );
-    final tunedFrameQualityFloor =
-        (baseFrameQualityFloor - signalSeverity * 0.08)
-            .clamp(0.18, baseFrameQualityFloor)
-            .toDouble();
-    final tunedLuminanceFloor = (baseLuminanceFloor - signalSeverity * 0.06)
-        .clamp(0.18, baseLuminanceFloor)
-        .toDouble();
-
-    final farDistanceAssist = adaptiveFarDistance
-        ? (0.016 + faceSizeSeverity * 0.018 + signalSeverity * 0.006)
-        : 0.0;
-
-    final autoBrightnessDelta =
-        (lowLightSeverity * 18 +
-                lowContrastSeverity * 6 -
-                overExposureSeverity * 16)
-            .round()
-            .clamp(-18, 18);
-    final autoContrastMultiplier =
-        (1.0 +
-                lowContrastSeverity * 0.20 +
-                overExposureSeverity * 0.12 -
-                lowLightSeverity * 0.05)
-            .clamp(0.88, 1.28)
-            .toDouble();
-    final autoGammaMultiplier =
-        (1.0 -
-                lowLightSeverity * 0.20 +
-                overExposureSeverity * 0.18 -
-                lowContrastSeverity * 0.05)
-            .clamp(0.80, 1.26)
-            .toDouble();
-    final autoSharpenAmount = (blurSeverity * 0.86 + lowContrastSeverity * 0.22)
-        .clamp(0.0, _autoTuneMaxSharpenAmount.clamp(0.0, 1.0))
-        .toDouble();
-
-    return _AutoTuneRuntimeProfile(
-      faceAreaRatioFloor: tunedFaceAreaFloor,
-      facePixelsFloor: tunedFacePixelsFloor,
-      frameQualityFloor: tunedFrameQualityFloor,
-      luminanceFloor: tunedLuminanceFloor,
-      signalSeverity: signalSeverity,
-      closeFaceSeverity: closeFaceSeverity,
-      matchThresholdBoost:
-          (signalSeverity * 0.03 + closePenalty * 0.004 - farDistanceAssist)
-              .clamp(-0.03, 0.05)
-              .toDouble(),
-      calibratedThresholdBoost:
-          (signalSeverity * 0.04 +
-                  closePenalty * 0.005 -
-                  farDistanceAssist * 1.2)
-              .clamp(-0.04, 0.06)
-              .toDouble(),
-      strongThresholdBoost:
-          (signalSeverity * 0.02 +
-                  closePenalty * 0.003 -
-                  farDistanceAssist * 0.85)
-              .clamp(-0.03, 0.04)
-              .toDouble(),
-      marginBoost:
-          (signalSeverity * 0.02 + closePenalty * 0.004 - farDistanceAssist)
-              .clamp(-0.02, 0.05)
-              .toDouble(),
-      voteMinCountBoost: signalSeverity >= 0.65 ? 1 : 0,
-      autoBrightnessDelta: autoBrightnessDelta,
-      autoContrastMultiplier: autoContrastMultiplier,
-      autoGammaMultiplier: autoGammaMultiplier,
-      autoSharpenAmount: autoSharpenAmount,
-      lowLightSeverity: lowLightSeverity,
-      overExposureSeverity: overExposureSeverity,
-      blurSeverity: blurSeverity,
-    );
-  }
-
   bool _shouldUseRobustRealtimeEmbedding({
     required int minFacePixels,
     required double faceAreaRatio,
@@ -5552,82 +5277,12 @@ class FaceRecognitionService {
     return true;
   }
 
-  void _logAutoTuneRuntimeProfile({
-    required String cameraId,
-    required int nowMs,
-    required double faceAreaRatio,
-    required int minFacePixels,
-    required double frameQuality,
-    required double luminance,
-    required _AutoTuneRuntimeProfile profile,
-    required bool adaptiveFarDistance,
-  }) {
-    if (!_autoTuneRecognitionParameters || !_traceLogsEnabled) {
-      return;
-    }
-
-    final lastAt = _autoTuneDebugLogAtByCameraId[cameraId] ?? 0;
-    if (nowMs - lastAt < _autoTuneDebugLogIntervalMs) {
-      return;
-    }
-    _autoTuneDebugLogAtByCameraId[cameraId] = nowMs;
-
-    _log.debug(
-      'AutoTune camera=$cameraId close=${profile.closeFaceSeverity.toStringAsFixed(2)} '
-      'signal=${profile.signalSeverity.toStringAsFixed(2)} '
-      'face=${faceAreaRatio.toStringAsFixed(4)}/${profile.faceAreaRatioFloor.toStringAsFixed(4)} '
-      'px=$minFacePixels/${profile.facePixelsFloor} '
-      'q=${frameQuality.toStringAsFixed(2)}/${profile.frameQualityFloor.toStringAsFixed(2)} '
-      'lum=${luminance.toStringAsFixed(2)}/${profile.luminanceFloor.toStringAsFixed(2)} '
-      'boost(m=${profile.matchThresholdBoost.toStringAsFixed(3)} '
-      'c=${profile.calibratedThresholdBoost.toStringAsFixed(3)} '
-      's=${profile.strongThresholdBoost.toStringAsFixed(3)} '
-      'g=${profile.marginBoost.toStringAsFixed(3)} '
-      'v=${profile.voteMinCountBoost}) '
-      'img(b=${profile.autoBrightnessDelta} '
-      'ct=${profile.autoContrastMultiplier.toStringAsFixed(2)} '
-      'gm=${profile.autoGammaMultiplier.toStringAsFixed(2)} '
-      'sh=${profile.autoSharpenAmount.toStringAsFixed(2)} '
-      'll=${profile.lowLightSeverity.toStringAsFixed(2)} '
-      'oe=${profile.overExposureSeverity.toStringAsFixed(2)} '
-      'bl=${profile.blurSeverity.toStringAsFixed(2)}) '
-      'farMode=$adaptiveFarDistance',
-    );
-  }
-
-  void _logRealtimeGateSkip({
-    required String cameraId,
-    required String stage,
-    required String reason,
-    required double faceAreaRatio,
-    required int minFacePixels,
-    required _AutoTuneRuntimeProfile profile,
-    required double frameQuality,
-    required double luminance,
-    required bool adaptiveFarDistance,
-  }) {
-    if (!_traceLogsEnabled) {
-      return;
-    }
-    _log.debug(
-      'GateSkip camera=$cameraId stage=$stage reason=$reason '
-      'face=${faceAreaRatio.toStringAsFixed(4)}/${profile.faceAreaRatioFloor.toStringAsFixed(4)} '
-      'px=$minFacePixels/${profile.facePixelsFloor} '
-      'q=${frameQuality.toStringAsFixed(2)}/${profile.frameQualityFloor.toStringAsFixed(2)} '
-      'lum=${luminance.toStringAsFixed(2)}/${profile.luminanceFloor.toStringAsFixed(2)} '
-      'close=${profile.closeFaceSeverity.toStringAsFixed(2)} '
-      'signal=${profile.signalSeverity.toStringAsFixed(2)} '
-      'farMode=$adaptiveFarDistance',
-    );
-  }
-
   void _logRealtimeDecisionTrace({
     required String cameraId,
     required String faceLogKey,
     required _MatchResult? match,
     required bool isKnown,
     required double frameQuality,
-    required _AutoTuneRuntimeProfile profile,
   }) {
     if (!_traceLogsEnabled) {
       return;
@@ -5635,8 +5290,7 @@ class FaceRecognitionService {
     if (match == null) {
       _log.debug(
         'DecisionTrace camera=$cameraId face=$faceLogKey known=false reason=no_match '
-        'q=${frameQuality.toStringAsFixed(2)} close=${profile.closeFaceSeverity.toStringAsFixed(2)} '
-        'signal=${profile.signalSeverity.toStringAsFixed(2)}',
+        'q=${frameQuality.toStringAsFixed(2)}',
       );
       return;
     }
@@ -5647,8 +5301,7 @@ class FaceRecognitionService {
       'score=${match.score.toStringAsFixed(3)} cal=${match.calibratedScore.toStringAsFixed(3)} '
       'tpl=${match.templateScore.toStringAsFixed(3)} partial=${match.partialScore.toStringAsFixed(3)} '
       'partialCov=${match.partialCoverage.toStringAsFixed(2)} ctr=${match.centroidScore.toStringAsFixed(3)} '
-      'margin=${match.margin.toStringAsFixed(3)} q=${frameQuality.toStringAsFixed(2)} '
-      'close=${profile.closeFaceSeverity.toStringAsFixed(2)} signal=${profile.signalSeverity.toStringAsFixed(2)}',
+      'margin=${match.margin.toStringAsFixed(3)} q=${frameQuality.toStringAsFixed(2)}',
     );
   }
 
@@ -5682,7 +5335,6 @@ class FaceRecognitionService {
     double frameQuality = 1.0,
     String? cameraId,
     String? faceLogKey,
-    _AutoTuneRuntimeProfile? autoTuneProfile,
   }) {
     if (_knownRecognitionBlockedByMissingTemplateCache && cameraId != null) {
       final nowMs = DateTime.now().millisecondsSinceEpoch;

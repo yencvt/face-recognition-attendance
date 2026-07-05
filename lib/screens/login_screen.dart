@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 
+import '../l10n/app_i18n.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
@@ -54,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final i18n = AppI18n.of(context);
     return Material(
       color: Colors.transparent,
       child: Stack(
@@ -166,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Nhan dien khuon mat & cham cong',
+                                  i18n.t('login.subtitle'),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: Colors.grey.shade700,
                                   ),
@@ -178,15 +181,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Neu khong thao tac 10 phut, he thong se tu dong dang xuat.',
+                        i18n.t('login.idleHint'),
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _usernameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Tai khoan',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: i18n.t('login.username'),
+                          border: const OutlineInputBorder(),
                         ),
                         textInputAction: TextInputAction.next,
                       ),
@@ -195,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _passwordController,
                         obscureText: _obscure,
                         decoration: InputDecoration(
-                          labelText: 'Mat khau',
+                          labelText: i18n.t('login.password'),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -227,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.login),
-                        label: const Text('Dang nhap'),
+                        label: Text(i18n.t('login.submit')),
                       ),
                     ],
                   ),

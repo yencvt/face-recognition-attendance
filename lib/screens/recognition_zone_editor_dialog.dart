@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
@@ -12,6 +13,7 @@ class RecognitionZoneEditorDialog extends StatefulWidget {
     required this.zone,
     required this.cameraName,
     this.renderer,
+    this.cameraController,
     this.mirrorHorizontally = false,
     super.key,
   });
@@ -19,6 +21,7 @@ class RecognitionZoneEditorDialog extends StatefulWidget {
   final RecognitionZone zone;
   final String cameraName;
   final RTCVideoRenderer? renderer;
+  final CameraController? cameraController;
   final bool mirrorHorizontally;
 
   @override
@@ -237,6 +240,10 @@ class _RecognitionZoneEditorDialogState extends State<RecognitionZoneEditorDialo
                             return Stack(
                               fit: StackFit.expand,
                               children: [
+                                if (widget.cameraController != null &&
+                                    widget.cameraController!.value.isInitialized)
+                                  CameraPreview(widget.cameraController!)
+                                else
                                 if (widget.renderer != null && widget.renderer!.renderVideo)
                                   Transform(
                                     alignment: Alignment.center,

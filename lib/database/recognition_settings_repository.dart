@@ -8,7 +8,6 @@ import 'app_database.dart';
 class RecognitionRuntimeConfig {
   const RecognitionRuntimeConfig({
     this.knownMatchThreshold = 0.945,
-    this.knownStrongThreshold = 0.972,
     this.knownCalibratedThreshold = 0.905,
     this.knownMatchMargin = 0.185,
     this.minTemplateSharpness = 34.0,
@@ -33,7 +32,6 @@ class RecognitionRuntimeConfig {
     this.realtimePartialMinFaceAreaRatio = 0.035,
     this.realtimePartialMinFacePixels = 64,
     this.realtimePartialMode = 0,
-    this.realtimePartialMaxRegions = 4,
     this.realtimePartialEnabledRegions =
       'forehead,leftEye,rightEye,nose,leftCheek,rightCheek,mouth,chin',
     this.realtimePartialFrameCycle = 2,
@@ -51,23 +49,15 @@ class RecognitionRuntimeConfig {
     this.eyeRegionMinQuality = 0.28,
     this.noseRegionMinQuality = 0.26,
     this.mouthRegionMinQuality = 0.26,
-    this.autoTuneRecognitionParameters = true,
+    this.enableRealtimeAutoSharpen = true,
     this.debugRealtimeOverlay = true,
     this.enableTraceLogs = false,
     this.enablePerfLogs = false,
-    this.realtimeInputBrightness = 0,
-    this.realtimeInputContrast = 1.0,
-    this.realtimeInputGamma = 1.0,
-    this.realtimeInputSaturation = 1.0,
-    this.realtimeInputGrayscale = false,
     this.realtimeCropFacesFromCameraImage = false,
     this.autoTuneMaxSharpenAmount = 1.0,
-    this.autoTuneLowLightThreshold = 0.40,
-    this.autoTuneOverExposureThreshold = 0.74,
   });
 
   final double knownMatchThreshold;
-  final double knownStrongThreshold;
   final double knownCalibratedThreshold;
   final double knownMatchMargin;
   final double minTemplateSharpness;
@@ -92,7 +82,6 @@ class RecognitionRuntimeConfig {
   final double realtimePartialMinFaceAreaRatio;
   final int realtimePartialMinFacePixels;
   final int realtimePartialMode;
-  final int realtimePartialMaxRegions;
   final String realtimePartialEnabledRegions;
   final int realtimePartialFrameCycle;
   final double minEnrollmentFaceAreaRatio;
@@ -109,23 +98,15 @@ class RecognitionRuntimeConfig {
   final double eyeRegionMinQuality;
   final double noseRegionMinQuality;
   final double mouthRegionMinQuality;
-  final bool autoTuneRecognitionParameters;
+  final bool enableRealtimeAutoSharpen;
   final bool debugRealtimeOverlay;
   final bool enableTraceLogs;
   final bool enablePerfLogs;
-  final int realtimeInputBrightness;
-  final double realtimeInputContrast;
-  final double realtimeInputGamma;
-  final double realtimeInputSaturation;
-  final bool realtimeInputGrayscale;
   final bool realtimeCropFacesFromCameraImage;
   final double autoTuneMaxSharpenAmount;
-  final double autoTuneLowLightThreshold;
-  final double autoTuneOverExposureThreshold;
 
   RecognitionRuntimeConfig copyWith({
     double? knownMatchThreshold,
-    double? knownStrongThreshold,
     double? knownCalibratedThreshold,
     double? knownMatchMargin,
     double? minTemplateSharpness,
@@ -150,7 +131,6 @@ class RecognitionRuntimeConfig {
     double? realtimePartialMinFaceAreaRatio,
     int? realtimePartialMinFacePixels,
     int? realtimePartialMode,
-    int? realtimePartialMaxRegions,
     String? realtimePartialEnabledRegions,
     int? realtimePartialFrameCycle,
     double? minEnrollmentFaceAreaRatio,
@@ -167,23 +147,15 @@ class RecognitionRuntimeConfig {
     double? eyeRegionMinQuality,
     double? noseRegionMinQuality,
     double? mouthRegionMinQuality,
-    bool? autoTuneRecognitionParameters,
+    bool? enableRealtimeAutoSharpen,
     bool? debugRealtimeOverlay,
     bool? enableTraceLogs,
     bool? enablePerfLogs,
-    int? realtimeInputBrightness,
-    double? realtimeInputContrast,
-    double? realtimeInputGamma,
-    double? realtimeInputSaturation,
-    bool? realtimeInputGrayscale,
     bool? realtimeCropFacesFromCameraImage,
     double? autoTuneMaxSharpenAmount,
-    double? autoTuneLowLightThreshold,
-    double? autoTuneOverExposureThreshold,
   }) {
     return RecognitionRuntimeConfig(
       knownMatchThreshold: knownMatchThreshold ?? this.knownMatchThreshold,
-      knownStrongThreshold: knownStrongThreshold ?? this.knownStrongThreshold,
       knownCalibratedThreshold:
           knownCalibratedThreshold ?? this.knownCalibratedThreshold,
       knownMatchMargin: knownMatchMargin ?? this.knownMatchMargin,
@@ -224,8 +196,6 @@ class RecognitionRuntimeConfig {
       realtimePartialMinFacePixels:
           realtimePartialMinFacePixels ?? this.realtimePartialMinFacePixels,
       realtimePartialMode: realtimePartialMode ?? this.realtimePartialMode,
-      realtimePartialMaxRegions:
-          realtimePartialMaxRegions ?? this.realtimePartialMaxRegions,
       realtimePartialEnabledRegions:
           realtimePartialEnabledRegions ?? this.realtimePartialEnabledRegions,
       realtimePartialFrameCycle:
@@ -250,36 +220,22 @@ class RecognitionRuntimeConfig {
       noseRegionMinQuality: noseRegionMinQuality ?? this.noseRegionMinQuality,
       mouthRegionMinQuality:
           mouthRegionMinQuality ?? this.mouthRegionMinQuality,
-      autoTuneRecognitionParameters:
-          autoTuneRecognitionParameters ?? this.autoTuneRecognitionParameters,
+        enableRealtimeAutoSharpen:
+          enableRealtimeAutoSharpen ?? this.enableRealtimeAutoSharpen,
       debugRealtimeOverlay: debugRealtimeOverlay ?? this.debugRealtimeOverlay,
       enableTraceLogs: enableTraceLogs ?? this.enableTraceLogs,
       enablePerfLogs: enablePerfLogs ?? this.enablePerfLogs,
-      realtimeInputBrightness:
-          realtimeInputBrightness ?? this.realtimeInputBrightness,
-      realtimeInputContrast:
-          realtimeInputContrast ?? this.realtimeInputContrast,
-      realtimeInputGamma: realtimeInputGamma ?? this.realtimeInputGamma,
-      realtimeInputSaturation:
-          realtimeInputSaturation ?? this.realtimeInputSaturation,
-      realtimeInputGrayscale:
-          realtimeInputGrayscale ?? this.realtimeInputGrayscale,
       realtimeCropFacesFromCameraImage:
           realtimeCropFacesFromCameraImage ??
           this.realtimeCropFacesFromCameraImage,
       autoTuneMaxSharpenAmount:
           autoTuneMaxSharpenAmount ?? this.autoTuneMaxSharpenAmount,
-      autoTuneLowLightThreshold:
-          autoTuneLowLightThreshold ?? this.autoTuneLowLightThreshold,
-      autoTuneOverExposureThreshold:
-          autoTuneOverExposureThreshold ?? this.autoTuneOverExposureThreshold,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'knownMatchThreshold': knownMatchThreshold,
-      'knownStrongThreshold': knownStrongThreshold,
       'knownCalibratedThreshold': knownCalibratedThreshold,
       'knownMatchMargin': knownMatchMargin,
       'minTemplateSharpness': minTemplateSharpness,
@@ -304,7 +260,6 @@ class RecognitionRuntimeConfig {
       'realtimePartialMinFaceAreaRatio': realtimePartialMinFaceAreaRatio,
       'realtimePartialMinFacePixels': realtimePartialMinFacePixels,
       'realtimePartialMode': realtimePartialMode,
-      'realtimePartialMaxRegions': realtimePartialMaxRegions,
       'realtimePartialEnabledRegions': realtimePartialEnabledRegions,
       'realtimePartialFrameCycle': realtimePartialFrameCycle,
       'minEnrollmentFaceAreaRatio': minEnrollmentFaceAreaRatio,
@@ -321,19 +276,12 @@ class RecognitionRuntimeConfig {
       'eyeRegionMinQuality': eyeRegionMinQuality,
       'noseRegionMinQuality': noseRegionMinQuality,
       'mouthRegionMinQuality': mouthRegionMinQuality,
-      'autoTuneRecognitionParameters': autoTuneRecognitionParameters,
+      'enableRealtimeAutoSharpen': enableRealtimeAutoSharpen,
       'debugRealtimeOverlay': debugRealtimeOverlay,
       'enableTraceLogs': enableTraceLogs,
       'enablePerfLogs': enablePerfLogs,
-      'realtimeInputBrightness': realtimeInputBrightness,
-      'realtimeInputContrast': realtimeInputContrast,
-      'realtimeInputGamma': realtimeInputGamma,
-      'realtimeInputSaturation': realtimeInputSaturation,
-      'realtimeInputGrayscale': realtimeInputGrayscale,
       'realtimeCropFacesFromCameraImage': realtimeCropFacesFromCameraImage,
       'autoTuneMaxSharpenAmount': autoTuneMaxSharpenAmount,
-      'autoTuneLowLightThreshold': autoTuneLowLightThreshold,
-      'autoTuneOverExposureThreshold': autoTuneOverExposureThreshold,
     };
   }
 
@@ -375,7 +323,6 @@ class RecognitionRuntimeConfig {
 
     return RecognitionRuntimeConfig(
       knownMatchThreshold: d('knownMatchThreshold', 0.945),
-      knownStrongThreshold: d('knownStrongThreshold', 0.972),
       knownCalibratedThreshold: d('knownCalibratedThreshold', 0.905),
       knownMatchMargin: d('knownMatchMargin', 0.185),
       minTemplateSharpness: d('minTemplateSharpness', 34.0),
@@ -400,7 +347,6 @@ class RecognitionRuntimeConfig {
       realtimePartialMinFaceAreaRatio: d('realtimePartialMinFaceAreaRatio', 0.035),
       realtimePartialMinFacePixels: i('realtimePartialMinFacePixels', 64),
       realtimePartialMode: i('realtimePartialMode', 0),
-      realtimePartialMaxRegions: i('realtimePartialMaxRegions', 4),
       realtimePartialEnabledRegions: s(
         'realtimePartialEnabledRegions',
         'forehead,leftEye,rightEye,nose,leftCheek,rightCheek,mouth,chin',
@@ -420,22 +366,18 @@ class RecognitionRuntimeConfig {
       eyeRegionMinQuality: d('eyeRegionMinQuality', 0.28),
       noseRegionMinQuality: d('noseRegionMinQuality', 0.26),
       mouthRegionMinQuality: d('mouthRegionMinQuality', 0.26),
-      autoTuneRecognitionParameters: b('autoTuneRecognitionParameters', true),
+      enableRealtimeAutoSharpen: b(
+        'enableRealtimeAutoSharpen',
+        b('autoTuneRecognitionParameters', true),
+      ),
       debugRealtimeOverlay: b('debugRealtimeOverlay', true),
       enableTraceLogs: b('enableTraceLogs', false),
       enablePerfLogs: b('enablePerfLogs', false),
-      realtimeInputBrightness: i('realtimeInputBrightness', 0),
-      realtimeInputContrast: d('realtimeInputContrast', 1.0),
-      realtimeInputGamma: d('realtimeInputGamma', 1.0),
-      realtimeInputSaturation: d('realtimeInputSaturation', 1.0),
-      realtimeInputGrayscale: b('realtimeInputGrayscale', false),
       realtimeCropFacesFromCameraImage: b(
         'realtimeCropFacesFromCameraImage',
         false,
       ),
       autoTuneMaxSharpenAmount: d('autoTuneMaxSharpenAmount', 1.0),
-      autoTuneLowLightThreshold: d('autoTuneLowLightThreshold', 0.40),
-      autoTuneOverExposureThreshold: d('autoTuneOverExposureThreshold', 0.74),
     );
   }
 

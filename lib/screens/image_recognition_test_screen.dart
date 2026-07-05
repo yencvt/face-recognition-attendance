@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../database/face_attendance_repository.dart';
+import '../l10n/app_i18n.dart';
 import '../database/recognition_settings_repository.dart';
 import '../services/face_recognition_service.dart';
 
@@ -36,8 +37,6 @@ class _RecognitionSectionDef {
   final List<String> switchKeys;
 }
 
-enum _GalleryCompareMode { selectedPeople, fullGallery }
-
 class ImageRecognitionTestScreen extends StatefulWidget {
   const ImageRecognitionTestScreen({super.key});
 
@@ -48,213 +47,307 @@ class ImageRecognitionTestScreen extends StatefulWidget {
 
 class _ImageRecognitionTestScreenState
     extends State<ImageRecognitionTestScreen> {
+  String _l(BuildContext context, String vi, String en) {
+    return AppI18n.of(context).locale.languageCode == 'en' ? en : vi;
+  }
+
+  String _sectionTitleText(BuildContext context, String title) {
+    final en = <String, String>{
+      'Ngưỡng nhận diện': 'Recognition thresholds',
+      'Luồng xử lý thời gian thực': 'Realtime pipeline',
+      'Chất lượng thời gian thực': 'Realtime quality',
+      'Đăng ký khuôn mặt': 'Enrollment constraints',
+      'Phát hiện và tìm kiếm': 'Detection and search',
+      'Xử lý đầu vào và gỡ lỗi': 'Input processing and debug',
+    };
+    return _l(context, title, en[title] ?? title);
+  }
+
+  String _fieldLabelText(BuildContext context, String label) {
+    final en = <String, String>{
+      'Ngưỡng khớp khuôn mặt': 'Known match threshold',
+      'Ngưỡng khớp đã hiệu chỉnh': 'Calibrated match threshold',
+      'Biên an toàn giữa hạng 1 và hạng 2': 'Safety margin between rank 1 and rank 2',
+      'Độ nét tối thiểu của mẫu đăng ký': 'Minimum enrollment template sharpness',
+      'Thời gian hiệu chỉnh camera (ms)': 'Camera calibration duration (ms)',
+      'Khoảng cách log hiệu chỉnh (ms)': 'Calibration log interval (ms)',
+      'Khoảng cách log bỏ qua fallback (ms)': 'Fallback skip-log interval (ms)',
+      'Chu kỳ chụp fallback (ms)': 'Fallback capture interval (ms)',
+      'Cạnh tối đa ảnh fallback (px)': 'Fallback max input edge (px)',
+      'Chu kỳ xử lý khung hình (ms)': 'Frame processing interval (ms)',
+      'Số khung hình giữ lại của xử lý đơn luồng': 'Keep-latest frame count',
+      'Chiều rộng đầu vào bộ phát hiện': 'Detector input width',
+      'Chiều cao đầu vào bộ phát hiện': 'Detector input height',
+      'Thời gian giữ track (ms)': 'Track keep-alive duration (ms)',
+      'Điểm tối thiểu để gán track': 'Minimum score to assign track',
+      'Hệ số làm mượt bbox': 'Bounding-box smoothing factor',
+      'Khoảng cách lớp phủ tối thiểu giữa các khung hình (ms)':
+        'Minimum annotated-frame interval (ms)',
+      'Khoảng cách phát sự kiện (ms)': 'Event publish interval (ms)',
+      'Chất lượng khung hình tối thiểu thời gian thực': 'Minimum realtime frame quality',
+      'Tỷ lệ diện tích mặt tối thiểu thời gian thực': 'Minimum realtime face area ratio',
+      'Số pixel mặt tối thiểu thời gian thực': 'Minimum realtime face pixels',
+      'Vùng cục bộ thời gian thực: ngưỡng chất lượng tối thiểu':
+        'Realtime partial: minimum quality threshold',
+      'Vùng cục bộ thời gian thực: tỷ lệ diện tích mặt tối thiểu':
+        'Realtime partial: minimum face area ratio',
+      'Vùng cục bộ thời gian thực: số pixel mặt tối thiểu':
+        'Realtime partial: minimum face pixels',
+      'Vùng cục bộ thời gian thực: chế độ (0=chất lượng/kích thước, 1=mọi khung hình, 2=tắt)':
+        'Realtime partial: mode (0=quality/size, 1=every frame, 2=off)',
+      'Vùng cục bộ thời gian thực: chu kỳ khung hình (N = 1/N khung)':
+        'Realtime partial: frame cycle (N = 1/N frames)',
+      'Tỷ lệ diện tích mặt tối thiểu khi đăng ký': 'Minimum enrollment face area ratio',
+      'Tỷ lệ diện tích mặt tối đa khi đăng ký': 'Maximum enrollment face area ratio',
+      'Tỷ lệ khung mặt tối thiểu khi đăng ký':
+        'Minimum enrollment face aspect ratio',
+      'Tỷ lệ khung mặt tối đa khi đăng ký':
+        'Maximum enrollment face aspect ratio',
+      'Số pixel mặt tối thiểu khi đăng ký': 'Minimum enrollment face pixels',
+      'Kích thước đầu vào SCRFD': 'SCRFD input size',
+      'Ngưỡng điểm phát hiện SCRFD': 'SCRFD score threshold',
+      'Ngưỡng NMS SCRFD': 'SCRFD NMS threshold',
+      'HNSW M': 'HNSW M',
+      'HNSW efConstruction': 'HNSW efConstruction',
+      'HNSW efSearch': 'HNSW efSearch',
+      'Ngưỡng chất lượng vùng mắt': 'Eye region quality threshold',
+      'Ngưỡng chất lượng vùng mũi': 'Nose region quality threshold',
+      'Ngưỡng chất lượng vùng miệng': 'Mouth region quality threshold',
+      'Mức làm sắc nét tự động tối đa': 'Maximum auto-sharpen amount',
+      'Mức làm sắc nét tự động tối đa (0.0..1.0)': 'Maximum auto-sharpen amount (0.0..1.0)',
+    };
+    return _l(context, label, en[label] ?? label);
+  }
+
+  String _regionLabelText(BuildContext context, String vi) {
+    final en = <String, String>{
+      'Trán': 'Forehead',
+      'Mắt trái': 'Left eye',
+      'Mắt phải': 'Right eye',
+      'Mũi': 'Nose',
+      'Má trái': 'Left cheek',
+      'Má phải': 'Right cheek',
+      'Miệng': 'Mouth',
+      'Cằm': 'Chin',
+    };
+    return _l(context, vi, en[vi] ?? vi);
+  }
+
+  String _switchLabelText(BuildContext context, String key) {
+    final vi = _switchLabels[key] ?? key;
+    final en = <String, String>{
+      'enableRealtimeAutoSharpen': 'Enable realtime auto-sharpen',
+      'debugRealtimeOverlay': 'Enable realtime debug overlay',
+      'enableTraceLogs': 'Enable detailed trace logs',
+      'enablePerfLogs': 'Enable performance logs',
+      'realtimeCropFacesFromCameraImage':
+          'Realtime: crop faces directly from camera image',
+    };
+    return _l(context, vi, en[key] ?? vi);
+  }
+
   static const Map<String, String> _switchLabels = {
-    'autoTuneRecognitionParameters': 'Tu dong dieu chinh tham so realtime',
-    'debugRealtimeOverlay': 'Bat overlay debug realtime',
-    'enableTraceLogs': 'Bat trace log chi tiet realtime',
-    'enablePerfLogs': 'Bat perf log do tre',
-    'realtimeInputGrayscale': 'Ep anh realtime sang den trang',
+    'enableRealtimeAutoSharpen':
+        'Bật tự động làm sắc nét ảnh thời gian thực',
+    'debugRealtimeOverlay': 'Bật lớp phủ gỡ lỗi thời gian thực',
+    'enableTraceLogs': 'Bật nhật ký theo vết chi tiết thời gian thực',
+    'enablePerfLogs': 'Bật nhật ký hiệu năng độ trễ',
     'realtimeCropFacesFromCameraImage':
-        'Realtime: cat tung face truc tiep tu CameraImage',
+        'Thời gian thực: cắt từng khuôn mặt trực tiếp từ ảnh camera',
   };
 
   static const List<_RecognitionSectionDef> _configSections = [
     _RecognitionSectionDef(
-      title: 'Nguong nhan dien',
+      title: 'Ngưỡng nhận diện',
       fields: [
         _RecognitionFieldDef(
           key: 'knownMatchThreshold',
-          label: 'Nguong khop khuon mat',
-          isInt: false,
-        ),
-        _RecognitionFieldDef(
-          key: 'knownStrongThreshold',
-          label: 'Nguong khop manh',
+          label: 'Ngưỡng khớp khuôn mặt',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'knownCalibratedThreshold',
-          label: 'Nguong khop da hieu chinh',
+          label: 'Ngưỡng khớp đã hiệu chỉnh',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'knownMatchMargin',
-          label: 'Bien an toan giua top1 va top2',
+          label: 'Biên an toàn giữa hạng 1 và hạng 2',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'minTemplateSharpness',
-          label: 'Do net toi thieu cua mau dang ky',
+          label: 'Độ nét tối thiểu của mẫu đăng ký',
           isInt: false,
         ),
       ],
     ),
     _RecognitionSectionDef(
-      title: 'Realtime pipeline',
+      title: 'Luồng xử lý thời gian thực',
       fields: [
         _RecognitionFieldDef(
           key: 'cameraCalibrationDurationMs',
-          label: 'Thoi gian hieu chinh camera (ms)',
+          label: 'Thời gian hiệu chỉnh camera (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'calibrationLogThrottleMs',
-          label: 'Khoang cach log hieu chinh (ms)',
+          label: 'Khoảng cách log hiệu chỉnh (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'fallbackSkipLogIntervalMs',
-          label: 'Khoang cach log bo qua fallback (ms)',
+          label: 'Khoảng cách log bỏ qua fallback (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'fallbackCaptureIntervalMs',
-          label: 'Chu ky chup fallback (ms)',
+          label: 'Chu kỳ chụp fallback (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'fallbackMaxInputEdge',
-          label: 'Canh toi da anh fallback (px)',
+          label: 'Cạnh tối đa ảnh fallback (px)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'processFrameIntervalMs',
-          label: 'Chu ky xu ly frame (ms)',
+          label: 'Chu kỳ xử lý khung hình (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'singleFlightKeepLatestFrames',
-          label: 'So frame giu lai cua single-flight (keep-latest)',
+          label: 'Số khung hình giữ lại của xử lý đơn luồng',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'detectorInputWidth',
-          label: 'Chieu rong input detector',
+          label: 'Chiều rộng đầu vào bộ phát hiện',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'detectorInputHeight',
-          label: 'Chieu cao input detector',
+          label: 'Chiều cao đầu vào bộ phát hiện',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'trackKeepAliveMs',
-          label: 'Thoi gian giu track (ms)',
+          label: 'Thời gian giữ track (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'trackMatchMinScore',
-          label: 'Diem toi thieu de gan track',
+          label: 'Điểm tối thiểu để gán track',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'bboxSmoothingAlpha',
-          label: 'He so lam muot bbox',
+          label: 'Hệ số làm mượt bbox',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'annotatedFrameMinIntervalMs',
-          label: 'Khoang cach frame overlay toi thieu (ms)',
+          label: 'Khoảng cách lớp phủ tối thiểu giữa các khung hình (ms)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'eventPublishIntervalMs',
-          label: 'Khoang cach phat su kien (ms)',
+          label: 'Khoảng cách phát sự kiện (ms)',
           isInt: true,
         ),
       ],
     ),
     _RecognitionSectionDef(
-      title: 'Chat luong realtime',
+      title: 'Chất lượng thời gian thực',
       fields: [
         _RecognitionFieldDef(
           key: 'minRealtimeFrameQuality',
-          label: 'Chat luong frame toi thieu realtime',
+          label: 'Chất lượng khung hình tối thiểu thời gian thực',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'minRealtimeFaceAreaRatio',
-          label: 'Ty le dien tich mat toi thieu realtime',
+          label: 'Tỷ lệ diện tích mặt tối thiểu thời gian thực',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'minRealtimeFacePixels',
-          label: 'So pixel mat toi thieu realtime',
+          label: 'Số pixel mặt tối thiểu thời gian thực',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialMinFrameQuality',
-          label: 'Partial realtime: nguong chat luong toi thieu',
+          label: 'Vùng cục bộ thời gian thực: ngưỡng chất lượng tối thiểu',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialMinFaceAreaRatio',
-          label: 'Partial realtime: ty le dien tich mat toi thieu',
+          label: 'Vùng cục bộ thời gian thực: tỷ lệ diện tích mặt tối thiểu',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialMinFacePixels',
-          label: 'Partial realtime: so pixel mat toi thieu',
+          label: 'Vùng cục bộ thời gian thực: số pixel mặt tối thiểu',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialMode',
-          label: 'Partial realtime: che do (0=quality/size, 1=all frame, 2=tat)',
+          label: 'Vùng cục bộ thời gian thực: chế độ (0=chất lượng/kích thước, 1=mọi khung hình, 2=tắt)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialFrameCycle',
-          label: 'Partial realtime: chu ky frame (N = 1/N frame)',
+          label: 'Vùng cục bộ thời gian thực: chu kỳ khung hình (N = 1/N khung)',
           isInt: true,
         ),
       ],
     ),
     _RecognitionSectionDef(
-      title: 'Dang ky khuon mat',
+      title: 'Đăng ký khuôn mặt',
       fields: [
         _RecognitionFieldDef(
           key: 'minEnrollmentFaceAreaRatio',
-          label: 'Ty le dien tich mat toi thieu khi dang ky',
+          label: 'Tỷ lệ diện tích mặt tối thiểu khi đăng ký',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'maxEnrollmentFaceAreaRatio',
-          label: 'Ty le dien tich mat toi da khi dang ky',
+          label: 'Tỷ lệ diện tích mặt tối đa khi đăng ký',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'minEnrollmentFaceAspectRatio',
-          label: 'Ty le khung mat toi thieu khi dang ky',
+          label: 'Tỷ lệ khung mặt tối thiểu khi đăng ký',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'maxEnrollmentFaceAspectRatio',
-          label: 'Ty le khung mat toi da khi dang ky',
+          label: 'Tỷ lệ khung mặt tối đa khi đăng ký',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'minEnrollmentFacePixels',
-          label: 'So pixel mat toi thieu khi dang ky',
+          label: 'Số pixel mặt tối thiểu khi đăng ký',
           isInt: true,
         ),
       ],
     ),
     _RecognitionSectionDef(
-      title: 'Detector va tim kiem',
+      title: 'Phát hiện và tìm kiếm',
       fields: [
         _RecognitionFieldDef(
           key: 'scrfdInputSize',
-          label: 'Kich thuoc input SCRFD',
+          label: 'Kích thước đầu vào SCRFD',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'scrfdScoreThreshold',
-          label: 'Nguong diem phat hien SCRFD',
+          label: 'Ngưỡng điểm phát hiện SCRFD',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'scrfdNmsThreshold',
-          label: 'Nguong NMS SCRFD',
+          label: 'Ngưỡng NMS SCRFD',
           isInt: false,
         ),
         _RecognitionFieldDef(key: 'hnswM', label: 'HNSW M', isInt: true),
@@ -270,66 +363,35 @@ class _ImageRecognitionTestScreenState
         ),
         _RecognitionFieldDef(
           key: 'eyeRegionMinQuality',
-          label: 'Nguong chat luong vung mat',
+          label: 'Ngưỡng chất lượng vùng mắt',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'noseRegionMinQuality',
-          label: 'Nguong chat luong vung mui',
+          label: 'Ngưỡng chất lượng vùng mũi',
           isInt: false,
         ),
         _RecognitionFieldDef(
           key: 'mouthRegionMinQuality',
-          label: 'Nguong chat luong vung mieng',
+          label: 'Ngưỡng chất lượng vùng miệng',
           isInt: false,
         ),
       ],
     ),
     _RecognitionSectionDef(
-      title: 'Xu ly input va debug',
+      title: 'Xử lý đầu vào và gỡ lỗi',
       fields: [
         _RecognitionFieldDef(
-          key: 'realtimeInputBrightness',
-          label: 'Do sang input realtime',
-          isInt: true,
-        ),
-        _RecognitionFieldDef(
-          key: 'realtimeInputContrast',
-          label: 'Tuong phan input realtime',
-          isInt: false,
-        ),
-        _RecognitionFieldDef(
-          key: 'realtimeInputGamma',
-          label: 'Gamma input realtime',
-          isInt: false,
-        ),
-        _RecognitionFieldDef(
-          key: 'realtimeInputSaturation',
-          label: 'Bao hoa input realtime',
-          isInt: false,
-        ),
-        _RecognitionFieldDef(
           key: 'autoTuneMaxSharpenAmount',
-          label: 'Sharpen toi da cua auto tune',
-          isInt: false,
-        ),
-        _RecognitionFieldDef(
-          key: 'autoTuneLowLightThreshold',
-          label: 'Nguong low-light',
-          isInt: false,
-        ),
-        _RecognitionFieldDef(
-          key: 'autoTuneOverExposureThreshold',
-          label: 'Nguong over-exposure',
+          label: 'Mức làm sắc nét tự động tối đa (0.0..1.0)',
           isInt: false,
         ),
       ],
       switchKeys: [
-        'autoTuneRecognitionParameters',
+        'enableRealtimeAutoSharpen',
         'debugRealtimeOverlay',
         'enableTraceLogs',
         'enablePerfLogs',
-        'realtimeInputGrayscale',
         'realtimeCropFacesFromCameraImage',
       ],
     ),
@@ -351,12 +413,16 @@ class _ImageRecognitionTestScreenState
   bool _isDraggingUpload = false;
   bool _isLoadingConfig = true;
   bool _isApplyingConfig = false;
-  bool _autoTuneRecognitionParameters = false;
+  bool _enableRealtimeAutoSharpen = false;
   bool _debugRealtimeOverlay = true;
   bool _enableTraceLogs = false;
   bool _enablePerfLogs = false;
-  bool _realtimeInputGrayscale = false;
   bool _realtimeCropFacesFromCameraImage = false;
+  final Set<String> _expandedConfigSections = <String>{
+    'Ngưỡng nhận diện',
+    'Chất lượng thời gian thực',
+    'Xử lý đầu vào và gỡ lỗi',
+  };
   Set<String> _realtimePartialEnabledRegions = <String>{
     'forehead',
     'leftEye',
@@ -369,16 +435,15 @@ class _ImageRecognitionTestScreenState
   };
 
   static const Map<String, String> _partialRegionLabels = {
-    'forehead': 'Forehead',
-    'leftEye': 'Left eye',
-    'rightEye': 'Right eye',
-    'nose': 'Nose',
-    'leftCheek': 'Left cheek',
-    'rightCheek': 'Right cheek',
-    'mouth': 'Mouth',
-    'chin': 'Chin',
+    'forehead': 'Trán',
+    'leftEye': 'Mắt trái',
+    'rightEye': 'Mắt phải',
+    'nose': 'Mũi',
+    'leftCheek': 'Má trái',
+    'rightCheek': 'Má phải',
+    'mouth': 'Miệng',
+    'chin': 'Cằm',
   };
-  _GalleryCompareMode _galleryCompareMode = _GalleryCompareMode.selectedPeople;
   double _matchThreshold = 0.55;
   UploadedImageRecognitionResult? _result;
 
@@ -402,6 +467,8 @@ class _ImageRecognitionTestScreenState
     if (!mounted) return;
     setState(() {
       _people = people;
+      final validIds = people.map((p) => p.id).toSet();
+      _selectedPersonIds.removeWhere((id) => !validIds.contains(id));
     });
   }
 
@@ -418,9 +485,6 @@ class _ImageRecognitionTestScreenState
   void _fillConfigControllers(RecognitionRuntimeConfig config) {
     _matchThreshold = config.knownMatchThreshold;
     _configControllers['knownMatchThreshold']!.text = config.knownMatchThreshold
-        .toString();
-    _configControllers['knownStrongThreshold']!.text = config
-        .knownStrongThreshold
         .toString();
     _configControllers['knownCalibratedThreshold']!.text = config
         .knownCalibratedThreshold
@@ -531,38 +595,26 @@ class _ImageRecognitionTestScreenState
     _configControllers['mouthRegionMinQuality']!.text = config
         .mouthRegionMinQuality
         .toString();
-    _configControllers['realtimeInputBrightness']!.text = config
-        .realtimeInputBrightness
-        .toString();
-    _configControllers['realtimeInputContrast']!.text = config
-        .realtimeInputContrast
-        .toString();
-    _configControllers['realtimeInputGamma']!.text = config.realtimeInputGamma
-        .toString();
-    _configControllers['realtimeInputSaturation']!.text = config
-        .realtimeInputSaturation
-        .toString();
     _configControllers['autoTuneMaxSharpenAmount']!.text = config
         .autoTuneMaxSharpenAmount
         .toString();
-    _configControllers['autoTuneLowLightThreshold']!.text = config
-        .autoTuneLowLightThreshold
-        .toString();
-    _configControllers['autoTuneOverExposureThreshold']!.text = config
-        .autoTuneOverExposureThreshold
-        .toString();
-    _autoTuneRecognitionParameters = config.autoTuneRecognitionParameters;
+    _enableRealtimeAutoSharpen = config.enableRealtimeAutoSharpen;
     _debugRealtimeOverlay = config.debugRealtimeOverlay;
     _enableTraceLogs = config.enableTraceLogs;
     _enablePerfLogs = config.enablePerfLogs;
-    _realtimeInputGrayscale = config.realtimeInputGrayscale;
     _realtimeCropFacesFromCameraImage = config.realtimeCropFacesFromCameraImage;
   }
 
   int _parseIntField(String key, String label) {
     final value = int.tryParse(_configControllers[key]!.text.trim());
     if (value == null) {
-      throw FormatException('Gia tri "$label" khong hop le');
+      throw FormatException(
+        _l(
+          context,
+          'Giá trị "${_fieldLabelText(context, label)}" không hợp lệ',
+          'Invalid value for "${_fieldLabelText(context, label)}"',
+        ),
+      );
     }
     return value;
   }
@@ -570,7 +622,13 @@ class _ImageRecognitionTestScreenState
   double _parseDoubleField(String key, String label) {
     final value = double.tryParse(_configControllers[key]!.text.trim());
     if (value == null) {
-      throw FormatException('Gia tri "$label" khong hop le');
+      throw FormatException(
+        _l(
+          context,
+          'Giá trị "${_fieldLabelText(context, label)}" không hợp lệ',
+          'Invalid value for "${_fieldLabelText(context, label)}"',
+        ),
+      );
     }
     return value;
   }
@@ -585,145 +643,141 @@ class _ImageRecognitionTestScreenState
       final config = RecognitionRuntimeConfig(
         knownMatchThreshold: _parseDoubleField(
           'knownMatchThreshold',
-          'Nguong khop khuon mat',
-        ),
-        knownStrongThreshold: _parseDoubleField(
-          'knownStrongThreshold',
-          'Nguong khop manh',
+          'Ngưỡng khớp khuôn mặt',
         ),
         knownCalibratedThreshold: _parseDoubleField(
           'knownCalibratedThreshold',
-          'Nguong khop da hieu chinh',
+          'Ngưỡng khớp đã hiệu chỉnh',
         ),
         knownMatchMargin: _parseDoubleField(
           'knownMatchMargin',
-          'Bien an toan giua top1 va top2',
+          'Biên an toàn giữa hạng 1 và hạng 2',
         ),
         minTemplateSharpness: _parseDoubleField(
           'minTemplateSharpness',
-          'Do net toi thieu cua mau dang ky',
+          'Độ nét tối thiểu của mẫu đăng ký',
         ),
         cameraCalibrationDurationMs: _parseIntField(
           'cameraCalibrationDurationMs',
-          'Thoi gian hieu chinh camera (ms)',
+          'Thời gian hiệu chỉnh camera (ms)',
         ),
         calibrationLogThrottleMs: _parseIntField(
           'calibrationLogThrottleMs',
-          'Khoang cach log hieu chinh (ms)',
+          'Khoảng cách log hiệu chỉnh (ms)',
         ),
         fallbackSkipLogIntervalMs: _parseIntField(
           'fallbackSkipLogIntervalMs',
-          'Khoang cach log bo qua fallback (ms)',
+          'Khoảng cách log bỏ qua fallback (ms)',
         ),
         fallbackCaptureIntervalMs: _parseIntField(
           'fallbackCaptureIntervalMs',
-          'Chu ky chup fallback (ms)',
+          'Chu kỳ chụp fallback (ms)',
         ),
         fallbackMaxInputEdge: _parseIntField(
           'fallbackMaxInputEdge',
-          'Canh toi da anh fallback (px)',
+          'Cạnh tối đa ảnh fallback (px)',
         ),
         processFrameIntervalMs: _parseIntField(
           'processFrameIntervalMs',
-          'Chu ky xu ly frame (ms)',
+          'Chu kỳ xử lý khung hình (ms)',
         ),
         singleFlightKeepLatestFrames: _parseIntField(
           'singleFlightKeepLatestFrames',
-          'So frame giu lai cua single-flight (keep-latest)',
+          'Số khung hình giữ lại của xử lý đơn luồng',
         ),
         detectorInputWidth: _parseIntField(
           'detectorInputWidth',
-          'Chieu rong input detector',
+          'Chiều rộng đầu vào bộ phát hiện',
         ),
         detectorInputHeight: _parseIntField(
           'detectorInputHeight',
-          'Chieu cao input detector',
+          'Chiều cao đầu vào bộ phát hiện',
         ),
         trackKeepAliveMs: _parseIntField(
           'trackKeepAliveMs',
-          'Thoi gian giu track (ms)',
+          'Thời gian giữ track (ms)',
         ),
         trackMatchMinScore: _parseDoubleField(
           'trackMatchMinScore',
-          'Diem toi thieu de gan track',
+          'Điểm tối thiểu để gán track',
         ),
         bboxSmoothingAlpha: _parseDoubleField(
           'bboxSmoothingAlpha',
-          'He so lam muot bbox',
+          'Hệ số làm mượt bbox',
         ),
         annotatedFrameMinIntervalMs: _parseIntField(
           'annotatedFrameMinIntervalMs',
-          'Khoang cach frame overlay toi thieu (ms)',
+          'Khoảng cách lớp phủ tối thiểu giữa các khung hình (ms)',
         ),
         eventPublishIntervalMs: _parseIntField(
           'eventPublishIntervalMs',
-          'Khoang cach phat su kien (ms)',
+          'Khoảng cách phát sự kiện (ms)',
         ),
         minRealtimeFrameQuality: _parseDoubleField(
           'minRealtimeFrameQuality',
-          'Chat luong frame toi thieu realtime',
+          'Chất lượng khung hình tối thiểu thời gian thực',
         ),
         minRealtimeFaceAreaRatio: _parseDoubleField(
           'minRealtimeFaceAreaRatio',
-          'Ty le dien tich mat toi thieu realtime',
+          'Tỷ lệ diện tích mặt tối thiểu thời gian thực',
         ),
         minRealtimeFacePixels: _parseIntField(
           'minRealtimeFacePixels',
-          'So pixel mat toi thieu realtime',
+          'Số pixel mặt tối thiểu thời gian thực',
         ),
         realtimePartialMinFrameQuality: _parseDoubleField(
           'realtimePartialMinFrameQuality',
-          'Partial realtime: nguong chat luong toi thieu',
+          'Vùng cục bộ thời gian thực: ngưỡng chất lượng tối thiểu',
         ),
         realtimePartialMinFaceAreaRatio: _parseDoubleField(
           'realtimePartialMinFaceAreaRatio',
-          'Partial realtime: ty le dien tich mat toi thieu',
+          'Vùng cục bộ thời gian thực: tỷ lệ diện tích mặt tối thiểu',
         ),
         realtimePartialMinFacePixels: _parseIntField(
           'realtimePartialMinFacePixels',
-          'Partial realtime: so pixel mat toi thieu',
+          'Vùng cục bộ thời gian thực: số pixel mặt tối thiểu',
         ),
         realtimePartialMode: _parseIntField(
           'realtimePartialMode',
-          'Partial realtime: che do',
+          'Vùng cục bộ thời gian thực: chế độ',
         ),
         realtimePartialEnabledRegions:
             _realtimePartialEnabledRegions.join(','),
         realtimePartialFrameCycle: _parseIntField(
           'realtimePartialFrameCycle',
-          'Partial realtime: chu ky frame',
+          'Vùng cục bộ thời gian thực: chu kỳ khung hình',
         ),
         minEnrollmentFaceAreaRatio: _parseDoubleField(
           'minEnrollmentFaceAreaRatio',
-          'Ty le dien tich mat toi thieu khi dang ky',
+          'Tỷ lệ diện tích mặt tối thiểu khi đăng ký',
         ),
         maxEnrollmentFaceAreaRatio: _parseDoubleField(
           'maxEnrollmentFaceAreaRatio',
-          'Ty le dien tich mat toi da khi dang ky',
+          'Tỷ lệ diện tích mặt tối đa khi đăng ký',
         ),
         minEnrollmentFaceAspectRatio: _parseDoubleField(
           'minEnrollmentFaceAspectRatio',
-          'Ty le khung mat toi thieu khi dang ky',
+          'Tỷ lệ khung mặt tối thiểu khi đăng ký',
         ),
         maxEnrollmentFaceAspectRatio: _parseDoubleField(
           'maxEnrollmentFaceAspectRatio',
-          'Ty le khung mat toi da khi dang ky',
+          'Tỷ lệ khung mặt tối đa khi đăng ký',
         ),
         minEnrollmentFacePixels: _parseIntField(
           'minEnrollmentFacePixels',
-          'So pixel mat toi thieu khi dang ky',
+          'Số pixel mặt tối thiểu khi đăng ký',
         ),
         scrfdInputSize: _parseIntField(
           'scrfdInputSize',
-          'Kich thuoc input SCRFD',
+          'Kích thước input SCRFD',
         ),
         scrfdScoreThreshold: _parseDoubleField(
           'scrfdScoreThreshold',
-          'Nguong diem phat hien SCRFD',
+          'Ngưỡng điểm phát hiện SCRFD',
         ),
         scrfdNmsThreshold: _parseDoubleField(
           'scrfdNmsThreshold',
-          'Nguong NMS SCRFD',
+          'Ngưỡng NMS SCRFD',
         ),
         hnswM: _parseIntField('hnswM', 'HNSW M'),
         hnswEfConstruction: _parseIntField(
@@ -733,49 +787,24 @@ class _ImageRecognitionTestScreenState
         hnswEfSearch: _parseIntField('hnswEfSearch', 'HNSW efSearch'),
         eyeRegionMinQuality: _parseDoubleField(
           'eyeRegionMinQuality',
-          'Nguong chat luong vung mat',
+          'Ngưỡng chất lượng vùng mắt',
         ),
         noseRegionMinQuality: _parseDoubleField(
           'noseRegionMinQuality',
-          'Nguong chat luong vung mui',
+          'Ngưỡng chất lượng vùng mũi',
         ),
         mouthRegionMinQuality: _parseDoubleField(
           'mouthRegionMinQuality',
-          'Nguong chat luong vung mieng',
+          'Ngưỡng chất lượng vùng miệng',
         ),
-        autoTuneRecognitionParameters: _autoTuneRecognitionParameters,
+        enableRealtimeAutoSharpen: _enableRealtimeAutoSharpen,
         debugRealtimeOverlay: _debugRealtimeOverlay,
         enableTraceLogs: _enableTraceLogs,
         enablePerfLogs: _enablePerfLogs,
-        realtimeInputBrightness: _parseIntField(
-          'realtimeInputBrightness',
-          'Do sang input realtime',
-        ),
-        realtimeInputContrast: _parseDoubleField(
-          'realtimeInputContrast',
-          'Tuong phan input realtime',
-        ),
-        realtimeInputGamma: _parseDoubleField(
-          'realtimeInputGamma',
-          'Gamma input realtime',
-        ),
-        realtimeInputSaturation: _parseDoubleField(
-          'realtimeInputSaturation',
-          'Bao hoa input realtime',
-        ),
-        realtimeInputGrayscale: _realtimeInputGrayscale,
         realtimeCropFacesFromCameraImage: _realtimeCropFacesFromCameraImage,
         autoTuneMaxSharpenAmount: _parseDoubleField(
           'autoTuneMaxSharpenAmount',
-          'Sharpen toi da cua auto tune',
-        ),
-        autoTuneLowLightThreshold: _parseDoubleField(
-          'autoTuneLowLightThreshold',
-          'Nguong low-light',
-        ),
-        autoTuneOverExposureThreshold: _parseDoubleField(
-          'autoTuneOverExposureThreshold',
-          'Nguong over-exposure',
+          'Mức làm sắc nét tự động tối đa',
         ),
       );
 
@@ -787,15 +816,31 @@ class _ImageRecognitionTestScreenState
       await RecognitionSettingsRepository.saveConfig(config);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Da luu tham so va ap dung ngay vao luong nhan dien.'),
+        SnackBar(
+          content: Text(
+            _l(
+              context,
+              'Đã lưu tham số và áp dụng ngay vào luồng nhận diện.',
+              'Parameters were saved and applied immediately to recognition flow.',
+            ),
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Khong luu duoc tham so: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _l(
+              context,
+              'Không lưu được tham số: $e',
+              'Failed to save parameters: $e',
+            ),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -820,7 +865,15 @@ class _ImageRecognitionTestScreenState
     if (bytes == null || bytes.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Khong doc duoc du lieu anh.')),
+        SnackBar(
+          content: Text(
+            _l(
+              context,
+              'Không đọc được dữ liệu ảnh.',
+              'Cannot read image data.',
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -849,7 +902,15 @@ class _ImageRecognitionTestScreenState
     if (!mounted) return;
     if (bytes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Khong doc duoc anh tu file keo tha.')),
+        SnackBar(
+          content: Text(
+            _l(
+              context,
+              'Không đọc được ảnh từ file kéo thả.',
+              'Cannot read image from dropped file.',
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -881,14 +942,30 @@ class _ImageRecognitionTestScreenState
 
   Future<void> _runTest() async {
     if (_originalImageBytes == null || _originalImageBytes!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui long chon hoac keo tha anh truoc.')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _l(
+                context,
+                'Vui lòng chọn hoặc kéo thả ảnh trước.',
+                'Please pick or drop an image first.',
+              ),
+            ),
+          ),
+        );
       return;
     }
     if (_selectedPersonIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui long chon danh sach doi tuong.')),
+          SnackBar(
+            content: Text(
+              _l(
+                context,
+                'Vui lòng chọn danh sách đối tượng.',
+                'Please select people for testing.',
+              ),
+            ),
+          ),
       );
       return;
     }
@@ -908,8 +985,7 @@ class _ImageRecognitionTestScreenState
             imageBytes: _originalImageBytes!,
             selectedPeople: selectedPeople,
             matchThreshold: _matchThreshold,
-            compareAgainstWholeGallery:
-                _galleryCompareMode == _GalleryCompareMode.fullGallery,
+            compareAgainstWholeGallery: false,
           )
           .timeout(const Duration(seconds: 30));
       if (!mounted) return;
@@ -920,20 +996,30 @@ class _ImageRecognitionTestScreenState
       if (!mounted) return;
       setState(() {
         _result = _buildSyntheticFailedResult(
-          'Kiem tra qua 30s chua xong. Co the model dang treo hoac anh qua nang.',
+          _l(
+            context,
+            'Kiểm tra quá 30s chưa xong. Có thể model đang treo hoặc ảnh quá nặng.',
+            'Test exceeded 30s. The model may be stalled or image is too heavy.',
+          ),
         );
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Kiem tra bi timeout.')));
+      ).showSnackBar(
+        SnackBar(content: Text(_l(context, 'Kiểm tra bị timeout.', 'Test timed out.'))),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _result = _buildSyntheticFailedResult('Loi khi chay kiem tra: $e');
+        _result = _buildSyntheticFailedResult(
+          _l(context, 'Lỗi khi chạy kiểm tra: $e', 'Error while running test: $e'),
+        );
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Kiem tra that bai: $e')));
+      ).showSnackBar(
+        SnackBar(content: Text(_l(context, 'Kiểm tra thất bại: $e', 'Test failed: $e'))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -959,7 +1045,15 @@ class _ImageRecognitionTestScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Test nhan dien tu anh upload')),
+      appBar: AppBar(
+        title: Text(
+          _l(
+            context,
+            'Kiểm thử nhận diện từ ảnh tải lên',
+            'Image upload recognition test',
+          ),
+        ),
+      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -1021,19 +1115,23 @@ class _ImageRecognitionTestScreenState
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.play_circle_fill),
-                label: Text(_isRunning ? 'Dang kiem tra...' : 'Kiem tra'),
+                label: Text(
+                  _isRunning
+                      ? _l(context, 'Đang kiểm tra...', 'Running...')
+                      : _l(context, 'Kiểm tra', 'Run test'),
+                ),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _showRecognitionConfigDialog,
                 icon: const Icon(Icons.tune),
-                label: const Text('Cau hinh'),
+                label: Text(_l(context, 'Cấu hình', 'Settings')),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _isRunning ? null : _clearQuick,
                 icon: const Icon(Icons.clear),
-                label: const Text('Clear'),
+                label: Text(_l(context, 'Xóa nhanh', 'Quick clear')),
               ),
             ],
           ),
@@ -1051,7 +1149,7 @@ class _ImageRecognitionTestScreenState
         Expanded(
           child: _buildImagePanel(
             context,
-            title: 'Anh goc',
+            title: _l(context, 'Ảnh gốc', 'Original image'),
             bytes: _originalImageBytes,
             enableDrop: true,
           ),
@@ -1060,7 +1158,7 @@ class _ImageRecognitionTestScreenState
         Expanded(
           child: _buildImagePanel(
             context,
-            title: 'Anh ket qua (bbox)',
+            title: _l(context, 'Ảnh kết quả (bbox)', 'Result image (bbox)'),
             bytes: _result?.annotatedImageBytes,
             enableDrop: false,
           ),
@@ -1122,7 +1220,7 @@ class _ImageRecognitionTestScreenState
                       ).colorScheme.primary.withValues(alpha: 0.08),
                       alignment: Alignment.center,
                       child: Text(
-                        'Tha file de upload',
+                        _l(context, 'Thả tệp để tải lên', 'Drop file to upload'),
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: Theme.of(context).colorScheme.primary,
@@ -1171,7 +1269,9 @@ class _ImageRecognitionTestScreenState
             if (enableDrop) ...[
               const SizedBox(height: 8),
               Text(
-                _fileName == null ? 'Chua chon anh' : 'File: $_fileName',
+                _fileName == null
+                    ? _l(context, 'Chưa chọn ảnh', 'No image selected')
+                    : _l(context, 'Tệp: $_fileName', 'File: $_fileName'),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -1197,8 +1297,16 @@ class _ImageRecognitionTestScreenState
               const SizedBox(height: 8),
               Text(
                 enableDrop
-                    ? 'Keo tha anh vao day\nhoac click de chon file'
-                    : 'Chua co ket qua nhan dien',
+                    ? _l(
+                        context,
+                        'Kéo thả ảnh vào đây\nhoặc bấm để chọn tệp',
+                        'Drag and drop image here\nor click to select a file',
+                      )
+                    : _l(
+                        context,
+                        'Chưa có kết quả nhận diện',
+                        'No recognition result yet',
+                      ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -1216,7 +1324,7 @@ class _ImageRecognitionTestScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Thong tin chi tiet ket qua',
+              _l(context, 'Thông tin chi tiết kết quả', 'Result details'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -1225,7 +1333,7 @@ class _ImageRecognitionTestScreenState
             _buildResultSummary(context),
             const SizedBox(height: 12),
             Text(
-              'Danh sach face detect',
+              _l(context, 'Danh sách khuôn mặt phát hiện', 'Detected faces'),
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
@@ -1240,7 +1348,13 @@ class _ImageRecognitionTestScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Match threshold: ${_matchThreshold.toStringAsFixed(2)}'),
+        Text(
+          _l(
+            context,
+            'Ngưỡng so khớp: ${_matchThreshold.toStringAsFixed(2)}',
+            'Match threshold: ${_matchThreshold.toStringAsFixed(2)}',
+          ),
+        ),
         Slider(
           value: _matchThreshold,
           min: 0.30,
@@ -1264,7 +1378,13 @@ class _ImageRecognitionTestScreenState
   Widget _buildResultSummary(BuildContext context) {
     final result = _result;
     if (result == null) {
-      return const Text('Chua co ket qua. Bam Kiem tra de chay nhan dien.');
+      return Text(
+        _l(
+          context,
+          'Chưa có kết quả. Bấm Kiểm tra để chạy nhận diện.',
+          'No results yet. Press Run test to start recognition.',
+        ),
+      );
     }
 
     final missingPeople = _people
@@ -1284,18 +1404,36 @@ class _ImageRecognitionTestScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            result.pass ? 'PASS' : 'FAILED',
+            result.pass
+                ? _l(context, 'ĐẠT', 'PASS')
+                : _l(context, 'KHÔNG ĐẠT', 'FAILED'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 4),
           Text(result.message),
           const SizedBox(height: 6),
-          Text('So mat phat hien: ${result.matches.length}'),
           Text(
-            'So doi tuong nhan dien duoc: ${result.recognizedPersonIds.length}',
+            _l(
+              context,
+              'Số khuôn mặt phát hiện: ${result.matches.length}',
+              'Detected faces: ${result.matches.length}',
+            ),
+          ),
+          Text(
+            _l(
+              context,
+              'Số đối tượng nhận diện được: ${result.recognizedPersonIds.length}',
+              'Recognized people: ${result.recognizedPersonIds.length}',
+            ),
           ),
           if (missingPeople.isNotEmpty)
-            Text('Con thieu: ${missingPeople.join(', ')}'),
+            Text(
+              _l(
+                context,
+                'Còn thiếu: ${missingPeople.join(', ')}',
+                'Missing: ${missingPeople.join(', ')}',
+              ),
+            ),
         ],
       ),
     );
@@ -1304,9 +1442,15 @@ class _ImageRecognitionTestScreenState
   Widget _buildFaceListTwoColumns(BuildContext context) {
     final result = _result;
     if (result == null || result.faceDebugInfos.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Text('Chua co danh sach face detect.'),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          _l(
+            context,
+            'Chưa có danh sách khuôn mặt phát hiện.',
+            'No detected face list yet.',
+          ),
+        ),
       );
     }
 
@@ -1314,7 +1458,7 @@ class _ImageRecognitionTestScreenState
       children: result.faceDebugInfos
           .map((face) {
             final top1 = face.topCandidates.isEmpty
-                ? 'N/A'
+              ? _l(context, 'Không có', 'None')
                 : face.topCandidates.first.personName;
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -1331,7 +1475,11 @@ class _ImageRecognitionTestScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Face #${face.faceIndex + 1} | det=${face.detectorScore.toStringAsFixed(3)} | top1=$top1',
+                        _l(
+                          context,
+                          'Khuôn mặt #${face.faceIndex + 1} | điểm phát hiện=${face.detectorScore.toStringAsFixed(3)} | ứng viên đầu=$top1',
+                          'Face #${face.faceIndex + 1} | detection=${face.detectorScore.toStringAsFixed(3)} | top candidate=$top1',
+                        ),
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 8),
@@ -1341,7 +1489,7 @@ class _ImageRecognitionTestScreenState
                           Expanded(
                             child: _buildFaceColImage(
                               context,
-                              title: 'Face goc',
+                              title: _l(context, 'Khuôn mặt gốc', 'Original face'),
                               bytes: face.originalFaceBytes,
                             ),
                           ),
@@ -1349,7 +1497,7 @@ class _ImageRecognitionTestScreenState
                           Expanded(
                             child: _buildFaceColImage(
                               context,
-                              title: 'Face da xu ly',
+                              title: _l(context, 'Khuôn mặt đã xử lý', 'Processed face'),
                               bytes: face.cleanedFaceBytes,
                             ),
                           ),
@@ -1357,12 +1505,19 @@ class _ImageRecognitionTestScreenState
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'rect=(${face.rect.left.toStringAsFixed(1)}, ${face.rect.top.toStringAsFixed(1)}, ${face.rect.width.toStringAsFixed(1)}, ${face.rect.height.toStringAsFixed(1)}) | '
-                        'pixels=${face.minFacePixels} | vector=${face.vector.length}',
+                        _l(
+                          context,
+                          'khung=(${face.rect.left.toStringAsFixed(1)}, ${face.rect.top.toStringAsFixed(1)}, ${face.rect.width.toStringAsFixed(1)}, ${face.rect.height.toStringAsFixed(1)}) | pixel=${face.minFacePixels} | chiều dài vector=${face.vector.length}',
+                          'rect=(${face.rect.left.toStringAsFixed(1)}, ${face.rect.top.toStringAsFixed(1)}, ${face.rect.width.toStringAsFixed(1)}, ${face.rect.height.toStringAsFixed(1)}) | pixels=${face.minFacePixels} | vector length=${face.vector.length}',
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Click de phong to cap anh face',
+                        _l(
+                          context,
+                          'Bấm để phóng to cặp ảnh khuôn mặt',
+                          'Click to zoom the face image pair',
+                        ),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -1394,7 +1549,11 @@ class _ImageRecognitionTestScreenState
                     children: [
                       Expanded(
                         child: Text(
-                          'Face #${face.faceIndex + 1} - Phong to',
+                          _l(
+                            dialogContext,
+                            'Khuôn mặt #${face.faceIndex + 1} - Phóng to',
+                            'Face #${face.faceIndex + 1} - Zoom',
+                          ),
                           style: Theme.of(dialogContext).textTheme.titleLarge,
                         ),
                       ),
@@ -1411,7 +1570,7 @@ class _ImageRecognitionTestScreenState
                         Expanded(
                           child: _buildZoomPanel(
                             dialogContext,
-                            title: 'Face goc',
+                            title: _l(dialogContext, 'Khuôn mặt gốc', 'Original face'),
                             bytes: face.originalFaceBytes,
                           ),
                         ),
@@ -1419,7 +1578,7 @@ class _ImageRecognitionTestScreenState
                         Expanded(
                           child: _buildZoomPanel(
                             dialogContext,
-                            title: 'Face da xu ly',
+                            title: _l(dialogContext, 'Khuôn mặt đã xử lý', 'Processed face'),
                             bytes: face.cleanedFaceBytes,
                           ),
                         ),
@@ -1497,6 +1656,8 @@ class _ImageRecognitionTestScreenState
     return LayoutBuilder(
       builder: (context, constraints) {
         final hasBoundedHeight = constraints.hasBoundedHeight;
+        final allSelected =
+            _people.isNotEmpty && _selectedPersonIds.length == _people.length;
 
         Widget peopleList() {
           final listView = ListView.builder(
@@ -1505,23 +1666,32 @@ class _ImageRecognitionTestScreenState
             itemBuilder: (context, index) {
               final person = _people[index];
               final selected = _selectedPersonIds.contains(person.id);
-              return CheckboxListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                value: selected,
-                title: Text(person.name),
-                subtitle: person.employeeCode.trim().isEmpty
-                    ? null
-                    : Text('Ma NV: ${person.employeeCode}'),
-                onChanged: (nextValue) {
-                  setState(() {
-                    if (nextValue == true) {
-                      _selectedPersonIds.add(person.id);
-                    } else {
-                      _selectedPersonIds.remove(person.id);
-                    }
-                  });
-                },
+              return Material(
+                color: Colors.transparent,
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: selected,
+                  title: Text(person.name),
+                  subtitle: person.employeeCode.trim().isEmpty
+                      ? null
+                      : Text(
+                          _l(
+                            context,
+                            'Mã NV: ${person.employeeCode}',
+                            'Employee code: ${person.employeeCode}',
+                          ),
+                        ),
+                  onChanged: (nextValue) {
+                    setState(() {
+                      if (nextValue == true) {
+                        _selectedPersonIds.add(person.id);
+                      } else {
+                        _selectedPersonIds.remove(person.id);
+                      }
+                    });
+                  },
+                ),
               );
             },
           );
@@ -1539,43 +1709,58 @@ class _ImageRecognitionTestScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Danh sach doi tuong',
+                  _l(context, 'Danh sách đối tượng', 'People list'),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Che do so khop',
+                  _l(context, 'Chọn danh sách kiểm thử', 'Select test list'),
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
-                const SizedBox(height: 8),
-                SegmentedButton<_GalleryCompareMode>(
-                  segments: const [
-                    ButtonSegment<_GalleryCompareMode>(
-                      value: _GalleryCompareMode.selectedPeople,
-                      label: Text('Selected people'),
+                Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      _l(
+                        context,
+                        'Chọn tất cả đối tượng',
+                        'Select all people',
+                      ),
                     ),
-                    ButtonSegment<_GalleryCompareMode>(
-                      value: _GalleryCompareMode.fullGallery,
-                      label: Text('Toan bo gallery'),
+                    subtitle: Text(
+                      _l(
+                        context,
+                        'Bật để tự động chọn toàn bộ danh sách hiện có.',
+                        'Enable to automatically select everyone in the list.',
+                      ),
                     ),
-                  ],
-                  selected: <_GalleryCompareMode>{_galleryCompareMode},
-                  onSelectionChanged: (selection) {
-                    setState(() {
-                      _galleryCompareMode = selection.first;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _galleryCompareMode == _GalleryCompareMode.selectedPeople
-                      ? 'Chi so khop trong danh sach da chon, phu hop de test tap hep.'
-                      : 'So khop voi toan bo gallery nhu realtime, nhung van danh gia PASS/FAILED theo danh sach da chon.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                    value: allSelected,
+                    onChanged: _people.isEmpty
+                        ? null
+                        : (checked) {
+                            setState(() {
+                              if (checked == true) {
+                                _selectedPersonIds
+                                  ..clear()
+                                  ..addAll(_people.map((p) => p.id));
+                              } else {
+                                _selectedPersonIds.clear();
+                              }
+                            });
+                          },
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (_people.isEmpty)
-                  const Text('Danh sach nguoi trong he thong dang trong.')
+                  Text(
+                    _l(
+                      context,
+                      'Danh sách người trong hệ thống đang trống.',
+                      'People list is empty.',
+                    ),
+                  )
                 else
                   peopleList(),
               ],
@@ -1589,7 +1774,7 @@ class _ImageRecognitionTestScreenState
   Future<void> _showRecognitionConfigDialog() async {
     await showGeneralDialog<void>(
       context: context,
-      barrierLabel: 'Recognition config',
+      barrierLabel: _l(context, 'Cấu hình nhận diện', 'Recognition settings'),
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.28),
       transitionDuration: const Duration(milliseconds: 320),
@@ -1679,7 +1864,11 @@ class _ImageRecognitionTestScreenState
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  'Tham so recognition runtime',
+                                                  _l(
+                                                    dialogContext,
+                                                    'Tham số nhận diện thời gian thực',
+                                                    'Realtime recognition parameters',
+                                                  ),
                                                   style: Theme.of(dialogContext)
                                                       .textTheme
                                                       .titleLarge
@@ -1690,7 +1879,11 @@ class _ImageRecognitionTestScreenState
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
-                                                  'Popup nay luu tham so vao RecognitionSettingsRepository va ap dung ngay vao luong nhan dien dang chay.',
+                                                  _l(
+                                                    dialogContext,
+                                                    'Bảng này lưu tham số vào RecognitionSettingsRepository và áp dụng ngay vào luồng nhận diện đang chạy.',
+                                                    'This panel saves parameters to RecognitionSettingsRepository and applies them immediately to the running recognition pipeline.',
+                                                  ),
                                                   style: Theme.of(
                                                     dialogContext,
                                                   ).textTheme.bodyMedium,
@@ -1722,7 +1915,11 @@ class _ImageRecognitionTestScreenState
                                           ),
                                         ),
                                         child: Text(
-                                          'Slider Match threshold trong man test upload van chi tac dong cho bai test anh, khong ghi de len runtime config.',
+                                          _l(
+                                            dialogContext,
+                                            'Thanh trượt ngưỡng so khớp trong màn kiểm thử ảnh chỉ tác động cho bài kiểm thử hiện tại, không ghi đè lên cấu hình thời gian thực.',
+                                            'The match-threshold slider in this screen only affects the current image test and does not override realtime configuration.',
+                                          ),
                                           style: Theme.of(
                                             dialogContext,
                                           ).textTheme.bodySmall,
@@ -1774,7 +1971,7 @@ class _ImageRecognitionTestScreenState
                                             onPressed: () => Navigator.of(
                                               dialogContext,
                                             ).pop(),
-                                            child: const Text('Dong'),
+                                            child: Text(_l(dialogContext, 'Đóng', 'Close')),
                                           ),
                                           const SizedBox(width: 10),
                                           FilledButton.icon(
@@ -1798,8 +1995,8 @@ class _ImageRecognitionTestScreenState
                                                 : const Icon(Icons.save),
                                             label: Text(
                                               _isApplyingConfig
-                                                  ? 'Dang ap dung...'
-                                                  : 'Ap dung va luu',
+                                                  ? _l(dialogContext, 'Đang áp dụng...', 'Applying...')
+                                                  : _l(dialogContext, 'Áp dụng và lưu', 'Apply and save'),
                                             ),
                                           ),
                                         ],
@@ -1831,45 +2028,172 @@ class _ImageRecognitionTestScreenState
     _RecognitionSectionDef section, {
     VoidCallback? onStateChanged,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+    final isExpanded = _expandedConfigSections.contains(section.title);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isExpanded
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.28)
+              : Theme.of(context).dividerColor.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: isExpanded,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          onExpansionChanged: (expanded) {
+            setState(() {
+              if (expanded) {
+                _expandedConfigSections.add(section.title);
+              } else {
+                _expandedConfigSections.remove(section.title);
+              }
+            });
+            onStateChanged?.call();
+          },
+          title: Row(
+            children: [
+              Icon(
+                _sectionIcon(section.title),
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _sectionTitleText(context, section.title),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (section.fields.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${section.fields.length}',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
+            ],
+          ),
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final int fieldColumns = width >= 980
+                    ? 3
+                    : width >= 640
+                    ? 2
+                    : 1;
+                final int switchColumns = width >= 920
+                    ? 2
+                    : 1;
+
+                return Column(
+                  children: [
+                    if (section.fields.isNotEmpty)
+                      GridView.builder(
+                        itemCount: section.fields.length,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: fieldColumns,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          mainAxisExtent: 94,
+                        ),
+                        itemBuilder: (context, index) {
+                          final field = section.fields[index];
+                          return _buildConfigFieldTile(context, field);
+                        },
+                      ),
+                    if (section.switchKeys.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      GridView.builder(
+                        itemCount: section.switchKeys.length,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: switchColumns,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          mainAxisExtent: 72,
+                        ),
+                        itemBuilder: (context, index) => _buildConfigSwitch(
+                          section.switchKeys[index],
+                          onStateChanged: onStateChanged,
+                        ),
+                      ),
+                    ],
+                    if (section.title == 'Chất lượng thời gian thực') ...[
+                      const SizedBox(height: 10),
+                      _buildPartialRegionSelector(onStateChanged: onStateChanged),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _sectionIcon(String title) {
+    switch (title) {
+      case 'Ngưỡng nhận diện':
+        return Icons.verified_user;
+      case 'Realtime pipeline':
+      case 'Luồng xử lý thời gian thực':
+        return Icons.speed;
+      case 'Chất lượng thời gian thực':
+        return Icons.high_quality;
+      case 'Đăng ký khuôn mặt':
+        return Icons.badge;
+      case 'Phát hiện và tìm kiếm':
+        return Icons.radar;
+      case 'Xử lý đầu vào và gỡ lỗi':
+        return Icons.tune;
+      default:
+        return Icons.settings;
+    }
+  }
+
+  Widget _buildConfigFieldTile(BuildContext context, _RecognitionFieldDef field) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(section.title, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: section.fields
-                .map(
-                  (field) =>
-                      SizedBox(width: 260, child: _buildConfigTextField(field)),
-                )
-                .toList(growable: false),
-          ),
-          if (section.switchKeys.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: section.switchKeys
-                  .map(
-                    (key) => SizedBox(
-                      width: 320,
-                      child: _buildConfigSwitch(
-                        key,
-                        onStateChanged: onStateChanged,
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
+          Text(
+            _fieldLabelText(context, field.label),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
-          ],
-          if (section.title == 'Chat luong realtime') ...[
-            const SizedBox(height: 12),
-            _buildPartialRegionSelector(onStateChanged: onStateChanged),
-          ],
+          ),
+          const SizedBox(height: 6),
+          Expanded(child: _buildConfigTextField(field)),
         ],
       ),
     );
@@ -1878,54 +2202,89 @@ class _ImageRecognitionTestScreenState
   Widget _buildPartialRegionSelector({VoidCallback? onStateChanged}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.54),
+        color: Colors.white.withValues(alpha: 0.62),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Partial realtime: chon vung su dung',
+            _l(
+              context,
+              'Vùng cục bộ thời gian thực: chọn vùng sử dụng',
+              'Realtime partial: select enabled regions',
+            ),
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: 8),
-          ..._partialRegionLabels.entries.map((entry) {
-            final selected = _realtimePartialEnabledRegions.contains(entry.key);
-            return CheckboxListTile(
-              dense: true,
-              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              title: Text(entry.value),
-              value: selected,
-              onChanged: (next) {
-                if (next == null) {
-                  return;
-                }
-                if (!next && _realtimePartialEnabledRegions.length <= 1) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Can giu it nhat 1 partial region'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 720 ? 3 : 2;
+              final entries = _partialRegionLabels.entries.toList(growable: false);
+              return GridView.builder(
+                itemCount: entries.length,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 6,
+                  crossAxisSpacing: 10,
+                  mainAxisExtent: 44,
+                ),
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  final selected = _realtimePartialEnabledRegions.contains(entry.key);
+                  return Material(
+                    color: Colors.transparent,
+                    child: CheckboxListTile(
+                      dense: true,
+                      visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(_regionLabelText(context, entry.value)),
+                      value: selected,
+                      onChanged: (next) {
+                        if (next == null) {
+                          return;
+                        }
+                        if (!next && _realtimePartialEnabledRegions.length <= 1) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                _l(
+                                  context,
+                                  'Cần giữ lại ít nhất 1 vùng cục bộ',
+                                  'At least one partial region must remain selected',
+                                ),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() {
+                          if (next) {
+                            _realtimePartialEnabledRegions.add(entry.key);
+                          } else {
+                            _realtimePartialEnabledRegions.remove(entry.key);
+                          }
+                        });
+                        onStateChanged?.call();
+                      },
                     ),
                   );
-                  return;
-                }
-                setState(() {
-                  if (next) {
-                    _realtimePartialEnabledRegions.add(entry.key);
-                  } else {
-                    _realtimePartialEnabledRegions.remove(entry.key);
-                  }
-                });
-                onStateChanged?.call();
-              },
-            );
-          }),
+                },
+              );
+            },
+          ),
           const SizedBox(height: 4),
           Text(
-            'Da chon ${_realtimePartialEnabledRegions.length}/${_partialRegionLabels.length} vung',
+            _l(
+              context,
+              'Đã chọn ${_realtimePartialEnabledRegions.length}/${_partialRegionLabels.length} vùng',
+              'Selected ${_realtimePartialEnabledRegions.length}/${_partialRegionLabels.length} regions',
+            ),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -1938,40 +2297,49 @@ class _ImageRecognitionTestScreenState
       controller: _configControllers[field.key],
       keyboardType: TextInputType.numberWithOptions(decimal: !field.isInt),
       decoration: InputDecoration(
-        labelText: field.label,
-        border: const OutlineInputBorder(),
+        hintText: field.isInt
+            ? _l(context, 'Nhập số nguyên', 'Enter an integer')
+            : _l(context, 'Nhập số thập phân', 'Enter a decimal number'),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.52),
+          ),
+        ),
         isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.72),
+        fillColor: Colors.white.withValues(alpha: 0.86),
       ),
     );
   }
 
   Widget _buildConfigSwitch(String key, {VoidCallback? onStateChanged}) {
     final value = switch (key) {
-      'autoTuneRecognitionParameters' => _autoTuneRecognitionParameters,
+      'enableRealtimeAutoSharpen' => _enableRealtimeAutoSharpen,
       'debugRealtimeOverlay' => _debugRealtimeOverlay,
       'enableTraceLogs' => _enableTraceLogs,
       'enablePerfLogs' => _enablePerfLogs,
-      'realtimeInputGrayscale' => _realtimeInputGrayscale,
       'realtimeCropFacesFromCameraImage' => _realtimeCropFacesFromCameraImage,
       _ => false,
     };
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.54),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white.withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: SwitchListTile(
         value: value,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-        title: Text(_switchLabels[key] ?? key),
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+        title: Text(_switchLabelText(context, key)),
         onChanged: (nextValue) {
           setState(() {
             switch (key) {
-              case 'autoTuneRecognitionParameters':
-                _autoTuneRecognitionParameters = nextValue;
+              case 'enableRealtimeAutoSharpen':
+                _enableRealtimeAutoSharpen = nextValue;
                 break;
               case 'debugRealtimeOverlay':
                 _debugRealtimeOverlay = nextValue;
@@ -1981,9 +2349,6 @@ class _ImageRecognitionTestScreenState
                 break;
               case 'enablePerfLogs':
                 _enablePerfLogs = nextValue;
-                break;
-              case 'realtimeInputGrayscale':
-                _realtimeInputGrayscale = nextValue;
                 break;
               case 'realtimeCropFacesFromCameraImage':
                 _realtimeCropFacesFromCameraImage = nextValue;

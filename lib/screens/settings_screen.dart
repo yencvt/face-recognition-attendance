@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../database/report_settings_repository.dart';
 import '../database/recognition_settings_repository.dart';
 import '../database/settings_repository.dart';
+import '../l10n/app_i18n.dart';
 import 'image_recognition_test_screen.dart';
 import 'people_management_screen.dart';
 import 'user_management_screen.dart';
@@ -17,142 +18,130 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  String _l(BuildContext context, String vi, String en) {
+    return AppI18n.of(context).locale.languageCode == 'en' ? en : vi;
+  }
+
+  String _ln(String vi, String en) {
+    return AppI18nController.localeNotifier.value.languageCode == 'en'
+        ? en
+        : vi;
+  }
+
   static const Map<String, String> _recognitionParameterLabels = {
-    'knownMatchThreshold': 'Nguong khop khuon mat',
-    'knownStrongThreshold': 'Nguong khop manh (chac chan)',
-    'knownCalibratedThreshold': 'Nguong khop da hieu chinh theo camera',
-    'knownMatchMargin': 'Bien an toan giua nhat va nhi',
-    'minTemplateSharpness': 'Do net toi thieu cua mau dang ky',
-    'cameraCalibrationDurationMs': 'Thoi gian hieu chinh camera (ms)',
-    'calibrationLogThrottleMs': 'Khoang cach log hieu chinh (ms)',
-    'fallbackSkipLogIntervalMs': 'Khoang cach log bo qua fallback (ms)',
-    'fallbackCaptureIntervalMs': 'Chu ky chup fallback (ms)',
-    'fallbackMaxInputEdge': 'Canh toi da anh fallback (px)',
-    'processFrameIntervalMs': 'Chu ky xu ly frame (ms)',
-    'detectorInputWidth': 'Chieu rong input detector',
-    'detectorInputHeight': 'Chieu cao input detector',
-    'trackKeepAliveMs': 'Thoi gian giu track (ms)',
-    'trackMatchMinScore': 'Diem toi thieu de gan track',
-    'bboxSmoothingAlpha': 'He so lam muot khung bbox',
-    'annotatedFrameMinIntervalMs': 'Khoang cach frame overlay toi thieu (ms)',
-    'eventPublishIntervalMs': 'Khoang cach phat su kien (ms)',
-    'minRealtimeFrameQuality': 'Chat luong frame toi thieu realtime',
-    'minRealtimeFaceAreaRatio': 'Ty le dien tich mat toi thieu realtime',
-    'minRealtimeFacePixels': 'So pixel mat toi thieu realtime',
-    'minEnrollmentFaceAreaRatio': 'Ty le dien tich mat toi thieu khi dang ky',
-    'maxEnrollmentFaceAreaRatio': 'Ty le dien tich mat toi da khi dang ky',
-    'minEnrollmentFaceAspectRatio': 'Ty le khung mat toi thieu khi dang ky',
-    'maxEnrollmentFaceAspectRatio': 'Ty le khung mat toi da khi dang ky',
-    'minEnrollmentFacePixels': 'So pixel mat toi thieu khi dang ky',
-    'scrfdInputSize': 'Kich thuoc input SCRFD',
-    'scrfdScoreThreshold': 'Nguong diem phat hien SCRFD',
-    'scrfdNmsThreshold': 'Nguong NMS SCRFD',
-    'hnswM': 'HNSW M (so canh moi node)',
+    'knownMatchThreshold': 'Ngưỡng khớp khuôn mặt',
+    'knownCalibratedThreshold': 'Ngưỡng khớp đã hiệu chỉnh theo camera',
+    'knownMatchMargin': 'Biên an toàn giữa nhất và nhì',
+    'minTemplateSharpness': 'Độ nét tối thiểu của mẫu đăng ký',
+    'cameraCalibrationDurationMs': 'Thời gian hiệu chỉnh camera (ms)',
+    'calibrationLogThrottleMs': 'Khoảng cách log hiệu chỉnh (ms)',
+    'fallbackSkipLogIntervalMs': 'Khoảng cách log bỏ qua fallback (ms)',
+    'fallbackCaptureIntervalMs': 'Chu kỳ chụp fallback (ms)',
+    'fallbackMaxInputEdge': 'Cạnh tối đa ảnh fallback (px)',
+    'processFrameIntervalMs': 'Chu kỳ xử lý frame (ms)',
+    'detectorInputWidth': 'Chiều rộng input detector',
+    'detectorInputHeight': 'Chiều cao input detector',
+    'trackKeepAliveMs': 'Thời gian giữ track (ms)',
+    'trackMatchMinScore': 'Điểm tối thiểu để gán track',
+    'bboxSmoothingAlpha': 'Hệ số làm mượt khung bbox',
+    'annotatedFrameMinIntervalMs': 'Khoảng cách frame overlay tối thiểu (ms)',
+    'eventPublishIntervalMs': 'Khoảng cách phát sự kiện (ms)',
+    'minRealtimeFrameQuality': 'Chất lượng frame tối thiểu realtime',
+    'minRealtimeFaceAreaRatio': 'Tỷ lệ diện tích mặt tối thiểu realtime',
+    'minRealtimeFacePixels': 'Số pixel mặt tối thiểu realtime',
+    'minEnrollmentFaceAreaRatio': 'Tỷ lệ diện tích mặt tối thiểu khi đăng ký',
+    'maxEnrollmentFaceAreaRatio': 'Tỷ lệ diện tích mặt tối đa khi đăng ký',
+    'minEnrollmentFaceAspectRatio': 'Tỷ lệ khung mặt tối thiểu khi đăng ký',
+    'maxEnrollmentFaceAspectRatio': 'Tỷ lệ khung mặt tối đa khi đăng ký',
+    'minEnrollmentFacePixels': 'Số pixel mặt tối thiểu khi đăng ký',
+    'scrfdInputSize': 'Kích thước input SCRFD',
+    'scrfdScoreThreshold': 'Ngưỡng điểm phát hiện SCRFD',
+    'scrfdNmsThreshold': 'Ngưỡng NMS SCRFD',
+    'hnswM': 'HNSW M (số cạnh mỗi node)',
     'hnswEfConstruction': 'HNSW efConstruction',
     'hnswEfSearch': 'HNSW efSearch',
-    'eyeRegionMinQuality': 'Nguong chat luong vung mat',
-    'noseRegionMinQuality': 'Nguong chat luong vung mui',
-    'mouthRegionMinQuality': 'Nguong chat luong vung mieng',
-    'autoTuneRecognitionParameters': 'Tu dong dieu chinh tham so realtime',
-    'enableTraceLogs': 'Bat trace log chi tiet realtime',
-    'enablePerfLogs': 'Bat perf log do tre (Perf[...])',
-    'realtimeInputBrightness': 'Xu ly input: do sang (-48..48)',
-    'realtimeInputContrast': 'Xu ly input: tuong phan (0.7..1.4)',
-    'realtimeInputGamma': 'Xu ly input: gamma (0.7..1.4)',
-    'realtimeInputSaturation': 'Xu ly input: do bao hoa (0.0..1.3)',
-    'realtimeInputGrayscale': 'Xu ly input: ep den trang',
-    'autoTuneMaxSharpenAmount': 'Auto tune anh: sharpen toi da (0.0..1.0)',
-    'autoTuneLowLightThreshold': 'Auto tune anh: nguong low-light (0.25..0.60)',
-    'autoTuneOverExposureThreshold':
-        'Auto tune anh: nguong over-exposure (0.55..0.90)',
+    'eyeRegionMinQuality': 'Ngưỡng chất lượng vùng mắt',
+    'noseRegionMinQuality': 'Ngưỡng chất lượng vùng mũi',
+    'mouthRegionMinQuality': 'Ngưỡng chất lượng vùng miệng',
+    'enableRealtimeAutoSharpen': 'Bật auto sharpen realtime',
+    'enableTraceLogs': 'Bật trace log chi tiết realtime',
+    'enablePerfLogs': 'Bật perf log độ trễ (Perf[...])',
+    'autoTuneMaxSharpenAmount':
+      'enableRealtimeAutoSharpenMaxAmount (0.0..1.0)',
   };
 
   static const Map<String, String> _recognitionParameterNotes = {
     'knownMatchThreshold':
-        'Nguong diem so khop tong quan de chap nhan danh tinh.',
-    'knownStrongThreshold':
-        'Nguong rat cao cho phep chap nhan nhanh hon khi diem rat chac.',
+      'Ngưỡng điểm so khớp tổng quan để chấp nhận danh tính.',
     'knownCalibratedThreshold':
-        'Nguong diem sau hieu chinh theo do tach biet giua cac nguoi.',
+      'Ngưỡng điểm sau hiệu chỉnh theo độ tách biệt giữa các người.',
     'knownMatchMargin':
-        'Khoang cach toi thieu giua top1 va top2 de tranh nham lan.',
-    'minTemplateSharpness': 'Do net toi thieu cua anh mau khi tao vector.',
+      'Khoảng cách tối thiểu giữa top1 và top2 để tránh nhầm lẫn.',
+    'minTemplateSharpness': 'Độ nét tối thiểu của ảnh mẫu khi tạo vector.',
     'cameraCalibrationDurationMs':
-        'Thoi gian gom mau de hieu chinh threshold theo camera.',
-    'calibrationLogThrottleMs': 'Tan suat ghi log trong giai doan hieu chinh.',
+      'Thời gian gom mẫu để hiệu chỉnh threshold theo camera.',
+    'calibrationLogThrottleMs': 'Tần suất ghi log trong giai đoạn hiệu chỉnh.',
     'fallbackSkipLogIntervalMs':
-        'Khoang cach log khi bo qua frame loi fallback.',
+      'Khoảng cách log khi bỏ qua frame lỗi fallback.',
     'fallbackCaptureIntervalMs':
-        'Khoang cach giua 2 lan chup fallback khi camera khong stream duoc.',
+      'Khoảng cách giữa 2 lần chụp fallback khi camera không stream được.',
     'fallbackMaxInputEdge':
-        'Gioi han canh lon nhat cua frame fallback truoc khi xu ly de giam tai CPU.',
+      'Giới hạn cạnh lớn nhất của frame fallback trước khi xử lý để giảm tải CPU.',
     'processFrameIntervalMs':
-        'Khoang cach xu ly giua 2 frame, nho hon thi nhanh hon nhung nang may.',
+      'Khoảng cách xử lý giữa 2 frame, nhỏ hơn thì nhanh hơn nhưng nặng máy.',
     'detectorInputWidth':
-        'Do rong anh dua vao detector; lon hon tang chat luong nhung cham hon.',
+      'Độ rộng ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
     'detectorInputHeight':
-        'Do cao anh dua vao detector; lon hon tang chat luong nhung cham hon.',
-    'trackKeepAliveMs': 'Thoi gian giu doi tuong theo doi truoc khi reset.',
+      'Độ cao ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
+    'trackKeepAliveMs': 'Thời gian giữ đối tượng theo dõi trước khi reset.',
     'trackMatchMinScore':
-        'Diem toi thieu de noi bbox hien tai voi track truoc do.',
+      'Điểm tối thiểu để nối bbox hiện tại với track trước đó.',
     'bboxSmoothingAlpha':
-        'He so lam muot bbox, cao thi bam theo nhanh nhung de rung.',
+      'Hệ số làm mượt bbox, cao thì bám theo nhanh nhưng dễ rung.',
     'annotatedFrameMinIntervalMs':
-        'Chu ky toi thieu ve overlay debug, giam de cap nhat nhanh hon.',
+      'Chu kỳ tối thiểu vẽ overlay debug, giảm để cập nhật nhanh hơn.',
     'eventPublishIntervalMs':
-        'Khoang cach toi thieu giua 2 su kien cung doi tuong.',
+      'Khoảng cách tối thiểu giữa 2 sự kiện cùng đối tượng.',
     'minRealtimeFrameQuality':
-        'Nguong chat luong frame realtime de cho phep nhan dien.',
+      'Ngưỡng chất lượng frame realtime để cho phép nhận diện.',
     'minRealtimeFaceAreaRatio':
-        'Ty le dien tich mat toi thieu tren khung hinh.',
+      'Tỷ lệ diện tích mặt tối thiểu trên khung hình.',
     'minRealtimeFacePixels':
-        'Canh ngan nhat cua mat (pixel) de tranh nhan dien mat qua nho.',
+      'Cạnh ngắn nhất của mặt (pixel) để tránh nhận diện mặt quá nhỏ.',
     'minEnrollmentFaceAreaRatio':
-        'Nguong nho nhat cho dien tich mat khi dang ky.',
+      'Ngưỡng nhỏ nhất cho diện tích mặt khi đăng ký.',
     'maxEnrollmentFaceAreaRatio':
-        'Nguong lon nhat cho dien tich mat khi dang ky.',
+      'Ngưỡng lớn nhất cho diện tích mặt khi đăng ký.',
     'minEnrollmentFaceAspectRatio':
-        'Ty le khung mat nho nhat cho phep khi dang ky.',
+      'Tỷ lệ khung mặt nhỏ nhất cho phép khi đăng ký.',
     'maxEnrollmentFaceAspectRatio':
-        'Ty le khung mat lon nhat cho phep khi dang ky.',
+      'Tỷ lệ khung mặt lớn nhất cho phép khi đăng ký.',
     'minEnrollmentFacePixels':
-        'Kich thuoc canh ngan toi thieu cua mat khi dang ky.',
+      'Kích thước cạnh ngắn tối thiểu của mặt khi đăng ký.',
     'scrfdInputSize':
-        'Kich thuoc input model SCRFD, lon hon thi tinh hon nhung cham hon.',
-    'scrfdScoreThreshold': 'Nguong diem detector SCRFD de giu lai bbox.',
-    'scrfdNmsThreshold': 'Nguong NMS SCRFD de loai bbox trung lap.',
+      'Kích thước input model SCRFD, lớn hơn thì tinh hơn nhưng chậm hơn.',
+    'scrfdScoreThreshold': 'Ngưỡng điểm detector SCRFD để giữ lại bbox.',
+    'scrfdNmsThreshold': 'Ngưỡng NMS SCRFD để loại bbox trùng lặp.',
     'hnswM':
-        'So ket noi toi da moi node trong do thi HNSW; lon hon thi tim tot hon nhung ton RAM hon.',
+      'Số kết nối tối đa mỗi node trong đồ thị HNSW; lớn hơn thì tìm tốt hơn nhưng tốn RAM hơn.',
     'hnswEfConstruction':
-        'Do rong tim kiem khi xay dung index HNSW; lon hon thi index chat hon nhung build cham hon.',
+      'Độ rộng tìm kiếm khi xây dựng index HNSW; lớn hơn thì index chặt hơn nhưng build chậm hơn.',
     'hnswEfSearch':
-        'Do rong tim kiem luc query HNSW; lon hon thi chinh xac hon nhung cham hon.',
+      'Độ rộng tìm kiếm lúc query HNSW; lớn hơn thì chính xác hơn nhưng chậm hơn.',
     'eyeRegionMinQuality':
-        'Nguong chat luong vung mat de dua vao partial embedding.',
+      'Ngưỡng chất lượng vùng mắt để đưa vào partial embedding.',
     'noseRegionMinQuality':
-        'Nguong chat luong vung mui de dua vao partial embedding.',
+      'Ngưỡng chất lượng vùng mũi để đưa vào partial embedding.',
     'mouthRegionMinQuality':
-        'Nguong chat luong vung mieng de dua vao partial embedding.',
-    'autoTuneRecognitionParameters':
-        'Tu dong nang/giam nguong realtime theo chat luong anh va kich thuoc khuon mat.',
+      'Ngưỡng chất lượng vùng miệng để đưa vào partial embedding.',
+    'enableRealtimeAutoSharpen':
+      'Tự động tăng sharpen ảnh realtime theo độ mờ và độ tương phản thấp.',
     'enableTraceLogs':
-        'Bat cac log DecisionTrace/Match/GateSkip/CalibTop2 de debug. Tat de giam lag.',
+      'Bật các log DecisionTrace/Match/GateSkip/CalibTop2 để debug. Tắt để giảm lag.',
     'enablePerfLogs':
-        'Bat log hieu nang Perf[ws]/Perf[db]. Tat de tranh IO log khong can thiet.',
-    'realtimeInputBrightness':
-        'Cong/tru do sang truoc khi tinh quality/spoof/embedding realtime.',
-    'realtimeInputContrast': 'He so tuong phan cho anh dau vao realtime.',
-    'realtimeInputGamma': 'He so gamma cho anh dau vao realtime.',
-    'realtimeInputSaturation':
-        'He so bao hoa cho anh dau vao realtime (0 la xam).',
-    'realtimeInputGrayscale':
-        'Chuyen anh dau vao realtime sang den trang truoc khi nhan dien.',
+      'Bật log hiệu năng Perf[ws]/Perf[db]. Tắt để tránh IO log không cần thiết.',
     'autoTuneMaxSharpenAmount':
-        'Gioi han muc sharpen toi da cua auto tune anh realtime.',
-    'autoTuneLowLightThreshold':
-        'Nguong sang de xac dinh frame toi (thap hon nguong se duoc tang sang).',
-    'autoTuneOverExposureThreshold':
-        'Nguong sang de xac dinh frame bi chay sang (cao hon nguong se duoc giam/chinh gamma).',
+      'Giới hạn mức sharpen tối đa khi bật enableRealtimeAutoSharpen.',
   };
 
   late TextEditingController _signalingServerController;
@@ -162,7 +151,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _turnPasswordController;
   late TextEditingController _iceTransportPolicyController;
   late TextEditingController _knownMatchThresholdController;
-  late TextEditingController _knownStrongThresholdController;
   late TextEditingController _knownCalibratedThresholdController;
   late TextEditingController _knownMatchMarginController;
   late TextEditingController _minTemplateSharpnessController;
@@ -196,25 +184,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _eyeRegionMinQualityController;
   late TextEditingController _noseRegionMinQualityController;
   late TextEditingController _mouthRegionMinQualityController;
-  late TextEditingController _realtimeInputBrightnessController;
-  late TextEditingController _realtimeInputContrastController;
-  late TextEditingController _realtimeInputGammaController;
-  late TextEditingController _realtimeInputSaturationController;
   late TextEditingController _autoTuneMaxSharpenAmountController;
-  late TextEditingController _autoTuneLowLightThresholdController;
-  late TextEditingController _autoTuneOverExposureThresholdController;
   late TextEditingController _reportExportDirectoryController;
   late TextEditingController _reportExportTimeController;
   late TextEditingController _reportApiHostController;
   late TextEditingController _reportApiPortController;
   late TextEditingController _reportFilePrefixController;
   String _selectedRecognitionPreset = 'strict';
-  bool _autoTuneRecognitionParameters = false;
+  bool _enableRealtimeAutoSharpen = false;
   bool _enableAudioProcessing = true;
   bool _debugRealtimeOverlay = true;
   bool _enableTraceLogs = false;
   bool _enablePerfLogs = false;
-  bool _realtimeInputGrayscale = false;
   bool _enableScheduledReportExport = false;
   bool _enablePublicReportApi = true;
   bool _isRecognitionAdvancedExpanded = false;
@@ -226,21 +207,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _presetDisplayName(String preset) {
     switch (preset) {
       case 'accuracy':
-        return 'Accuracy cao';
+        return _ln('Accuracy cao', 'High accuracy');
       case 'balanced':
-        return 'Can bang';
+        return _ln('Cân bằng', 'Balanced');
       case 'low-light':
-        return 'Anh sang yeu';
+        return _ln('Ánh sáng yếu', 'Low light');
       case 'far-distance':
-        return 'Xa camera';
+        return _ln('Ở xa camera', 'Far distance');
       case 'speed':
-        return 'Toc do cao';
+        return _ln('Tốc độ cao', 'High speed');
       case 'strict':
-        return 'Chong nhan nham';
+        return _ln('Chống nhận nhầm', 'Strict anti-mismatch');
       case 'recall':
-        return 'Uu tien khong bo sot';
+        return _ln('Ưu tiên không bỏ sót', 'Recall priority');
       default:
-        return 'Tuy chinh';
+        return _ln('Tùy chỉnh', 'Custom');
     }
   }
 
@@ -259,7 +240,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _turnPasswordController = TextEditingController();
     _iceTransportPolicyController = TextEditingController();
     _knownMatchThresholdController = TextEditingController();
-    _knownStrongThresholdController = TextEditingController();
     _knownCalibratedThresholdController = TextEditingController();
     _knownMatchMarginController = TextEditingController();
     _minTemplateSharpnessController = TextEditingController();
@@ -293,13 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _eyeRegionMinQualityController = TextEditingController();
     _noseRegionMinQualityController = TextEditingController();
     _mouthRegionMinQualityController = TextEditingController();
-    _realtimeInputBrightnessController = TextEditingController();
-    _realtimeInputContrastController = TextEditingController();
-    _realtimeInputGammaController = TextEditingController();
-    _realtimeInputSaturationController = TextEditingController();
     _autoTuneMaxSharpenAmountController = TextEditingController();
-    _autoTuneLowLightThresholdController = TextEditingController();
-    _autoTuneOverExposureThresholdController = TextEditingController();
     _reportExportDirectoryController = TextEditingController();
     _reportExportTimeController = TextEditingController();
     _reportApiHostController = TextEditingController();
@@ -323,9 +297,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _enableAudioProcessing = settings.enableAudioProcessing;
         _knownMatchThresholdController.text = recognitionConfig
             .knownMatchThreshold
-            .toString();
-        _knownStrongThresholdController.text = recognitionConfig
-            .knownStrongThreshold
             .toString();
         _knownCalibratedThresholdController.text = recognitionConfig
             .knownCalibratedThreshold
@@ -419,33 +390,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _mouthRegionMinQualityController.text = recognitionConfig
             .mouthRegionMinQuality
             .toString();
-        _realtimeInputBrightnessController.text = recognitionConfig
-            .realtimeInputBrightness
-            .toString();
-        _realtimeInputContrastController.text = recognitionConfig
-            .realtimeInputContrast
-            .toString();
-        _realtimeInputGammaController.text = recognitionConfig
-            .realtimeInputGamma
-            .toString();
-        _realtimeInputSaturationController.text = recognitionConfig
-            .realtimeInputSaturation
-            .toString();
         _autoTuneMaxSharpenAmountController.text = recognitionConfig
             .autoTuneMaxSharpenAmount
             .toString();
-        _autoTuneLowLightThresholdController.text = recognitionConfig
-            .autoTuneLowLightThreshold
-            .toString();
-        _autoTuneOverExposureThresholdController.text = recognitionConfig
-            .autoTuneOverExposureThreshold
-            .toString();
-        _autoTuneRecognitionParameters =
-            recognitionConfig.autoTuneRecognitionParameters;
+        _enableRealtimeAutoSharpen =
+          recognitionConfig.enableRealtimeAutoSharpen;
         _debugRealtimeOverlay = recognitionConfig.debugRealtimeOverlay;
         _enableTraceLogs = recognitionConfig.enableTraceLogs;
         _enablePerfLogs = recognitionConfig.enablePerfLogs;
-        _realtimeInputGrayscale = recognitionConfig.realtimeInputGrayscale;
         _reportExportDirectoryController.text =
             reportConfig.scheduledExportDirectory;
         _reportExportTimeController.text = reportConfig.scheduledExportTime;
@@ -482,7 +434,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Lỗi tải cấu hình: $e')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            _l(context, 'Lỗi tải cấu hình: $e', 'Failed to load settings: $e'),
+          ),
+        ),
+      );
     }
   }
 
@@ -492,7 +450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final value = double.tryParse(controller.text.trim());
         if (value == null) {
           throw FormatException(
-            'Gia tri "${_recognitionLabel(label)}" khong hop le',
+            'Giá trị "${_recognitionLabel(label)}" không hợp lệ',
           );
         }
         return value;
@@ -502,7 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final value = int.tryParse(controller.text.trim());
         if (value == null) {
           throw FormatException(
-            'Gia tri "${_recognitionLabel(label)}" khong hop le',
+            'Giá trị "${_recognitionLabel(label)}" không hợp lệ',
           );
         }
         return value;
@@ -520,12 +478,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final signalingUrl = _signalingServerController.text.trim();
       if (signalingUrl.isEmpty) {
-        _showErrorSnackBar('Vui lòng nhập URL máy chủ Signaling');
+        _showErrorSnackBar(
+          _ln(
+            'Vui lòng nhập URL máy chủ Signaling',
+            'Please enter the Signaling server URL',
+          ),
+        );
         return;
       }
 
       if (stunList.isEmpty && turnList.isEmpty) {
-        _showErrorSnackBar('Vui lòng nhập ít nhất một STUN hoặc TURN server');
+        _showErrorSnackBar(
+          _ln(
+            'Vui lòng nhập ít nhất một STUN hoặc TURN server',
+            'Please provide at least one STUN or TURN server',
+          ),
+        );
         return;
       }
 
@@ -548,10 +516,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         knownMatchThreshold: parseDouble(
           _knownMatchThresholdController,
           'knownMatchThreshold',
-        ),
-        knownStrongThreshold: parseDouble(
-          _knownStrongThresholdController,
-          'knownStrongThreshold',
         ),
         knownCalibratedThreshold: parseDouble(
           _knownCalibratedThresholdController,
@@ -676,38 +640,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _mouthRegionMinQualityController,
           'mouthRegionMinQuality',
         ),
-        autoTuneRecognitionParameters: _autoTuneRecognitionParameters,
+        enableRealtimeAutoSharpen: _enableRealtimeAutoSharpen,
         debugRealtimeOverlay: _debugRealtimeOverlay,
         enableTraceLogs: _enableTraceLogs,
         enablePerfLogs: _enablePerfLogs,
-        realtimeInputBrightness: parseInt(
-          _realtimeInputBrightnessController,
-          'realtimeInputBrightness',
-        ),
-        realtimeInputContrast: parseDouble(
-          _realtimeInputContrastController,
-          'realtimeInputContrast',
-        ),
-        realtimeInputGamma: parseDouble(
-          _realtimeInputGammaController,
-          'realtimeInputGamma',
-        ),
-        realtimeInputSaturation: parseDouble(
-          _realtimeInputSaturationController,
-          'realtimeInputSaturation',
-        ),
-        realtimeInputGrayscale: _realtimeInputGrayscale,
         autoTuneMaxSharpenAmount: parseDouble(
           _autoTuneMaxSharpenAmountController,
           'autoTuneMaxSharpenAmount',
-        ),
-        autoTuneLowLightThreshold: parseDouble(
-          _autoTuneLowLightThresholdController,
-          'autoTuneLowLightThreshold',
-        ),
-        autoTuneOverExposureThreshold: parseDouble(
-          _autoTuneOverExposureThresholdController,
-          'autoTuneOverExposureThreshold',
         ),
       );
       await RecognitionSettingsRepository.saveConfig(recognitionConfig);
@@ -717,7 +656,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (scheduleParts.length != 2 ||
           int.tryParse(scheduleParts[0]) == null ||
           int.tryParse(scheduleParts[1]) == null) {
-        _showErrorSnackBar('Thoi gian chay job phai theo dinh dang HH:mm');
+        _showErrorSnackBar(
+          _ln(
+            'Thời gian chạy job phải theo định dạng HH:mm',
+            'Job time must be in HH:mm format',
+          ),
+        );
         return;
       }
 
@@ -727,7 +671,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           scheduleHour > 23 ||
           scheduleMinute < 0 ||
           scheduleMinute > 59) {
-        _showErrorSnackBar('Thoi gian chay job khong hop le');
+        _showErrorSnackBar(
+          _ln('Thời gian chạy job không hợp lệ', 'Invalid job time'),
+        );
         return;
       }
 
@@ -735,7 +681,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (reportApiPort == null ||
           reportApiPort <= 0 ||
           reportApiPort > 65535) {
-        _showErrorSnackBar('Cong API bao cao khong hop le (1-65535)');
+        _showErrorSnackBar(
+          _ln(
+            'Cổng API báo cáo không hợp lệ (1-65535)',
+            'Invalid report API port (1-65535)',
+          ),
+        );
         return;
       }
 
@@ -756,16 +707,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await ReportSettingsRepository.saveConfig(reportConfig);
 
       if (!mounted) return;
-      _showSuccessSnackBar('Cấu hình đã được lưu và áp dụng ngay lập tức');
+      _showSuccessSnackBar(
+        _ln(
+          'Cấu hình đã được lưu và áp dụng ngay lập tức',
+          'Settings have been saved and applied immediately',
+        ),
+      );
     } catch (e) {
-      _showErrorSnackBar('Lỗi lưu cấu hình: $e');
+      _showErrorSnackBar(
+        _ln('Lỗi lưu cấu hình: $e', 'Failed to save settings: $e'),
+      );
     }
   }
 
   void _setRecognitionControllers(RecognitionRuntimeConfig config) {
     _knownMatchThresholdController.text = config.knownMatchThreshold.toString();
-    _knownStrongThresholdController.text = config.knownStrongThreshold
-        .toString();
     _knownCalibratedThresholdController.text = config.knownCalibratedThreshold
         .toString();
     _knownMatchMarginController.text = config.knownMatchMargin.toString();
@@ -825,31 +781,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .toString();
     _mouthRegionMinQualityController.text = config.mouthRegionMinQuality
         .toString();
-    _realtimeInputBrightnessController.text = config.realtimeInputBrightness
-        .toString();
-    _realtimeInputContrastController.text = config.realtimeInputContrast
-        .toString();
-    _realtimeInputGammaController.text = config.realtimeInputGamma.toString();
-    _realtimeInputSaturationController.text = config.realtimeInputSaturation
-        .toString();
     _autoTuneMaxSharpenAmountController.text = config.autoTuneMaxSharpenAmount
         .toString();
-    _autoTuneLowLightThresholdController.text = config.autoTuneLowLightThreshold
-        .toString();
-    _autoTuneOverExposureThresholdController.text = config
-        .autoTuneOverExposureThreshold
-        .toString();
-    _autoTuneRecognitionParameters = config.autoTuneRecognitionParameters;
+    _enableRealtimeAutoSharpen = config.enableRealtimeAutoSharpen;
     _debugRealtimeOverlay = config.debugRealtimeOverlay;
     _enableTraceLogs = config.enableTraceLogs;
     _enablePerfLogs = config.enablePerfLogs;
-    _realtimeInputGrayscale = config.realtimeInputGrayscale;
   }
 
   RecognitionRuntimeConfig _presetAccuracyConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.95,
-      knownStrongThreshold: 0.98,
       knownCalibratedThreshold: 0.92,
       knownMatchMargin: 0.22,
       minTemplateSharpness: 36.0,
@@ -860,14 +802,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFacePixels: 72,
       scrfdScoreThreshold: 0.62,
       scrfdNmsThreshold: 0.34,
-      autoTuneRecognitionParameters: false,
+      enableRealtimeAutoSharpen: false,
     );
   }
 
   RecognitionRuntimeConfig _presetBalancedConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.92,
-      knownStrongThreshold: 0.96,
       knownCalibratedThreshold: 0.78,
       knownMatchMargin: 0.18,
       minTemplateSharpness: 28.0,
@@ -884,14 +825,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       eyeRegionMinQuality: 0.24,
       noseRegionMinQuality: 0.22,
       mouthRegionMinQuality: 0.22,
-      autoTuneRecognitionParameters: false,
+      enableRealtimeAutoSharpen: false,
     );
   }
 
   RecognitionRuntimeConfig _presetLowLightConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.97,
-      knownStrongThreshold: 0.989,
       knownCalibratedThreshold: 0.95,
       knownMatchMargin: 0.28,
       minTemplateSharpness: 40.0,
@@ -909,14 +849,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       eyeRegionMinQuality: 0.32,
       noseRegionMinQuality: 0.30,
       mouthRegionMinQuality: 0.30,
-      autoTuneRecognitionParameters: true,
+      enableRealtimeAutoSharpen: true,
     );
   }
 
   RecognitionRuntimeConfig _presetFarDistanceConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.955,
-      knownStrongThreshold: 0.98,
       knownCalibratedThreshold: 0.90,
       knownMatchMargin: 0.20,
       minTemplateSharpness: 32.0,
@@ -934,14 +873,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       eyeRegionMinQuality: 0.22,
       noseRegionMinQuality: 0.20,
       mouthRegionMinQuality: 0.20,
-      autoTuneRecognitionParameters: true,
+      enableRealtimeAutoSharpen: true,
     );
   }
 
   RecognitionRuntimeConfig _presetSpeedConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.90,
-      knownStrongThreshold: 0.95,
       knownCalibratedThreshold: 0.74,
       knownMatchMargin: 0.15,
       minTemplateSharpness: 24.0,
@@ -953,14 +891,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       scrfdInputSize: 512,
       scrfdScoreThreshold: 0.47,
       scrfdNmsThreshold: 0.42,
-      autoTuneRecognitionParameters: false,
+      enableRealtimeAutoSharpen: false,
     );
   }
 
   RecognitionRuntimeConfig _presetStrictConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.965,
-      knownStrongThreshold: 0.985,
       knownCalibratedThreshold: 0.94,
       knownMatchMargin: 0.26,
       minTemplateSharpness: 38.0,
@@ -978,14 +915,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       eyeRegionMinQuality: 0.30,
       noseRegionMinQuality: 0.28,
       mouthRegionMinQuality: 0.28,
-      autoTuneRecognitionParameters: false,
+      enableRealtimeAutoSharpen: false,
     );
   }
 
   RecognitionRuntimeConfig _presetRecallConfig() {
     return const RecognitionRuntimeConfig(
       knownMatchThreshold: 0.90,
-      knownStrongThreshold: 0.95,
       knownCalibratedThreshold: 0.72,
       knownMatchMargin: 0.12,
       minTemplateSharpness: 24.0,
@@ -1003,7 +939,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       eyeRegionMinQuality: 0.20,
       noseRegionMinQuality: 0.18,
       mouthRegionMinQuality: 0.18,
-      autoTuneRecognitionParameters: false,
+      enableRealtimeAutoSharpen: false,
     );
   }
 
@@ -1040,7 +976,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     await RecognitionSettingsRepository.saveConfig(config);
     if (!mounted) return;
-    _showSuccessSnackBar('Da ap dung preset ${_presetDisplayName(preset)}');
+    _showSuccessSnackBar(
+      _ln(
+        'Đã áp dụng preset ${_presetDisplayName(preset)}',
+        'Applied preset ${_presetDisplayName(preset)}',
+      ),
+    );
   }
 
   String _recognitionPresetForConfig(RecognitionRuntimeConfig config) {
@@ -1083,14 +1024,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Đặt lại cấu hình mặc định'),
-          content: const Text(
-            'Điều này sẽ đặt lại tất cả các cài đặt WebRTC về giá trị mặc định. Bạn chắc chắn muốn tiếp tục?',
+          title: Text(
+            _l(context, 'Đặt lại cấu hình mặc định', 'Reset default settings'),
+          ),
+          content: Text(
+            _l(
+              context,
+              'Điều này sẽ đặt lại tất cả các cài đặt WebRTC về giá trị mặc định. Bạn chắc chắn muốn tiếp tục?',
+              'This will reset all WebRTC settings to defaults. Are you sure you want to continue?',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy'),
+              child: Text(_l(context, 'Hủy', 'Cancel')),
             ),
             FilledButton(
               onPressed: () async {
@@ -1114,7 +1061,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (!mounted) return;
                 await _loadSettings();
               },
-              child: const Text('Đặt lại'),
+              child: Text(_l(context, 'Đặt lại', 'Reset')),
             ),
           ],
         );
@@ -1131,7 +1078,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _turnPasswordController.dispose();
     _iceTransportPolicyController.dispose();
     _knownMatchThresholdController.dispose();
-    _knownStrongThresholdController.dispose();
     _knownCalibratedThresholdController.dispose();
     _knownMatchMarginController.dispose();
     _minTemplateSharpnessController.dispose();
@@ -1165,13 +1111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _eyeRegionMinQualityController.dispose();
     _noseRegionMinQualityController.dispose();
     _mouthRegionMinQualityController.dispose();
-    _realtimeInputBrightnessController.dispose();
-    _realtimeInputContrastController.dispose();
-    _realtimeInputGammaController.dispose();
-    _realtimeInputSaturationController.dispose();
     _autoTuneMaxSharpenAmountController.dispose();
-    _autoTuneLowLightThresholdController.dispose();
-    _autoTuneOverExposureThresholdController.dispose();
     _reportExportDirectoryController.dispose();
     _reportExportTimeController.dispose();
     _reportApiHostController.dispose();
@@ -1182,238 +1122,508 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final i18n = AppI18n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Cấu hình hệ thống'), elevation: 0),
+      appBar: AppBar(title: Text(i18n.t('settings.title')), elevation: 0),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // WebRTC Server Configuration Card
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.videocam,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Cấu hình máy chủ WebRTC',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _signalingServerController,
-                            label: 'URL Máy chủ Signaling',
-                            hint: 'wss://signaling.example.com',
-                            helperText:
-                                'Nhập địa chỉ máy chủ signaling (WebSocket)',
-                          ),
-                          const SizedBox(height: 16),
-                          _buildServersField(
-                            controller: _stunServersController,
-                            label: 'STUN Servers',
-                            hint: 'stun:stun.l.google.com:19302',
-                            helperText: 'Nhập một STUN server trên mỗi dòng',
-                          ),
-                          const SizedBox(height: 16),
-                          _buildServersField(
-                            controller: _turnServersController,
-                            label: 'TURN Servers',
-                            hint: 'turn:turnserver.example.com:3478',
-                            helperText: 'Nhập một TURN server trên mỗi dòng',
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _turnUsernameController,
-                            label: 'Tên người dùng TURN',
-                            hint: 'username',
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _turnPasswordController,
-                            label: 'Mật khẩu TURN',
-                            hint: 'password',
-                            obscureText: true,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildDropdownField(),
-                          const SizedBox(height: 16),
-                          _buildCheckboxField(),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Connection Test Section
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.link,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Kiểm tra kết nối',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Kiểm tra xem máy chủ WebRTC có thể kết nối được từ thiết bị này không.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            onPressed: _testConnection,
-                            icon: const Icon(Icons.cloud_queue),
-                            label: const Text('Kiểm tra kết nối'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.manage_accounts,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Nguoi nhan dien',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Them thong tin va anh tham chieu cho moi nguoi de phuc vu nhan dien cham cong.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            onPressed: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const PeopleManagementScreen(),
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.colorScheme.primary.withValues(alpha: 0.05),
+                    theme.colorScheme.surface,
+                  ],
+                ),
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1180),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                theme.colorScheme.primaryContainer.withValues(
+                                  alpha: 0.92,
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.people_alt),
-                            label: const Text('Quan ly nguoi'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.manage_accounts_outlined,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Tai khoan dang nhap',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Them, sua, xoa tai khoan dang nhap dung cho man hinh login va tu dong logout.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            onPressed: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const UserManagementScreen(),
+                                theme.colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.82),
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.12,
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.person_add_alt_1),
-                            label: const Text('Quan ly user'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.tune,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Cau hinh nhan dien',
-                                style: Theme.of(context).textTheme.titleMedium,
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Tham so recognition da duoc chuyen sang man Test nhan dien tu anh upload de tranh trung lap voi Settings he thong.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
+                          child: Wrap(
+                            spacing: 14,
+                            runSpacing: 12,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  'Tiep tuc cau hinh va ap dung tham so real-time ngay trong popup cua man test anh.',
-                                  style: Theme.of(context).textTheme.bodyMedium,
+                              SizedBox(
+                                width: 510,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      i18n.t('settings.centerTitle'),
+                                      style: theme.textTheme.titleLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      i18n.t('settings.centerSubtitle'),
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              _buildOverviewChip(
+                                context,
+                                icon: Icons.shield_outlined,
+                                label: i18n.t('settings.overview.preset'),
+                                value: _presetDisplayName(
+                                  _selectedRecognitionPreset,
+                                ),
+                              ),
+                              _buildOverviewChip(
+                                context,
+                                icon: Icons.table_chart,
+                                label: i18n.t('settings.overview.report'),
+                                value: _enableScheduledReportExport
+                                    ? i18n.t('status.on')
+                                    : i18n.t('status.off'),
+                              ),
+                              _buildOverviewChip(
+                                context,
+                                icon: Icons.cloud_outlined,
+                                label: i18n.t('settings.overview.api'),
+                                value: _enablePublicReportApi
+                                    ? i18n.t('status.on')
+                                    : i18n.t('status.off'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: _testConnection,
+                              icon: const Icon(Icons.cloud_done),
+                              label: Text(i18n.t('settings.quick.testConnection')),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const PeopleManagementScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.people_alt),
+                              label: Text(i18n.t('settings.quick.people')),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const UserManagementScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.manage_accounts),
+                              label: Text(i18n.t('settings.quick.accounts')),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ImageRecognitionTestScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.image_search),
+                              label: Text(i18n.t('settings.quick.imageTest')),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSectionCard(
+                          context,
+                          icon: Icons.videocam,
+                          title: _l(context, 'Kết nối WebRTC', 'WebRTC Connectivity'),
+                          subtitle:
+                              _l(
+                                context,
+                                'Thiết lập máy chủ signaling, STUN/TURN và chính sách truyền tải ICE.',
+                                'Configure signaling server, STUN/TURN, and ICE transport policy.',
+                              ),
+                          child: Column(
+                            children: [
+                              _buildTextField(
+                                controller: _signalingServerController,
+                                label: _l(
+                                  context,
+                                  'URL máy chủ Signaling',
+                                  'Signaling server URL',
+                                ),
+                                hint: 'wss://signaling.example.com',
+                                helperText:
+                                    _l(
+                                      context,
+                                      'Nhập địa chỉ máy chủ signaling (WebSocket)',
+                                      'Enter signaling server address (WebSocket)',
+                                    ),
+                                icon: Icons.link,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildServersField(
+                                controller: _stunServersController,
+                                label: _l(context, 'Máy chủ STUN', 'STUN servers'),
+                                hint: 'stun:stun.l.google.com:19302',
+                                helperText: _l(
+                                  context,
+                                  'Mỗi dòng một máy chủ STUN',
+                                  'One STUN server per line',
+                                ),
+                                icon: Icons.dns_outlined,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildServersField(
+                                controller: _turnServersController,
+                                label: _l(context, 'Máy chủ TURN', 'TURN servers'),
+                                hint: 'turn:turnserver.example.com:3478',
+                                helperText: _l(
+                                  context,
+                                  'Mỗi dòng một máy chủ TURN',
+                                  'One TURN server per line',
+                                ),
+                                icon: Icons.storage_rounded,
+                              ),
+                              const SizedBox(height: 12),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final compact = constraints.maxWidth < 720;
+                                  if (compact) {
+                                    return Column(
+                                      children: [
+                                        _buildTextField(
+                                          controller: _turnUsernameController,
+                                          label: _l(
+                                            context,
+                                            'Tên người dùng TURN',
+                                            'TURN username',
+                                          ),
+                                          hint: 'username',
+                                          icon: Icons.person_outline,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _buildTextField(
+                                          controller: _turnPasswordController,
+                                          label: _l(
+                                            context,
+                                            'Mật khẩu TURN',
+                                            'TURN password',
+                                          ),
+                                          hint: 'password',
+                                          obscureText: true,
+                                          icon: Icons.password_rounded,
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildTextField(
+                                          controller: _turnUsernameController,
+                                          label: _l(
+                                            context,
+                                            'Tên người dùng TURN',
+                                            'TURN username',
+                                          ),
+                                          hint: 'username',
+                                          icon: Icons.person_outline,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildTextField(
+                                          controller: _turnPasswordController,
+                                          label: _l(
+                                            context,
+                                            'Mật khẩu TURN',
+                                            'TURN password',
+                                          ),
+                                          hint: 'password',
+                                          obscureText: true,
+                                          icon: Icons.password_rounded,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              _buildDropdownField(),
+                              const SizedBox(height: 10),
+                              _buildCheckboxField(),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSectionCard(
+                          context,
+                          icon: Icons.table_view,
+                          title: _l(
+                            context,
+                            'Báo cáo CSV và API công khai',
+                            'CSV Reports and Public API',
+                          ),
+                          subtitle:
+                              _l(
+                                context,
+                                'Cấu hình lịch xuất báo cáo và dịch vụ API đọc dữ liệu chấm công.',
+                                'Configure report schedule and API service for attendance data.',
+                              ),
+                          child: Column(
+                            children: [
+                              Material(
+                                color: Colors.transparent,
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    _l(
+                                      context,
+                                      'Bật xuất báo cáo định kỳ',
+                                      'Enable scheduled report export',
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    _l(
+                                      context,
+                                      'Ứng dụng tự động xuất CSV theo lịch đã cấu hình.',
+                                      'App automatically exports CSV based on the configured schedule.',
+                                    ),
+                                  ),
+                                  value: _enableScheduledReportExport,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _enableScheduledReportExport = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildTextField(
+                                      controller:
+                                          _reportExportDirectoryController,
+                                      label: _l(
+                                        context,
+                                        'Thư mục xuất báo cáo',
+                                        'Report export directory',
+                                      ),
+                                      hint: 'C:/reports/attendance',
+                                      helperText:
+                                          _l(
+                                            context,
+                                            'Dùng cho job định kỳ và API save=true',
+                                            'Used for scheduled job and API save=true',
+                                          ),
+                                      icon: Icons.folder_copy_outlined,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  FilledButton.tonalIcon(
+                                    onPressed: _pickReportDirectory,
+                                    icon: const Icon(Icons.folder_open),
+                                    label: Text(_l(context, 'Chọn', 'Pick')),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final compact = constraints.maxWidth < 720;
+                                  if (compact) {
+                                    return Column(
+                                      children: [
+                                        _buildTextField(
+                                          controller:
+                                              _reportExportTimeController,
+                                          label:
+                                              _l(
+                                                context,
+                                                'Thời gian chạy định kỳ (HH:mm)',
+                                                'Scheduled time (HH:mm)',
+                                              ),
+                                          hint: '23:55',
+                                          helperText:
+                                              _l(
+                                                context,
+                                                'Mỗi ngày chạy một lần theo giờ này',
+                                                'Runs once daily at this time',
+                                              ),
+                                          icon: Icons.schedule,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _buildTextField(
+                                          controller: _reportFilePrefixController,
+                                          label: _l(
+                                            context,
+                                            'Tiền tố tên tệp báo cáo',
+                                            'Report file prefix',
+                                          ),
+                                          hint: 'attendance_report',
+                                          icon: Icons.badge_outlined,
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildTextField(
+                                          controller:
+                                              _reportExportTimeController,
+                                          label:
+                                              _l(
+                                                context,
+                                                'Thời gian chạy định kỳ (HH:mm)',
+                                                'Scheduled time (HH:mm)',
+                                              ),
+                                          hint: '23:55',
+                                          helperText:
+                                              _l(
+                                                context,
+                                                'Mỗi ngày chạy một lần theo giờ này',
+                                                'Runs once daily at this time',
+                                              ),
+                                          icon: Icons.schedule,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildTextField(
+                                          controller: _reportFilePrefixController,
+                                          label: _l(
+                                            context,
+                                            'Tiền tố tên tệp báo cáo',
+                                            'Report file prefix',
+                                          ),
+                                          hint: 'attendance_report',
+                                          icon: Icons.badge_outlined,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              Material(
+                                color: Colors.transparent,
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    _l(
+                                      context,
+                                      'Bật API xuất báo cáo',
+                                      'Enable report export API',
+                                    ),
+                                  ),
+                                  subtitle: const Text(
+                                    'GET /api/reports/export?from=2026-07-01&to=2026-07-04&subject=An&type=start',
+                                  ),
+                                  value: _enablePublicReportApi,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _enablePublicReportApi = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildTextField(
+                                      controller: _reportApiHostController,
+                                      label: _l(context, 'Máy chủ API', 'API host'),
+                                      hint: '0.0.0.0',
+                                      icon: Icons.language,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _buildTextField(
+                                      controller: _reportApiPortController,
+                                      label: _l(context, 'Cổng API', 'API port'),
+                                      hint: '8787',
+                                      icon: Icons.settings_ethernet,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSectionCard(
+                          context,
+                          icon: Icons.tune,
+                          title: _l(
+                            context,
+                            'Cấu hình nhận diện nâng cao',
+                            'Advanced recognition settings',
+                          ),
+                          subtitle:
+                              _l(
+                                context,
+                                'Toàn bộ tham số nhận diện đã chuyển sang màn kiểm thử ảnh để tránh trùng lặp và dễ hiệu chỉnh theo ngữ cảnh.',
+                                'Recognition parameters were moved to the image test screen to avoid duplication and support context-based tuning.',
+                              ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _l(
+                                  context,
+                                  'Mở màn kiểm thử ảnh để chỉnh tham số và áp dụng ngay vào luồng thời gian thực.',
+                                  'Open image test screen to adjust parameters and apply them immediately to realtime flow.',
+                                ),
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
                               FilledButton.icon(
                                 onPressed: () async {
                                   await Navigator.of(context).push(
@@ -1424,142 +1634,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   );
                                 },
                                 icon: const Icon(Icons.image_search),
-                                label: const Text('Mo man test anh'),
+                                label: Text(i18n.t('settings.quick.imageTest')),
                               ),
                             ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _resetToDefaults,
+                                icon: const Icon(Icons.restore),
+                                label: Text(i18n.t('settings.reset')),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: _saveSettings,
+                                icon: const Icon(Icons.save),
+                                label: Text(i18n.t('settings.save')),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.table_view,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Bao cao log CSV va Public API',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SwitchListTile(
-                            title: const Text('Bat job xuat bao cao dinh ky'),
-                            subtitle: const Text(
-                              'App se tu dong xuat CSV theo gio da cau hinh',
-                            ),
-                            value: _enableScheduledReportExport,
-                            onChanged: (value) {
-                              setState(() {
-                                _enableScheduledReportExport = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _reportExportDirectoryController,
-                                  label: 'Thu muc xuat bao cao',
-                                  hint: 'C:/reports/attendance',
-                                  helperText:
-                                      'Dung cho job dinh ky va API save=true',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: _pickReportDirectory,
-                                tooltip: 'Chon thu muc',
-                                icon: const Icon(Icons.folder_open),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _reportExportTimeController,
-                            label: 'Thoi gian chay dinh ky (HH:mm)',
-                            hint: '23:55',
-                            helperText: 'Job chay moi ngay 1 lan',
-                          ),
-                          const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _reportFilePrefixController,
-                            label: 'Tien to ten file bao cao',
-                            hint: 'attendance_report',
-                          ),
-                          const SizedBox(height: 12),
-                          SwitchListTile(
-                            title: const Text('Bat public API xuat bao cao'),
-                            subtitle: const Text(
-                              'GET /api/reports/export?from=2026-07-01&to=2026-07-04&subject=An&type=start',
-                            ),
-                            value: _enablePublicReportApi,
-                            onChanged: (value) {
-                              setState(() {
-                                _enablePublicReportApi = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _reportApiHostController,
-                                  label: 'API Host',
-                                  hint: '0.0.0.0',
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _reportApiPortController,
-                                  label: 'API Port',
-                                  hint: '8787',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _resetToDefaults,
-                          icon: const Icon(Icons.restore),
-                          label: const Text('Đặt lại mặc định'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _saveSettings,
-                          icon: const Icon(Icons.save),
-                          label: const Text('Lưu cấu hình'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             ),
+    );
+  }
+
+  Widget _buildOverviewChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: theme.textTheme.labelSmall),
+              Text(
+                value,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.20),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromARGB(20, 0, 0, 0),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
     );
   }
 
@@ -1569,6 +1776,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String hint,
     String? helperText,
     bool obscureText = false,
+    IconData icon = Icons.language,
   }) {
     return TextField(
       controller: controller,
@@ -1576,8 +1784,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         labelText: label,
         hintText: hint,
         helperText: helperText,
-        border: const OutlineInputBorder(),
-        prefixIcon: const Icon(Icons.language),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.85),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.58),
+          ),
+        ),
+        prefixIcon: Icon(icon),
       ),
       obscureText: obscureText,
     );
@@ -1588,6 +1804,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String label,
     required String hint,
     required String helperText,
+    IconData icon = Icons.dns,
   }) {
     return TextField(
       controller: controller,
@@ -1595,8 +1812,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         labelText: label,
         hintText: hint,
         helperText: helperText,
-        border: const OutlineInputBorder(),
-        prefixIcon: const Icon(Icons.dns),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.85),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.58),
+          ),
+        ),
+        prefixIcon: Icon(icon),
       ),
       maxLines: 4,
       minLines: 2,
@@ -1646,14 +1871,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
       initialValue: _iceTransportPolicyController.text.isEmpty
           ? 'all'
           : _iceTransportPolicyController.text,
-      decoration: const InputDecoration(
-        labelText: 'Chính sách vận chuyển ICE',
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.device_hub),
+      decoration: InputDecoration(
+        labelText: _l(
+          context,
+          'Chính sách vận chuyển ICE',
+          'ICE transport policy',
+        ),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.85),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.58),
+          ),
+        ),
+        prefixIcon: const Icon(Icons.device_hub),
       ),
-      items: const [
-        DropdownMenuItem(value: 'all', child: Text('Tất cả (UDP và TCP)')),
-        DropdownMenuItem(value: 'relay', child: Text('Chỉ Relay (TURN)')),
+      items: [
+        DropdownMenuItem(
+          value: 'all',
+          child: Text(_l(context, 'Tất cả (UDP và TCP)', 'All (UDP and TCP)')),
+        ),
+        DropdownMenuItem(
+          value: 'relay',
+          child: Text(_l(context, 'Chỉ Relay (TURN)', 'Relay only (TURN)')),
+        ),
       ],
       onChanged: (value) {
         if (value != null) {
@@ -1664,27 +1907,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCheckboxField() {
-    return CheckboxListTile(
-      title: const Text('Kích hoạt xử lý âm thanh'),
-      subtitle: const Text(
-        'Bật xử lý âm thanh nâng cao để cải thiện chất lượng',
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.55),
+        ),
       ),
-      value: _enableAudioProcessing,
-      onChanged: (value) {
-        if (value != null) {
-          setState(() {
-            _enableAudioProcessing = value;
-          });
-        }
-      },
-      secondary: const Icon(Icons.mic),
+      child: Material(
+        color: Colors.transparent,
+        child: CheckboxListTile(
+          title: Text(
+            _l(
+              context,
+              'Kích hoạt xử lý âm thanh',
+              'Enable audio processing',
+            ),
+          ),
+          subtitle: Text(
+            _l(
+              context,
+              'Bật xử lý âm thanh nâng cao để cải thiện chất lượng',
+              'Enable advanced audio processing for better quality',
+            ),
+          ),
+          value: _enableAudioProcessing,
+          onChanged: (value) {
+            if (value != null) {
+              setState(() {
+                _enableAudioProcessing = value;
+              });
+            }
+          },
+          secondary: const Icon(Icons.mic),
+        ),
+      ),
     );
   }
 
   Future<void> _testConnection() async {
     final signalingUrl = _signalingServerController.text.trim();
     if (signalingUrl.isEmpty) {
-      _showErrorSnackBar('Vui lòng nhập URL máy chủ Signaling trước');
+      _showErrorSnackBar(
+        _l(
+          context,
+          'Vui lòng nhập URL máy chủ Signaling trước',
+          'Please enter Signaling server URL first',
+        ),
+      );
       return;
     }
 
@@ -1693,13 +1964,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Đang kiểm tra kết nối...'),
-          content: const Column(
+          title: Text(_l(context, 'Đang kiểm tra kết nối...', 'Testing connection...')),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Vui lòng đợi...'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(_l(context, 'Vui lòng đợi...', 'Please wait...')),
             ],
           ),
         );
@@ -1713,12 +1984,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.pop(context);
 
     // Show result
-    _showSuccessSnackBar('Cấu hình máy chủ WebRTC hợp lệ');
+    _showSuccessSnackBar(
+      _l(
+        context,
+        'Cấu hình máy chủ WebRTC hợp lệ',
+        'WebRTC server configuration is valid',
+      ),
+    );
   }
 
   Future<void> _pickReportDirectory() async {
     final selectedPath = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Chon thu muc xuat bao cao CSV',
+      dialogTitle: _l(
+        context,
+        'Chọn thư mục xuất báo cáo CSV',
+        'Select CSV export directory',
+      ),
     );
     if (selectedPath == null || selectedPath.trim().isEmpty) return;
     if (!mounted) return;

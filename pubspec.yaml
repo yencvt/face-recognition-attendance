@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   file_picker: ^8.0.7
   desktop_drop: ^0.6.0
   sqflite: ^2.3.0

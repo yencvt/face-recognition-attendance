@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../database/face_attendance_repository.dart';
+import '../l10n/app_i18n.dart';
 import '../services/auth_session_service.dart';
 import '../services/camera_stream_service.dart';
 import '../services/face_recognition_service.dart';
@@ -1080,22 +1081,39 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final selected = _selected;
     if (selected.id == 'default') return;
 
-    final wasRunning = _recognitionService.isRunning(selected.id);
-    final wasConnected = selected.isConnected;
-    var previewConnectedTemporarily = false;
-
-    if (!wasConnected && _isLocalSession(selected)) {
-      if (wasRunning) {
-        await _recognitionService.stopProcessor(selected.id);
-      }
-      await _streamService.connect(selected.id);
-      previewConnectedTemporarily = true;
-    }
-
-    final selectedForPreview = _snapshot.sessions.firstWhere(
+    var selectedForPreview = _snapshot.sessions.firstWhere(
       (session) => session.id == selected.id,
       orElse: () => selected,
     );
+    var previewController = selected.id == 'default'
+        ? null
+        : _recognitionService.previewControllerFor(selected.id);
+    var hasActivePreview =
+        previewController != null && previewController.value.isInitialized;
+    hasActivePreview =
+        hasActivePreview ||
+        (selectedForPreview.renderer != null &&
+            selectedForPreview.renderer!.renderVideo);
+
+    final wasRunning = _recognitionService.isRunning(selected.id);
+    var previewConnectedTemporarily = false;
+
+    if (!hasActivePreview) {
+      if (_isLocalSession(selected)) {
+        await _ensureRecognitionForSelected(forceStart: true);
+      } else if (!selectedForPreview.isConnected) {
+        await _streamService.connect(selected.id);
+        previewConnectedTemporarily = true;
+      }
+
+      selectedForPreview = _snapshot.sessions.firstWhere(
+        (session) => session.id == selected.id,
+        orElse: () => selected,
+      );
+      previewController = selected.id == 'default'
+          ? null
+          : _recognitionService.previewControllerFor(selected.id);
+    }
 
     if (!mounted) return;
 
@@ -1107,6 +1125,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           zone: current,
           cameraName: selectedForPreview.name,
           renderer: selectedForPreview.renderer,
+          cameraController: previewController,
           mirrorHorizontally: _shouldMirrorZoneEditor(selectedForPreview),
         ),
       );
@@ -1121,7 +1140,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (previewConnectedTemporarily) {
         await _streamService.disconnect(selected.id);
       }
-      if (wasRunning) {
+      if (wasRunning && !_recognitionService.isRunning(selected.id)) {
         await _ensureRecognitionForSelected(forceStart: true);
       }
     }
@@ -1477,8 +1496,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final i18n = AppI18n.of(context);
     final selected = _selected;
     final wide = MediaQuery.of(context).size.width > 1100;
+    final compactTopBar = MediaQuery.of(context).size.width < 1280;
     final auth = AuthSessionService.instance;
     final currentUser = auth.currentUser;
 
@@ -1486,14 +1507,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       backgroundColor: const Color(0xFFF3F6FB),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text(
-          'Cham cong khuon mat',
+        title: Text(
+          i18n.t('attendance.title'),
         ),
         actions: [
+          _buildLanguageSelector(context),
           IconButton(
             onPressed: _addCameraDialog,
             icon: const Icon(Icons.add_link),
-            tooltip: 'Add camera',
+            tooltip: i18n.t('attendance.addCamera'),
           ),
           IconButton(
             onPressed: () {
@@ -1502,12 +1524,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               );
             },
             icon: const Icon(Icons.settings),
-            tooltip: 'Cau hinh he thong',
-          ),
-          IconButton(
-            onPressed: _openZoneConfig,
-            icon: const Icon(Icons.crop_free),
-            tooltip: 'Cau hinh vung nhan dien',
+            tooltip: i18n.t('attendance.systemConfig'),
           ),
           if (currentUser != null)
             Padding(
@@ -1515,8 +1532,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               child: Center(
                 child: Chip(
                   visualDensity: VisualDensity.compact,
-                  label: Text(
-                    '${currentUser.username} • ${currentUser.isAdmin ? 'Admin' : 'User'}',
+                  label: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: compactTopBar ? 120 : 220,
+                    ),
+                    child: Text(
+                      compactTopBar
+                          ? currentUser.username
+                          : '${currentUser.username} • ${currentUser.isAdmin ? i18n.t('role.admin') : i18n.t('role.user')}',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ),
@@ -1524,7 +1550,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           IconButton(
             onPressed: auth.isAuthenticated ? auth.logout : null,
             icon: const Icon(Icons.logout),
-            tooltip: 'Dang xuat',
+            tooltip: i18n.t('attendance.logout'),
           ),
         ],
       ),
@@ -1718,6 +1744,103 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     Expanded(flex: 2, child: _buildRealtimeLogsCard()),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageSelector(BuildContext context) {
+    final i18n = AppI18n.of(context);
+    final current = AppI18nController.localeNotifier.value.languageCode;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Center(
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.55),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromARGB(18, 0, 0, 0),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: current,
+              isDense: true,
+              itemHeight: kMinInteractiveDimension,
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              style: Theme.of(context).textTheme.labelMedium,
+              items: [
+                DropdownMenuItem(
+                  value: 'vi',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🇻🇳'),
+                      const SizedBox(width: 6),
+                      Text(i18n.t('language.vi')),
+                    ],
+                  ),
+                ),
+                DropdownMenuItem(
+                  value: 'en',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('🇺🇸'),
+                      const SizedBox(width: 6),
+                      Text(i18n.t('language.en')),
+                    ],
+                  ),
+                ),
+              ],
+              selectedItemBuilder: (context) => [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🇻🇳'),
+                    const SizedBox(width: 4),
+                    Text(
+                      'VI',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🇺🇸'),
+                    const SizedBox(width: 4),
+                    Text(
+                      'EN',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                AppI18nController.setLocaleCode(value);
+              },
+            ),
+          ),
         ),
       ),
     );
