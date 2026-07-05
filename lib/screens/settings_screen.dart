@@ -542,7 +542,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       await SettingsRepository.saveSettings(settings);
 
-      final recognitionConfig = RecognitionRuntimeConfig(
+      final previousRecognitionConfig =
+          await RecognitionSettingsRepository.getOrCreateDefaultConfig();
+      final recognitionConfig = previousRecognitionConfig.copyWith(
         knownMatchThreshold: parseDouble(
           _knownMatchThresholdController,
           'knownMatchThreshold',

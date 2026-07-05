@@ -768,11 +768,14 @@ class _Processor {
 
   final CameraController controller;
   bool busy = false;
+  bool draining = false;
   int frameCount = 0;
   int lastProcessAtMs = 0;
   int lastAnnotatedFrameAtMs = 0;
   String lastOverlaySignature = '';
   Uint8List? lastOverlayPng;
+  final List<CameraImage> pendingFrames = <CameraImage>[];
+  Timer? pendingDrainTimer;
   Timer? stillCaptureTimer;
 }
 
@@ -975,6 +978,8 @@ class FaceRecognitionService {
       _runtimeConfig.fallbackCaptureIntervalMs;
   int get _fallbackMaxInputEdge => _runtimeConfig.fallbackMaxInputEdge;
   int get _processFrameIntervalMs => _runtimeConfig.processFrameIntervalMs;
+  int get _singleFlightKeepLatestFrames =>
+      _runtimeConfig.singleFlightKeepLatestFrames.clamp(1, 24).toInt();
   int get _detectorInputWidth => _runtimeConfig.detectorInputWidth;
   int get _detectorInputHeight => _runtimeConfig.detectorInputHeight;
   int get _trackKeepAliveMs => _runtimeConfig.trackKeepAliveMs;
@@ -989,6 +994,9 @@ class FaceRecognitionService {
   static const double _adaptiveFarDistanceFaceAreaRatio = 0.010;
   static const int _adaptiveFarDistanceFacePixels = 24;
   static const double _adaptiveFarDistanceFrameQuality = 0.20;
+  static const int _realtimePartialModeQualitySize = 0;
+  static const int _realtimePartialModeAllFrames = 1;
+  static const int _realtimePartialModeDisabled = 2;
   static const int _autoTuneDebugLogIntervalMs = 1000;
   int get _eventPublishIntervalMs =>
       _runtimeConfig.eventPublishIntervalMs.clamp(1000, 20000).toInt();
@@ -996,6 +1004,36 @@ class FaceRecognitionService {
   double get _minRealtimeFaceAreaRatio =>
       _runtimeConfig.minRealtimeFaceAreaRatio;
   int get _minRealtimeFacePixels => _runtimeConfig.minRealtimeFacePixels;
+  double get _realtimePartialMinFrameQuality =>
+      _runtimeConfig.realtimePartialMinFrameQuality;
+  double get _realtimePartialMinFaceAreaRatio =>
+      _runtimeConfig.realtimePartialMinFaceAreaRatio;
+  int get _realtimePartialMinFacePixels =>
+      _runtimeConfig.realtimePartialMinFacePixels;
+  int get _realtimePartialMode =>
+      _runtimeConfig.realtimePartialMode.clamp(0, 2).toInt();
+  Set<String> get _realtimePartialEnabledRegions {
+    const fallback = <String>{
+      'forehead',
+      'leftEye',
+      'rightEye',
+      'nose',
+      'leftCheek',
+      'rightCheek',
+      'mouth',
+      'chin',
+    };
+    final raw = _runtimeConfig.realtimePartialEnabledRegions;
+    final parsed = raw
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    final valid = parsed.intersection(fallback);
+    return valid.isEmpty ? fallback : valid;
+  }
+  int get _realtimePartialFrameCycle =>
+      _runtimeConfig.realtimePartialFrameCycle;
   double get _minEnrollmentFaceAreaRatio =>
       _runtimeConfig.minEnrollmentFaceAreaRatio;
   double get _maxEnrollmentFaceAreaRatio =>
@@ -2008,7 +2046,7 @@ class FaceRecognitionService {
         _startCameraCalibrationWindow(cameraId);
 
         await controller.startImageStream((image) {
-          unawaited(_processFrame(cameraId, processor, image));
+          _enqueueStreamFrame(cameraId, processor, image);
         });
       } catch (_) {
         _streamUnavailableByCameraId[cameraId] = true;
@@ -2033,6 +2071,9 @@ class FaceRecognitionService {
     }
     processor.stillCaptureTimer?.cancel();
     processor.stillCaptureTimer = null;
+    processor.pendingDrainTimer?.cancel();
+    processor.pendingDrainTimer = null;
+    processor.pendingFrames.clear();
     await processor.controller.dispose();
     _streamUnavailableByCameraId.remove(cameraId);
     _overlaysByCameraId.remove(cameraId);
@@ -2045,6 +2086,60 @@ class FaceRecognitionService {
     final window = _calibrationWindows.remove(cameraId);
     window?.timer?.cancel();
     _emitFrame(cameraId, const []);
+  }
+
+  void _enqueueStreamFrame(
+    String cameraId,
+    _Processor processor,
+    CameraImage image,
+  ) {
+    if (!processor.controller.value.isInitialized) return;
+
+    processor.pendingFrames.add(image);
+    final maxPending = _singleFlightKeepLatestFrames;
+    if (processor.pendingFrames.length > maxPending) {
+      final overflow = processor.pendingFrames.length - maxPending;
+      processor.pendingFrames.removeRange(0, overflow);
+    }
+    unawaited(_drainPendingFrames(cameraId, processor));
+  }
+
+  Future<void> _drainPendingFrames(
+    String cameraId,
+    _Processor processor,
+  ) async {
+    if (processor.draining) return;
+    processor.draining = true;
+    try {
+      while (true) {
+        if (!processor.controller.value.isInitialized || processor.busy) {
+          return;
+        }
+        if (processor.pendingFrames.isEmpty) {
+          return;
+        }
+
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        final waitMs =
+            _processFrameIntervalMs - (nowMs - processor.lastProcessAtMs);
+        if (waitMs > 0) {
+          processor.pendingDrainTimer?.cancel();
+          processor.pendingDrainTimer = Timer(
+            Duration(milliseconds: waitMs),
+            () {
+              processor.pendingDrainTimer = null;
+              unawaited(_drainPendingFrames(cameraId, processor));
+            },
+          );
+          return;
+        }
+
+        final nextFrame = processor.pendingFrames.removeAt(0);
+        await _processFrame(cameraId, processor, nextFrame);
+      }
+    } finally {
+      processor.draining = false;
+    }
   }
 
   void _startStillCaptureFallback(String cameraId, _Processor processor) {
@@ -2063,12 +2158,18 @@ class FaceRecognitionService {
 
     processor.busy = true;
     try {
+      processor.frameCount++;
       final decoded = await _capturePreviewFrameFromWindows(processor);
       if (decoded == null) return;
       final optimizedFrame = _optimizeFallbackFrame(decoded);
 
       final zone = await _resolveZone(cameraId);
-      await _processFallbackImage(cameraId, zone, optimizedFrame);
+      await _processFallbackImage(
+        cameraId,
+        zone,
+        optimizedFrame,
+        frameIndex: processor.frameCount,
+      );
     } catch (e, st) {
       final stLine = st.toString().split('\n').first;
       _log.error(
@@ -2641,11 +2742,7 @@ class FaceRecognitionService {
     _Processor processor,
     CameraImage image,
   ) async {
-    if (processor.busy) return;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    if (nowMs - processor.lastProcessAtMs < _processFrameIntervalMs) {
-      return;
-    }
 
     processor.lastProcessAtMs = nowMs;
     processor.frameCount++;
@@ -2867,13 +2964,22 @@ class FaceRecognitionService {
             _templateVectorDimension,
           );
           if (vector.isEmpty) continue;
-          final partialBundle = await _buildPartialEmbeddingsFromFace(
-            workingCrop,
-            targetDimension: _templateVectorDimension,
+          final shouldComputePartials = _shouldComputeRealtimePartials(
+            minFacePixels: minFacePixels,
+            faceAreaRatio: faceAreaRatio,
             frameQuality: frameQuality,
-            forRealtime: false,
-            faceAlreadyPrepared: true,
+            adaptiveFarDistance: adaptiveFarDistance,
+            frameIndex: processor.frameCount,
           );
+          final partialBundle = shouldComputePartials
+              ? await _buildPartialEmbeddingsFromFace(
+                  workingCrop,
+                  targetDimension: _templateVectorDimension,
+                  frameQuality: frameQuality,
+                  forRealtime: true,
+                  faceAlreadyPrepared: true,
+                )
+              : const _PartialEmbeddingBundle();
           final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
           final assignedKnownIds = nextTracks.values
               .map((track) => track.event.personId)
@@ -2972,7 +3078,12 @@ class FaceRecognitionService {
       } else {
         final rgb = _cameraImageToRgb(image);
         if (rgb == null) return;
-        await _processFallbackImage(cameraId, zone, rgb);
+        await _processFallbackImage(
+          cameraId,
+          zone,
+          rgb,
+          frameIndex: processor.frameCount,
+        );
       }
     } catch (_) {
       // Keep frame pipeline alive when one frame fails.
@@ -2990,6 +3101,7 @@ class FaceRecognitionService {
     String cameraId,
     RecognitionZone zone,
     img.Image rgb,
+    {int frameIndex = 0}
   ) async {
     try {
       final detections = await _detectFacesForFallback(rgb, cameraId);
@@ -3152,13 +3264,22 @@ class FaceRecognitionService {
             _templateVectorDimension,
           );
           if (vector.isEmpty) continue;
-          final partialBundle = await _buildPartialEmbeddingsFromFace(
-            workingCrop,
-            targetDimension: _templateVectorDimension,
+          final shouldComputePartials = _shouldComputeRealtimePartials(
+            minFacePixels: minFacePixels,
+            faceAreaRatio: faceAreaRatio,
             frameQuality: frameQuality,
-            forRealtime: false,
-            faceAlreadyPrepared: true,
+            adaptiveFarDistance: adaptiveFarDistance,
+            frameIndex: frameIndex,
           );
+          final partialBundle = shouldComputePartials
+              ? await _buildPartialEmbeddingsFromFace(
+                  workingCrop,
+                  targetDimension: _templateVectorDimension,
+                  frameQuality: frameQuality,
+                  forRealtime: true,
+                  faceAlreadyPrepared: true,
+                )
+              : const _PartialEmbeddingBundle();
           final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
           final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
           final assignedKnownIds = nextTracks.values
@@ -5401,19 +5522,31 @@ class FaceRecognitionService {
     required double faceAreaRatio,
     required double frameQuality,
     required bool adaptiveFarDistance,
+    required int frameIndex,
   }) {
-    if (frameQuality < 0.44) {
+    if (_realtimePartialMode == _realtimePartialModeDisabled) {
       return false;
     }
-    final areaGate = math.max(_minRealtimeFaceAreaRatio * 0.70, 0.018);
-    final pixelGate = math.max((_minRealtimeFacePixels * 0.75).round(), 44);
+    final cycle = _realtimePartialFrameCycle.clamp(1, 8).toInt();
+    if (cycle > 1 && frameIndex > 0 && frameIndex % cycle != 0) {
+      return false;
+    }
+
+    if (_realtimePartialMode == _realtimePartialModeAllFrames) {
+      return true;
+    }
+
+    final qualityGate = _realtimePartialMinFrameQuality.clamp(0.0, 1.0);
+    final areaGate = _realtimePartialMinFaceAreaRatio.clamp(0.0, 1.0);
+    final pixelGate = _realtimePartialMinFacePixels.clamp(1, 4096).toInt();
+
+    if (frameQuality < qualityGate) {
+      return false;
+    }
     if (faceAreaRatio < areaGate || minFacePixels < pixelGate) {
       return false;
     }
     if (adaptiveFarDistance && minFacePixels < 56) {
-      return false;
-    }
-    if (frameQuality < 0.52) {
       return false;
     }
     return true;
@@ -6375,7 +6508,85 @@ class FaceRecognitionService {
     final chin = await buildRegion(chinCrop, 0.13, 0.20);
 
     final eyeVector = _averageVectors(<List<double>?>[leftEye.$1, rightEye.$1]);
-    final eyeWeight = (leftEye.$2 + rightEye.$2).clamp(0.0, 1.0).toDouble();
+    final eyeWeightRaw = (leftEye.$2 + rightEye.$2).clamp(0.0, 1.0).toDouble();
+
+    if (forRealtime) {
+      final enabledRegions = _realtimePartialEnabledRegions;
+      final candidates = <({
+        String key,
+        List<double>? vector,
+        double weight,
+      })>[
+        (key: 'forehead', vector: forehead.$1, weight: forehead.$2),
+        (key: 'leftEye', vector: leftEye.$1, weight: leftEye.$2),
+        (key: 'rightEye', vector: rightEye.$1, weight: rightEye.$2),
+        (key: 'nose', vector: nose.$1, weight: nose.$2),
+        (key: 'mouth', vector: mouth.$1, weight: mouth.$2),
+        (key: 'leftCheek', vector: leftCheek.$1, weight: leftCheek.$2),
+        (key: 'rightCheek', vector: rightCheek.$1, weight: rightCheek.$2),
+        (key: 'chin', vector: chin.$1, weight: chin.$2),
+      ]
+          .where(
+            (entry) =>
+                enabledRegions.contains(entry.key) &&
+                entry.vector != null &&
+                entry.weight > 0,
+          )
+          .toList();
+
+      if (candidates.isEmpty) {
+        return const _PartialEmbeddingBundle();
+      }
+
+      candidates.sort((a, b) => b.weight.compareTo(a.weight));
+
+      final total = candidates.fold<double>(
+        0.0,
+        (sum, entry) => sum + entry.weight,
+      );
+      if (total <= 0) {
+        return const _PartialEmbeddingBundle();
+      }
+
+      List<double>? vectorOf(String key) {
+        for (final entry in candidates) {
+          if (entry.key == key) {
+            return entry.vector;
+          }
+        }
+        return null;
+      }
+
+      double weightOf(String key) {
+        for (final entry in candidates) {
+          if (entry.key == key) {
+            return (entry.weight / total).clamp(0.0, 1.0).toDouble();
+          }
+        }
+        return 0.0;
+      }
+
+      return _PartialEmbeddingBundle(
+        eyeVector: null,
+        leftEyeVector: vectorOf('leftEye'),
+        rightEyeVector: vectorOf('rightEye'),
+        noseVector: vectorOf('nose'),
+        mouthVector: vectorOf('mouth'),
+        foreheadVector: vectorOf('forehead'),
+        leftCheekVector: vectorOf('leftCheek'),
+        rightCheekVector: vectorOf('rightCheek'),
+        chinVector: vectorOf('chin'),
+        eyeWeight: 0.0,
+        leftEyeWeight: weightOf('leftEye'),
+        rightEyeWeight: weightOf('rightEye'),
+        noseWeight: weightOf('nose'),
+        mouthWeight: weightOf('mouth'),
+        foreheadWeight: weightOf('forehead'),
+        leftCheekWeight: weightOf('leftCheek'),
+        rightCheekWeight: weightOf('rightCheek'),
+        chinWeight: weightOf('chin'),
+      );
+    }
 
     final total =
         (forehead.$2 +
@@ -6401,7 +6612,7 @@ class FaceRecognitionService {
       leftCheekVector: leftCheek.$1,
       rightCheekVector: rightCheek.$1,
       chinVector: chin.$1,
-      eyeWeight: eyeWeight / total,
+      eyeWeight: eyeWeightRaw / total,
       leftEyeWeight: leftEye.$2 / total,
       rightEyeWeight: rightEye.$2 / total,
       noseWeight: nose.$2 / total,

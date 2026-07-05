@@ -123,6 +123,11 @@ class _ImageRecognitionTestScreenState
           isInt: true,
         ),
         _RecognitionFieldDef(
+          key: 'singleFlightKeepLatestFrames',
+          label: 'So frame giu lai cua single-flight (keep-latest)',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
           key: 'detectorInputWidth',
           label: 'Chieu rong input detector',
           isInt: true,
@@ -175,6 +180,31 @@ class _ImageRecognitionTestScreenState
         _RecognitionFieldDef(
           key: 'minRealtimeFacePixels',
           label: 'So pixel mat toi thieu realtime',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
+          key: 'realtimePartialMinFrameQuality',
+          label: 'Partial realtime: nguong chat luong toi thieu',
+          isInt: false,
+        ),
+        _RecognitionFieldDef(
+          key: 'realtimePartialMinFaceAreaRatio',
+          label: 'Partial realtime: ty le dien tich mat toi thieu',
+          isInt: false,
+        ),
+        _RecognitionFieldDef(
+          key: 'realtimePartialMinFacePixels',
+          label: 'Partial realtime: so pixel mat toi thieu',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
+          key: 'realtimePartialMode',
+          label: 'Partial realtime: che do (0=quality/size, 1=all frame, 2=tat)',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
+          key: 'realtimePartialFrameCycle',
+          label: 'Partial realtime: chu ky frame (N = 1/N frame)',
           isInt: true,
         ),
       ],
@@ -327,6 +357,27 @@ class _ImageRecognitionTestScreenState
   bool _enablePerfLogs = false;
   bool _realtimeInputGrayscale = false;
   bool _realtimeCropFacesFromCameraImage = false;
+  Set<String> _realtimePartialEnabledRegions = <String>{
+    'forehead',
+    'leftEye',
+    'rightEye',
+    'nose',
+    'leftCheek',
+    'rightCheek',
+    'mouth',
+    'chin',
+  };
+
+  static const Map<String, String> _partialRegionLabels = {
+    'forehead': 'Forehead',
+    'leftEye': 'Left eye',
+    'rightEye': 'Right eye',
+    'nose': 'Nose',
+    'leftCheek': 'Left cheek',
+    'rightCheek': 'Right cheek',
+    'mouth': 'Mouth',
+    'chin': 'Chin',
+  };
   _GalleryCompareMode _galleryCompareMode = _GalleryCompareMode.selectedPeople;
   double _matchThreshold = 0.55;
   UploadedImageRecognitionResult? _result;
@@ -397,6 +448,9 @@ class _ImageRecognitionTestScreenState
     _configControllers['processFrameIntervalMs']!.text = config
         .processFrameIntervalMs
         .toString();
+    _configControllers['singleFlightKeepLatestFrames']!.text = config
+        .singleFlightKeepLatestFrames
+        .toString();
     _configControllers['detectorInputWidth']!.text = config.detectorInputWidth
         .toString();
     _configControllers['detectorInputHeight']!.text = config.detectorInputHeight
@@ -422,6 +476,28 @@ class _ImageRecognitionTestScreenState
     _configControllers['minRealtimeFacePixels']!.text = config
         .minRealtimeFacePixels
         .toString();
+    _configControllers['realtimePartialMinFrameQuality']!.text = config
+      .realtimePartialMinFrameQuality
+      .toString();
+    _configControllers['realtimePartialMinFaceAreaRatio']!.text = config
+      .realtimePartialMinFaceAreaRatio
+      .toString();
+    _configControllers['realtimePartialMinFacePixels']!.text = config
+      .realtimePartialMinFacePixels
+      .toString();
+    _configControllers['realtimePartialMode']!.text = config.realtimePartialMode
+      .toString();
+    _configControllers['realtimePartialFrameCycle']!.text = config
+      .realtimePartialFrameCycle
+      .toString();
+    _realtimePartialEnabledRegions = config.realtimePartialEnabledRegions
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => _partialRegionLabels.containsKey(item))
+        .toSet();
+    if (_realtimePartialEnabledRegions.isEmpty) {
+      _realtimePartialEnabledRegions = _partialRegionLabels.keys.toSet();
+    }
     _configControllers['minEnrollmentFaceAreaRatio']!.text = config
         .minEnrollmentFaceAreaRatio
         .toString();
@@ -551,6 +627,10 @@ class _ImageRecognitionTestScreenState
           'processFrameIntervalMs',
           'Chu ky xu ly frame (ms)',
         ),
+        singleFlightKeepLatestFrames: _parseIntField(
+          'singleFlightKeepLatestFrames',
+          'So frame giu lai cua single-flight (keep-latest)',
+        ),
         detectorInputWidth: _parseIntField(
           'detectorInputWidth',
           'Chieu rong input detector',
@@ -590,6 +670,28 @@ class _ImageRecognitionTestScreenState
         minRealtimeFacePixels: _parseIntField(
           'minRealtimeFacePixels',
           'So pixel mat toi thieu realtime',
+        ),
+        realtimePartialMinFrameQuality: _parseDoubleField(
+          'realtimePartialMinFrameQuality',
+          'Partial realtime: nguong chat luong toi thieu',
+        ),
+        realtimePartialMinFaceAreaRatio: _parseDoubleField(
+          'realtimePartialMinFaceAreaRatio',
+          'Partial realtime: ty le dien tich mat toi thieu',
+        ),
+        realtimePartialMinFacePixels: _parseIntField(
+          'realtimePartialMinFacePixels',
+          'Partial realtime: so pixel mat toi thieu',
+        ),
+        realtimePartialMode: _parseIntField(
+          'realtimePartialMode',
+          'Partial realtime: che do',
+        ),
+        realtimePartialEnabledRegions:
+            _realtimePartialEnabledRegions.join(','),
+        realtimePartialFrameCycle: _parseIntField(
+          'realtimePartialFrameCycle',
+          'Partial realtime: chu ky frame',
         ),
         minEnrollmentFaceAreaRatio: _parseDoubleField(
           'minEnrollmentFaceAreaRatio',
@@ -695,11 +797,12 @@ class _ImageRecognitionTestScreenState
         context,
       ).showSnackBar(SnackBar(content: Text('Khong luu duoc tham so: $e')));
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isApplyingConfig = false;
-      });
-      onStateChanged?.call();
+      if (mounted) {
+        setState(() {
+          _isApplyingConfig = false;
+        });
+        onStateChanged?.call();
+      }
     }
   }
 
@@ -1763,6 +1866,68 @@ class _ImageRecognitionTestScreenState
                   .toList(growable: false),
             ),
           ],
+          if (section.title == 'Chat luong realtime') ...[
+            const SizedBox(height: 12),
+            _buildPartialRegionSelector(onStateChanged: onStateChanged),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPartialRegionSelector({VoidCallback? onStateChanged}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.54),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Partial realtime: chon vung su dung',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          ..._partialRegionLabels.entries.map((entry) {
+            final selected = _realtimePartialEnabledRegions.contains(entry.key);
+            return CheckboxListTile(
+              dense: true,
+              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(entry.value),
+              value: selected,
+              onChanged: (next) {
+                if (next == null) {
+                  return;
+                }
+                if (!next && _realtimePartialEnabledRegions.length <= 1) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Can giu it nhat 1 partial region'),
+                    ),
+                  );
+                  return;
+                }
+                setState(() {
+                  if (next) {
+                    _realtimePartialEnabledRegions.add(entry.key);
+                  } else {
+                    _realtimePartialEnabledRegions.remove(entry.key);
+                  }
+                });
+                onStateChanged?.call();
+              },
+            );
+          }),
+          const SizedBox(height: 4),
+          Text(
+            'Da chon ${_realtimePartialEnabledRegions.length}/${_partialRegionLabels.length} vung',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );

@@ -18,6 +18,7 @@ class RecognitionRuntimeConfig {
     this.fallbackCaptureIntervalMs = 100,
     this.fallbackMaxInputEdge = 960,
     this.processFrameIntervalMs = 82,
+    this.singleFlightKeepLatestFrames = 1,
     this.detectorInputWidth = 640,
     this.detectorInputHeight = 480,
     this.trackKeepAliveMs = 1200,
@@ -28,6 +29,14 @@ class RecognitionRuntimeConfig {
     this.minRealtimeFrameQuality = 0.28,
     this.minRealtimeFaceAreaRatio = 0.030,
     this.minRealtimeFacePixels = 52,
+    this.realtimePartialMinFrameQuality = 0.60,
+    this.realtimePartialMinFaceAreaRatio = 0.035,
+    this.realtimePartialMinFacePixels = 64,
+    this.realtimePartialMode = 0,
+    this.realtimePartialMaxRegions = 4,
+    this.realtimePartialEnabledRegions =
+      'forehead,leftEye,rightEye,nose,leftCheek,rightCheek,mouth,chin',
+    this.realtimePartialFrameCycle = 2,
     this.minEnrollmentFaceAreaRatio = 0.08,
     this.maxEnrollmentFaceAreaRatio = 0.75,
     this.minEnrollmentFaceAspectRatio = 0.65,
@@ -68,6 +77,7 @@ class RecognitionRuntimeConfig {
   final int fallbackCaptureIntervalMs;
   final int fallbackMaxInputEdge;
   final int processFrameIntervalMs;
+  final int singleFlightKeepLatestFrames;
   final int detectorInputWidth;
   final int detectorInputHeight;
   final int trackKeepAliveMs;
@@ -78,6 +88,13 @@ class RecognitionRuntimeConfig {
   final double minRealtimeFrameQuality;
   final double minRealtimeFaceAreaRatio;
   final int minRealtimeFacePixels;
+  final double realtimePartialMinFrameQuality;
+  final double realtimePartialMinFaceAreaRatio;
+  final int realtimePartialMinFacePixels;
+  final int realtimePartialMode;
+  final int realtimePartialMaxRegions;
+  final String realtimePartialEnabledRegions;
+  final int realtimePartialFrameCycle;
   final double minEnrollmentFaceAreaRatio;
   final double maxEnrollmentFaceAreaRatio;
   final double minEnrollmentFaceAspectRatio;
@@ -118,6 +135,7 @@ class RecognitionRuntimeConfig {
     int? fallbackCaptureIntervalMs,
     int? fallbackMaxInputEdge,
     int? processFrameIntervalMs,
+    int? singleFlightKeepLatestFrames,
     int? detectorInputWidth,
     int? detectorInputHeight,
     int? trackKeepAliveMs,
@@ -128,6 +146,13 @@ class RecognitionRuntimeConfig {
     double? minRealtimeFrameQuality,
     double? minRealtimeFaceAreaRatio,
     int? minRealtimeFacePixels,
+    double? realtimePartialMinFrameQuality,
+    double? realtimePartialMinFaceAreaRatio,
+    int? realtimePartialMinFacePixels,
+    int? realtimePartialMode,
+    int? realtimePartialMaxRegions,
+    String? realtimePartialEnabledRegions,
+    int? realtimePartialFrameCycle,
     double? minEnrollmentFaceAreaRatio,
     double? maxEnrollmentFaceAreaRatio,
     double? minEnrollmentFaceAspectRatio,
@@ -174,6 +199,8 @@ class RecognitionRuntimeConfig {
       fallbackMaxInputEdge: fallbackMaxInputEdge ?? this.fallbackMaxInputEdge,
       processFrameIntervalMs:
           processFrameIntervalMs ?? this.processFrameIntervalMs,
+      singleFlightKeepLatestFrames:
+          singleFlightKeepLatestFrames ?? this.singleFlightKeepLatestFrames,
       detectorInputWidth: detectorInputWidth ?? this.detectorInputWidth,
       detectorInputHeight: detectorInputHeight ?? this.detectorInputHeight,
       trackKeepAliveMs: trackKeepAliveMs ?? this.trackKeepAliveMs,
@@ -189,6 +216,20 @@ class RecognitionRuntimeConfig {
           minRealtimeFaceAreaRatio ?? this.minRealtimeFaceAreaRatio,
       minRealtimeFacePixels:
           minRealtimeFacePixels ?? this.minRealtimeFacePixels,
+      realtimePartialMinFrameQuality:
+          realtimePartialMinFrameQuality ?? this.realtimePartialMinFrameQuality,
+      realtimePartialMinFaceAreaRatio:
+          realtimePartialMinFaceAreaRatio ??
+          this.realtimePartialMinFaceAreaRatio,
+      realtimePartialMinFacePixels:
+          realtimePartialMinFacePixels ?? this.realtimePartialMinFacePixels,
+      realtimePartialMode: realtimePartialMode ?? this.realtimePartialMode,
+      realtimePartialMaxRegions:
+          realtimePartialMaxRegions ?? this.realtimePartialMaxRegions,
+      realtimePartialEnabledRegions:
+          realtimePartialEnabledRegions ?? this.realtimePartialEnabledRegions,
+      realtimePartialFrameCycle:
+          realtimePartialFrameCycle ?? this.realtimePartialFrameCycle,
       minEnrollmentFaceAreaRatio:
           minEnrollmentFaceAreaRatio ?? this.minEnrollmentFaceAreaRatio,
       maxEnrollmentFaceAreaRatio:
@@ -248,6 +289,7 @@ class RecognitionRuntimeConfig {
       'fallbackCaptureIntervalMs': fallbackCaptureIntervalMs,
       'fallbackMaxInputEdge': fallbackMaxInputEdge,
       'processFrameIntervalMs': processFrameIntervalMs,
+      'singleFlightKeepLatestFrames': singleFlightKeepLatestFrames,
       'detectorInputWidth': detectorInputWidth,
       'detectorInputHeight': detectorInputHeight,
       'trackKeepAliveMs': trackKeepAliveMs,
@@ -258,6 +300,13 @@ class RecognitionRuntimeConfig {
       'minRealtimeFrameQuality': minRealtimeFrameQuality,
       'minRealtimeFaceAreaRatio': minRealtimeFaceAreaRatio,
       'minRealtimeFacePixels': minRealtimeFacePixels,
+      'realtimePartialMinFrameQuality': realtimePartialMinFrameQuality,
+      'realtimePartialMinFaceAreaRatio': realtimePartialMinFaceAreaRatio,
+      'realtimePartialMinFacePixels': realtimePartialMinFacePixels,
+      'realtimePartialMode': realtimePartialMode,
+      'realtimePartialMaxRegions': realtimePartialMaxRegions,
+      'realtimePartialEnabledRegions': realtimePartialEnabledRegions,
+      'realtimePartialFrameCycle': realtimePartialFrameCycle,
       'minEnrollmentFaceAreaRatio': minEnrollmentFaceAreaRatio,
       'maxEnrollmentFaceAreaRatio': maxEnrollmentFaceAreaRatio,
       'minEnrollmentFaceAspectRatio': minEnrollmentFaceAspectRatio,
@@ -315,6 +364,15 @@ class RecognitionRuntimeConfig {
       return fallback;
     }
 
+    String s(String key, String fallback) {
+      final value = map[key];
+      if (value is String) {
+        final trimmed = value.trim();
+        return trimmed.isEmpty ? fallback : trimmed;
+      }
+      return fallback;
+    }
+
     return RecognitionRuntimeConfig(
       knownMatchThreshold: d('knownMatchThreshold', 0.945),
       knownStrongThreshold: d('knownStrongThreshold', 0.972),
@@ -327,6 +385,7 @@ class RecognitionRuntimeConfig {
       fallbackCaptureIntervalMs: i('fallbackCaptureIntervalMs', 100),
       fallbackMaxInputEdge: i('fallbackMaxInputEdge', 960),
       processFrameIntervalMs: i('processFrameIntervalMs', 82),
+      singleFlightKeepLatestFrames: i('singleFlightKeepLatestFrames', 1),
       detectorInputWidth: i('detectorInputWidth', 640),
       detectorInputHeight: i('detectorInputHeight', 480),
       trackKeepAliveMs: i('trackKeepAliveMs', 1200),
@@ -337,6 +396,16 @@ class RecognitionRuntimeConfig {
       minRealtimeFrameQuality: d('minRealtimeFrameQuality', 0.28),
       minRealtimeFaceAreaRatio: d('minRealtimeFaceAreaRatio', 0.030),
       minRealtimeFacePixels: i('minRealtimeFacePixels', 52),
+      realtimePartialMinFrameQuality: d('realtimePartialMinFrameQuality', 0.60),
+      realtimePartialMinFaceAreaRatio: d('realtimePartialMinFaceAreaRatio', 0.035),
+      realtimePartialMinFacePixels: i('realtimePartialMinFacePixels', 64),
+      realtimePartialMode: i('realtimePartialMode', 0),
+      realtimePartialMaxRegions: i('realtimePartialMaxRegions', 4),
+      realtimePartialEnabledRegions: s(
+        'realtimePartialEnabledRegions',
+        'forehead,leftEye,rightEye,nose,leftCheek,rightCheek,mouth,chin',
+      ),
+      realtimePartialFrameCycle: i('realtimePartialFrameCycle', 2),
       minEnrollmentFaceAreaRatio: d('minEnrollmentFaceAreaRatio', 0.08),
       maxEnrollmentFaceAreaRatio: d('maxEnrollmentFaceAreaRatio', 0.75),
       minEnrollmentFaceAspectRatio: d('minEnrollmentFaceAspectRatio', 0.65),
