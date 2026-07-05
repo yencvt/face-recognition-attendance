@@ -28,9 +28,6 @@ class RecognitionRuntimeConfig {
     this.minRealtimeFrameQuality = 0.28,
     this.minRealtimeFaceAreaRatio = 0.030,
     this.minRealtimeFacePixels = 52,
-    this.voteWindowSize = 7,
-    this.voteMinCount = 5,
-    this.voteMaxAgeMs = 2200,
     this.minEnrollmentFaceAreaRatio = 0.08,
     this.maxEnrollmentFaceAreaRatio = 0.75,
     this.minEnrollmentFaceAspectRatio = 0.65,
@@ -80,9 +77,6 @@ class RecognitionRuntimeConfig {
   final double minRealtimeFrameQuality;
   final double minRealtimeFaceAreaRatio;
   final int minRealtimeFacePixels;
-  final int voteWindowSize;
-  final int voteMinCount;
-  final int voteMaxAgeMs;
   final double minEnrollmentFaceAreaRatio;
   final double maxEnrollmentFaceAreaRatio;
   final double minEnrollmentFaceAspectRatio;
@@ -132,9 +126,6 @@ class RecognitionRuntimeConfig {
     double? minRealtimeFrameQuality,
     double? minRealtimeFaceAreaRatio,
     int? minRealtimeFacePixels,
-    int? voteWindowSize,
-    int? voteMinCount,
-    int? voteMaxAgeMs,
     double? minEnrollmentFaceAreaRatio,
     double? maxEnrollmentFaceAreaRatio,
     double? minEnrollmentFaceAspectRatio,
@@ -193,11 +184,7 @@ class RecognitionRuntimeConfig {
           minRealtimeFrameQuality ?? this.minRealtimeFrameQuality,
       minRealtimeFaceAreaRatio:
           minRealtimeFaceAreaRatio ?? this.minRealtimeFaceAreaRatio,
-      minRealtimeFacePixels:
-          minRealtimeFacePixels ?? this.minRealtimeFacePixels,
-      voteWindowSize: voteWindowSize ?? this.voteWindowSize,
-      voteMinCount: voteMinCount ?? this.voteMinCount,
-      voteMaxAgeMs: voteMaxAgeMs ?? this.voteMaxAgeMs,
+        minRealtimeFacePixels: minRealtimeFacePixels ?? this.minRealtimeFacePixels,
       minEnrollmentFaceAreaRatio:
           minEnrollmentFaceAreaRatio ?? this.minEnrollmentFaceAreaRatio,
       maxEnrollmentFaceAreaRatio:
@@ -264,9 +251,6 @@ class RecognitionRuntimeConfig {
       'minRealtimeFrameQuality': minRealtimeFrameQuality,
       'minRealtimeFaceAreaRatio': minRealtimeFaceAreaRatio,
       'minRealtimeFacePixels': minRealtimeFacePixels,
-      'voteWindowSize': voteWindowSize,
-      'voteMinCount': voteMinCount,
-      'voteMaxAgeMs': voteMaxAgeMs,
       'minEnrollmentFaceAreaRatio': minEnrollmentFaceAreaRatio,
       'maxEnrollmentFaceAreaRatio': maxEnrollmentFaceAreaRatio,
       'minEnrollmentFaceAspectRatio': minEnrollmentFaceAspectRatio,
@@ -345,9 +329,6 @@ class RecognitionRuntimeConfig {
       minRealtimeFrameQuality: d('minRealtimeFrameQuality', 0.28),
       minRealtimeFaceAreaRatio: d('minRealtimeFaceAreaRatio', 0.030),
       minRealtimeFacePixels: i('minRealtimeFacePixels', 52),
-      voteWindowSize: i('voteWindowSize', 7),
-      voteMinCount: i('voteMinCount', 5),
-      voteMaxAgeMs: i('voteMaxAgeMs', 2200),
       minEnrollmentFaceAreaRatio: d('minEnrollmentFaceAreaRatio', 0.08),
       maxEnrollmentFaceAreaRatio: d('maxEnrollmentFaceAreaRatio', 0.75),
       minEnrollmentFaceAspectRatio: d('minEnrollmentFaceAspectRatio', 0.65),

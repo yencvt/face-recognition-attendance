@@ -39,9 +39,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'minRealtimeFrameQuality': 'Chat luong frame toi thieu realtime',
     'minRealtimeFaceAreaRatio': 'Ty le dien tich mat toi thieu realtime',
     'minRealtimeFacePixels': 'So pixel mat toi thieu realtime',
-    'voteWindowSize': 'So frame trong cua so bo phieu',
-    'voteMinCount': 'So phieu toi thieu de chap nhan',
-    'voteMaxAgeMs': 'Do tuoi toi da cua phieu (ms)',
     'minEnrollmentFaceAreaRatio': 'Ty le dien tich mat toi thieu khi dang ky',
     'maxEnrollmentFaceAreaRatio': 'Ty le dien tich mat toi da khi dang ky',
     'minEnrollmentFaceAspectRatio': 'Ty le khung mat toi thieu khi dang ky',
@@ -110,9 +107,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'Ty le dien tich mat toi thieu tren khung hinh.',
     'minRealtimeFacePixels':
         'Canh ngan nhat cua mat (pixel) de tranh nhan dien mat qua nho.',
-    'voteWindowSize': 'So frame luu trong cua so bo phieu tam thoi.',
-    'voteMinCount': 'So phieu trung khop toi thieu de chap nhan nguoi quen.',
-    'voteMaxAgeMs': 'Do tuoi toi da cua moi phieu trong bo phieu tam thoi.',
     'minEnrollmentFaceAreaRatio':
         'Nguong nho nhat cho dien tich mat khi dang ky.',
     'maxEnrollmentFaceAreaRatio':
@@ -188,9 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _minRealtimeFrameQualityController;
   late TextEditingController _minRealtimeFaceAreaRatioController;
   late TextEditingController _minRealtimeFacePixelsController;
-  late TextEditingController _voteWindowSizeController;
-  late TextEditingController _voteMinCountController;
-  late TextEditingController _voteMaxAgeMsController;
   late TextEditingController _minEnrollmentFaceAreaRatioController;
   late TextEditingController _maxEnrollmentFaceAreaRatioController;
   late TextEditingController _minEnrollmentFaceAspectRatioController;
@@ -288,9 +279,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _minRealtimeFrameQualityController = TextEditingController();
     _minRealtimeFaceAreaRatioController = TextEditingController();
     _minRealtimeFacePixelsController = TextEditingController();
-    _voteWindowSizeController = TextEditingController();
-    _voteMinCountController = TextEditingController();
-    _voteMaxAgeMsController = TextEditingController();
     _minEnrollmentFaceAreaRatioController = TextEditingController();
     _maxEnrollmentFaceAreaRatioController = TextEditingController();
     _minEnrollmentFaceAspectRatioController = TextEditingController();
@@ -393,12 +381,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             .toString();
         _minRealtimeFacePixelsController.text = recognitionConfig
             .minRealtimeFacePixels
-            .toString();
-        _voteWindowSizeController.text = recognitionConfig.voteWindowSize
-            .toString();
-        _voteMinCountController.text = recognitionConfig.voteMinCount
-            .toString();
-        _voteMaxAgeMsController.text = recognitionConfig.voteMaxAgeMs
             .toString();
         _minEnrollmentFaceAreaRatioController.text = recognitionConfig
             .minEnrollmentFaceAreaRatio
@@ -645,9 +627,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _minRealtimeFacePixelsController,
           'minRealtimeFacePixels',
         ),
-        voteWindowSize: parseInt(_voteWindowSizeController, 'voteWindowSize'),
-        voteMinCount: parseInt(_voteMinCountController, 'voteMinCount'),
-        voteMaxAgeMs: parseInt(_voteMaxAgeMsController, 'voteMaxAgeMs'),
         minEnrollmentFaceAreaRatio: parseDouble(
           _minEnrollmentFaceAreaRatioController,
           'minEnrollmentFaceAreaRatio',
@@ -819,9 +798,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .toString();
     _minRealtimeFacePixelsController.text = config.minRealtimeFacePixels
         .toString();
-    _voteWindowSizeController.text = config.voteWindowSize.toString();
-    _voteMinCountController.text = config.voteMinCount.toString();
-    _voteMaxAgeMsController.text = config.voteMaxAgeMs.toString();
     _minEnrollmentFaceAreaRatioController.text = config
         .minEnrollmentFaceAreaRatio
         .toString();
@@ -880,9 +856,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.28,
       minRealtimeFaceAreaRatio: 0.05,
       minRealtimeFacePixels: 72,
-      voteWindowSize: 7,
-      voteMinCount: 5,
-      voteMaxAgeMs: 2400,
       scrfdScoreThreshold: 0.62,
       scrfdNmsThreshold: 0.34,
       autoTuneRecognitionParameters: false,
@@ -901,9 +874,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.22,
       minRealtimeFaceAreaRatio: 0.035,
       minRealtimeFacePixels: 56,
-      voteWindowSize: 5,
-      voteMinCount: 3,
-      voteMaxAgeMs: 1800,
       scrfdScoreThreshold: 0.55,
       scrfdNmsThreshold: 0.38,
       hnswM: 20,
@@ -928,9 +898,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.33,
       minRealtimeFaceAreaRatio: 0.06,
       minRealtimeFacePixels: 80,
-      voteWindowSize: 9,
-      voteMinCount: 7,
-      voteMaxAgeMs: 2800,
       scrfdInputSize: 640,
       scrfdScoreThreshold: 0.66,
       scrfdNmsThreshold: 0.32,
@@ -956,9 +923,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.20,
       minRealtimeFaceAreaRatio: 0.015,
       minRealtimeFacePixels: 30,
-      voteWindowSize: 5,
-      voteMinCount: 3,
-      voteMaxAgeMs: 2000,
       scrfdInputSize: 640,
       scrfdScoreThreshold: 0.50,
       scrfdNmsThreshold: 0.36,
@@ -984,9 +948,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.16,
       minRealtimeFaceAreaRatio: 0.026,
       minRealtimeFacePixels: 44,
-      voteWindowSize: 3,
-      voteMinCount: 2,
-      voteMaxAgeMs: 1200,
       scrfdInputSize: 512,
       scrfdScoreThreshold: 0.47,
       scrfdNmsThreshold: 0.42,
@@ -1006,9 +967,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.30,
       minRealtimeFaceAreaRatio: 0.055,
       minRealtimeFacePixels: 76,
-      voteWindowSize: 8,
-      voteMinCount: 6,
-      voteMaxAgeMs: 2600,
       scrfdInputSize: 640,
       scrfdScoreThreshold: 0.64,
       scrfdNmsThreshold: 0.33,
@@ -1034,9 +992,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       minRealtimeFrameQuality: 0.15,
       minRealtimeFaceAreaRatio: 0.024,
       minRealtimeFacePixels: 42,
-      voteWindowSize: 4,
-      voteMinCount: 2,
-      voteMaxAgeMs: 1300,
       scrfdInputSize: 512,
       scrfdScoreThreshold: 0.45,
       scrfdNmsThreshold: 0.44,
@@ -1194,9 +1149,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _minRealtimeFrameQualityController.dispose();
     _minRealtimeFaceAreaRatioController.dispose();
     _minRealtimeFacePixelsController.dispose();
-    _voteWindowSizeController.dispose();
-    _voteMinCountController.dispose();
-    _voteMaxAgeMsController.dispose();
     _minEnrollmentFaceAreaRatioController.dispose();
     _maxEnrollmentFaceAreaRatioController.dispose();
     _minEnrollmentFaceAspectRatioController.dispose();
@@ -1349,49 +1301,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Row(
                             children: [
                               Icon(
-                                Icons.fact_check_outlined,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Module test nhan dien bang anh',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Upload anh, chon danh sach doi tuong can nhan dien, sau do bam Kiem tra de danh gia PASS/FAILED doc lap voi luong camera.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            onPressed: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ImageRecognitionTestScreen(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.image_search),
-                            label: const Text('Mo module test anh'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
                                 Icons.manage_accounts,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
@@ -1483,510 +1392,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                'Cau hinh tham so nhan dien (ap dung ngay)',
+                                'Cau hinh nhan dien',
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Tat ca tham so duoc luu DB va service se cap nhat real-time, khong can sua code.',
+                            'Tham so recognition da duoc chuyen sang man Test nhan dien tu anh upload de tranh trung lap voi Settings he thong.',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 8,
+                          Row(
                             children: [
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('accuracy'),
-                                icon: const Icon(Icons.bolt),
-                                label: const Text('Accuracy cao'),
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('balanced'),
-                                icon: const Icon(Icons.balance),
-                                label: const Text('Can bang'),
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('speed'),
-                                icon: const Icon(Icons.speed),
-                                label: const Text('Toc do cao'),
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('strict'),
-                                icon: const Icon(Icons.gpp_good),
-                                label: const Text('Chong nhan nham'),
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('low-light'),
-                                icon: const Icon(Icons.dark_mode),
-                                label: const Text('Anh sang yeu'),
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('far-distance'),
-                                icon: const Icon(Icons.zoom_out_map),
-                                label: const Text('Xa camera'),
-                              ),
-                              FilledButton.tonalIcon(
-                                onPressed: () =>
-                                    _applyRecognitionPreset('recall'),
-                                icon: const Icon(Icons.person_search),
-                                label: const Text('Uu tien khong bo sot'),
-                              ),
-                              Chip(
-                                label: Text(
-                                  'Preset: ${_presetDisplayName(_selectedRecognitionPreset)}',
+                              Expanded(
+                                child: Text(
+                                  'Tiep tuc cau hinh va ap dung tham so real-time ngay trong popup cua man test anh.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Mo phan nang cao khi can tinh chinh chi tiet. Mac dinh thu gon de man hinh Settings muot hon.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 8),
-                          ExpansionTile(
-                            tilePadding: EdgeInsets.zero,
-                            childrenPadding: const EdgeInsets.only(bottom: 8),
-                            maintainState: false,
-                            initiallyExpanded: _isRecognitionAdvancedExpanded,
-                            onExpansionChanged: (expanded) {
-                              setState(() {
-                                _isRecognitionAdvancedExpanded = expanded;
-                              });
-                            },
-                            title: const Text(
-                              'Tham so nang cao (toi uu/chuan doan)',
-                            ),
-                            subtitle: const Text(
-                              'Chi render khi mo ra de giam giat lag luc vao Settings.',
-                            ),
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Accuracy cao: tang do chac chan, giam nham lan, doi hoi anh/chat luong tot.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                              const SizedBox(width: 12),
+                              FilledButton.icon(
+                                onPressed: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ImageRecognitionTestScreen(),
                                     ),
-                                    Text(
-                                      'Can bang: thong so mac dinh cho van hanh chung.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                    Text(
-                                      'Toc do cao: uu tien toc do, chap nhan giam do chac chan.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                    Text(
-                                      'Chong nhan nham: uu tien khong nhan nguoi la thanh nguoi that (siet manh).',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                    Text(
-                                      'Anh sang yeu: can bang cho moi truong toi/anh xau, siet nham lan nhung van giu do on dinh cho frame tot.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                    Text(
-                                      'Xa camera: giam nguong cho mat nho/far, uu tien giu mat o xa van duoc nhan dien thay vi bo qua.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                    Text(
-                                      'Uu tien khong bo sot: uu tien nhan ra nguoi that, co the tang nham lan neu moi truong xau.',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Wrap(
-                                spacing: 12,
-                                runSpacing: 12,
-                                children: [
-                                  _buildRecognitionTextField(
-                                    controller: _knownMatchThresholdController,
-                                    label: _recognitionLabel(
-                                      'knownMatchThreshold',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _knownStrongThresholdController,
-                                    label: _recognitionLabel(
-                                      'knownStrongThreshold',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _knownCalibratedThresholdController,
-                                    label: _recognitionLabel(
-                                      'knownCalibratedThreshold',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _knownMatchMarginController,
-                                    label: _recognitionLabel(
-                                      'knownMatchMargin',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _minTemplateSharpnessController,
-                                    label: _recognitionLabel(
-                                      'minTemplateSharpness',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _cameraCalibrationDurationMsController,
-                                    label: _recognitionLabel(
-                                      'cameraCalibrationDurationMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _calibrationLogThrottleMsController,
-                                    label: _recognitionLabel(
-                                      'calibrationLogThrottleMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _fallbackSkipLogIntervalMsController,
-                                    label: _recognitionLabel(
-                                      'fallbackSkipLogIntervalMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _fallbackCaptureIntervalMsController,
-                                    label: _recognitionLabel(
-                                      'fallbackCaptureIntervalMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _fallbackMaxInputEdgeController,
-                                    label: _recognitionLabel(
-                                      'fallbackMaxInputEdge',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _processFrameIntervalMsController,
-                                    label: _recognitionLabel(
-                                      'processFrameIntervalMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _detectorInputWidthController,
-                                    label: _recognitionLabel(
-                                      'detectorInputWidth',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _detectorInputHeightController,
-                                    label: _recognitionLabel(
-                                      'detectorInputHeight',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _trackKeepAliveMsController,
-                                    label: _recognitionLabel(
-                                      'trackKeepAliveMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _trackMatchMinScoreController,
-                                    label: _recognitionLabel(
-                                      'trackMatchMinScore',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _bboxSmoothingAlphaController,
-                                    label: _recognitionLabel(
-                                      'bboxSmoothingAlpha',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _annotatedFrameMinIntervalMsController,
-                                    label: _recognitionLabel(
-                                      'annotatedFrameMinIntervalMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _eventPublishIntervalMsController,
-                                    label: _recognitionLabel(
-                                      'eventPublishIntervalMs',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _minRealtimeFrameQualityController,
-                                    label: _recognitionLabel(
-                                      'minRealtimeFrameQuality',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _minRealtimeFaceAreaRatioController,
-                                    label: _recognitionLabel(
-                                      'minRealtimeFaceAreaRatio',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _minRealtimeFacePixelsController,
-                                    label: _recognitionLabel(
-                                      'minRealtimeFacePixels',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _voteWindowSizeController,
-                                    label: _recognitionLabel('voteWindowSize'),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _voteMinCountController,
-                                    label: _recognitionLabel('voteMinCount'),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _voteMaxAgeMsController,
-                                    label: _recognitionLabel('voteMaxAgeMs'),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _minEnrollmentFaceAreaRatioController,
-                                    label: _recognitionLabel(
-                                      'minEnrollmentFaceAreaRatio',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _maxEnrollmentFaceAreaRatioController,
-                                    label: _recognitionLabel(
-                                      'maxEnrollmentFaceAreaRatio',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _minEnrollmentFaceAspectRatioController,
-                                    label: _recognitionLabel(
-                                      'minEnrollmentFaceAspectRatio',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _maxEnrollmentFaceAspectRatioController,
-                                    label: _recognitionLabel(
-                                      'maxEnrollmentFaceAspectRatio',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _minEnrollmentFacePixelsController,
-                                    label: _recognitionLabel(
-                                      'minEnrollmentFacePixels',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _scrfdInputSizeController,
-                                    label: _recognitionLabel('scrfdInputSize'),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _scrfdScoreThresholdController,
-                                    label: _recognitionLabel(
-                                      'scrfdScoreThreshold',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _scrfdNmsThresholdController,
-                                    label: _recognitionLabel(
-                                      'scrfdNmsThreshold',
-                                    ),
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _hnswMController,
-                                    label: _recognitionLabel('hnswM'),
-                                    parameterKey: 'hnswM',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _hnswEfConstructionController,
-                                    label: _recognitionLabel(
-                                      'hnswEfConstruction',
-                                    ),
-                                    parameterKey: 'hnswEfConstruction',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _hnswEfSearchController,
-                                    label: _recognitionLabel('hnswEfSearch'),
-                                    parameterKey: 'hnswEfSearch',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _eyeRegionMinQualityController,
-                                    label: _recognitionLabel(
-                                      'eyeRegionMinQuality',
-                                    ),
-                                    parameterKey: 'eyeRegionMinQuality',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _noseRegionMinQualityController,
-                                    label: _recognitionLabel(
-                                      'noseRegionMinQuality',
-                                    ),
-                                    parameterKey: 'noseRegionMinQuality',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _mouthRegionMinQualityController,
-                                    label: _recognitionLabel(
-                                      'mouthRegionMinQuality',
-                                    ),
-                                    parameterKey: 'mouthRegionMinQuality',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _realtimeInputBrightnessController,
-                                    label: _recognitionLabel(
-                                      'realtimeInputBrightness',
-                                    ),
-                                    parameterKey: 'realtimeInputBrightness',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _realtimeInputContrastController,
-                                    label: _recognitionLabel(
-                                      'realtimeInputContrast',
-                                    ),
-                                    parameterKey: 'realtimeInputContrast',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller: _realtimeInputGammaController,
-                                    label: _recognitionLabel(
-                                      'realtimeInputGamma',
-                                    ),
-                                    parameterKey: 'realtimeInputGamma',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _realtimeInputSaturationController,
-                                    label: _recognitionLabel(
-                                      'realtimeInputSaturation',
-                                    ),
-                                    parameterKey: 'realtimeInputSaturation',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _autoTuneMaxSharpenAmountController,
-                                    label: _recognitionLabel(
-                                      'autoTuneMaxSharpenAmount',
-                                    ),
-                                    parameterKey: 'autoTuneMaxSharpenAmount',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _autoTuneLowLightThresholdController,
-                                    label: _recognitionLabel(
-                                      'autoTuneLowLightThreshold',
-                                    ),
-                                    parameterKey: 'autoTuneLowLightThreshold',
-                                  ),
-                                  _buildRecognitionTextField(
-                                    controller:
-                                        _autoTuneOverExposureThresholdController,
-                                    label: _recognitionLabel(
-                                      'autoTuneOverExposureThreshold',
-                                    ),
-                                    parameterKey:
-                                        'autoTuneOverExposureThreshold',
-                                  ),
-                                ],
+                                  );
+                                },
+                                icon: const Icon(Icons.image_search),
+                                label: const Text('Mo man test anh'),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 8),
-                          SwitchListTile(
-                            title: const Text(
-                              'Tu dong dieu chinh tham so realtime',
-                            ),
-                            subtitle: const Text(
-                              'He thong tu nắn nguong theo chat luong anh va kich thuoc khuon mat trong luc chay',
-                            ),
-                            value: _autoTuneRecognitionParameters,
-                            onChanged: (value) {
-                              setState(() {
-                                _autoTuneRecognitionParameters = value;
-                              });
-                            },
-                          ),
-                          SwitchListTile(
-                            title: const Text('Overlay debug realtime'),
-                            subtitle: const Text(
-                              'Hien thi globalScore, partialScore va trong so mat/mui/mieng tren bbox',
-                            ),
-                            value: _debugRealtimeOverlay,
-                            onChanged: (value) {
-                              setState(() {
-                                _debugRealtimeOverlay = value;
-                              });
-                            },
-                          ),
-                          SwitchListTile(
-                            title: const Text(
-                              'Bat trace log chi tiet realtime',
-                            ),
-                            subtitle: const Text(
-                              'DecisionTrace, Match decision, GateSkip, CalibTop2. Tat de giam cham IO log.',
-                            ),
-                            value: _enableTraceLogs,
-                            onChanged: (value) {
-                              setState(() {
-                                _enableTraceLogs = value;
-                              });
-                            },
-                          ),
-                          SwitchListTile(
-                            title: const Text('Bat perf log'),
-                            subtitle: const Text(
-                              'Ghi log Perf[ws]/Perf[db] de do tre he thong.',
-                            ),
-                            value: _enablePerfLogs,
-                            onChanged: (value) {
-                              setState(() {
-                                _enablePerfLogs = value;
-                              });
-                            },
-                          ),
-                          SwitchListTile(
-                            title: const Text('Xu ly input: ep den trang'),
-                            subtitle: const Text(
-                              'Ap dung tren crop mat realtime truoc khi tinh quality/spoof/embedding.',
-                            ),
-                            value: _realtimeInputGrayscale,
-                            onChanged: (value) {
-                              setState(() {
-                                _realtimeInputGrayscale = value;
-                              });
-                            },
                           ),
                         ],
                       ),
