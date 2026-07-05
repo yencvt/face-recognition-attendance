@@ -1030,6 +1030,8 @@ class FaceRecognitionService {
   double get _realtimeInputGamma => _runtimeConfig.realtimeInputGamma;
   double get _realtimeInputSaturation => _runtimeConfig.realtimeInputSaturation;
   bool get _realtimeInputGrayscale => _runtimeConfig.realtimeInputGrayscale;
+  bool get _realtimeCropFacesFromCameraImage =>
+      _runtimeConfig.realtimeCropFacesFromCameraImage;
   double get _autoTuneMaxSharpenAmount =>
       _runtimeConfig.autoTuneMaxSharpenAmount;
   double get _autoTuneLowLightThreshold =>
@@ -2741,7 +2743,10 @@ class FaceRecognitionService {
             minFacePixels,
             nowMs,
           );
-          final crop = _selectRecognitionCrop(source: rgb, rect: rect, mesh: f);
+          final crop = _realtimeCropFacesFromCameraImage
+              ? (_cameraImageFaceToRgb(image, rect) ??
+                    _selectRecognitionCrop(source: rgb, rect: rect, mesh: f))
+              : _selectRecognitionCrop(source: rgb, rect: rect, mesh: f);
           if (crop == null) continue;
 
           var workingCrop = crop;
@@ -5598,7 +5603,7 @@ class FaceRecognitionService {
         : candidatePersonIds
               .map((id) => _templatesByPersonId[id])
               .whereType<_PersonScoreBucket>();
-      final probePartials = partialBundle ?? const _PartialEmbeddingBundle();
+    final probePartials = partialBundle ?? const _PartialEmbeddingBundle();
     final scoredBuckets = searchBuckets.where(
       (bucket) =>
           bucket.templates.isNotEmpty && !excluded.contains(bucket.person.id),
@@ -6633,6 +6638,91 @@ class FaceRecognitionService {
         output.setPixelRgb(x, y, r, g, b);
       }
     }
+    return output;
+  }
+
+  img.Image? _cameraImageFaceToRgb(CameraImage image, Rect rect) {
+    final shortestSide = math.min(rect.width, rect.height);
+    final adaptivePadding = shortestSide < 64
+        ? 0.14
+        : shortestSide < 96
+        ? 0.06
+        : shortestSide < 160
+        ? 0.0
+        : shortestSide < 256
+        ? 0.03
+        : 0.05;
+    final paddedRect = _expandRect(
+      rect,
+      imageWidth: image.width,
+      imageHeight: image.height,
+      paddingRatio: adaptivePadding,
+    );
+    final left = paddedRect.left.floor().clamp(0, image.width - 1);
+    final top = paddedRect.top.floor().clamp(0, image.height - 1);
+    final width = paddedRect.width.ceil().clamp(8, image.width - left);
+    final height = paddedRect.height.ceil().clamp(8, image.height - top);
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+
+    if (image.format.group == ImageFormatGroup.bgra8888 &&
+        image.planes.isNotEmpty) {
+      final plane = image.planes.first;
+      final bytes = plane.bytes;
+      final rowStride = plane.bytesPerRow;
+      final pixelStride = plane.bytesPerPixel ?? 4;
+      final output = img.Image(width: width, height: height);
+      for (var y = 0; y < height; y++) {
+        final sourceY = top + y;
+        final rowStart = sourceY * rowStride;
+        for (var x = 0; x < width; x++) {
+          final sourceX = left + x;
+          final index = rowStart + sourceX * pixelStride;
+          if (index + 3 >= bytes.length) {
+            continue;
+          }
+          final b = bytes[index];
+          final g = bytes[index + 1];
+          final r = bytes[index + 2];
+          final a = bytes[index + 3];
+          output.setPixelRgba(x, y, r, g, b, a);
+        }
+      }
+      return output;
+    }
+
+    if (image.format.group != ImageFormatGroup.yuv420 ||
+        image.planes.length < 3) {
+      return null;
+    }
+
+    final yPlane = image.planes[0];
+    final uPlane = image.planes[1];
+    final vPlane = image.planes[2];
+    final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+    final output = img.Image(width: width, height: height);
+
+    for (var y = 0; y < height; y++) {
+      final sourceY = top + y;
+      final yRow = sourceY * yPlane.bytesPerRow;
+      final uvRow = (sourceY >> 1) * uPlane.bytesPerRow;
+      for (var x = 0; x < width; x++) {
+        final sourceX = left + x;
+        final yp = yPlane.bytes[yRow + sourceX];
+        final uvOffset = uvRow + (sourceX >> 1) * uvPixelStride;
+        final up = uPlane.bytes[uvOffset];
+        final vp = vPlane.bytes[uvOffset];
+
+        final r = (yp + 1.402 * (vp - 128)).round().clamp(0, 255);
+        final g = (yp - 0.344136 * (up - 128) - 0.714136 * (vp - 128))
+            .round()
+            .clamp(0, 255);
+        final b = (yp + 1.772 * (up - 128)).round().clamp(0, 255);
+        output.setPixelRgb(x, y, r, g, b);
+      }
+    }
+
     return output;
   }
 

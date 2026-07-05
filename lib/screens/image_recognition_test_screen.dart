@@ -54,6 +54,8 @@ class _ImageRecognitionTestScreenState
     'enableTraceLogs': 'Bat trace log chi tiet realtime',
     'enablePerfLogs': 'Bat perf log do tre',
     'realtimeInputGrayscale': 'Ep anh realtime sang den trang',
+    'realtimeCropFacesFromCameraImage':
+        'Realtime: cat tung face truc tiep tu CameraImage',
   };
 
   static const List<_RecognitionSectionDef> _configSections = [
@@ -298,6 +300,7 @@ class _ImageRecognitionTestScreenState
         'enableTraceLogs',
         'enablePerfLogs',
         'realtimeInputGrayscale',
+        'realtimeCropFacesFromCameraImage',
       ],
     ),
   ];
@@ -323,6 +326,7 @@ class _ImageRecognitionTestScreenState
   bool _enableTraceLogs = false;
   bool _enablePerfLogs = false;
   bool _realtimeInputGrayscale = false;
+  bool _realtimeCropFacesFromCameraImage = false;
   _GalleryCompareMode _galleryCompareMode = _GalleryCompareMode.selectedPeople;
   double _matchThreshold = 0.55;
   UploadedImageRecognitionResult? _result;
@@ -476,6 +480,7 @@ class _ImageRecognitionTestScreenState
     _enableTraceLogs = config.enableTraceLogs;
     _enablePerfLogs = config.enablePerfLogs;
     _realtimeInputGrayscale = config.realtimeInputGrayscale;
+    _realtimeCropFacesFromCameraImage = config.realtimeCropFacesFromCameraImage;
   }
 
   int _parseIntField(String key, String label) {
@@ -657,6 +662,7 @@ class _ImageRecognitionTestScreenState
           'Bao hoa input realtime',
         ),
         realtimeInputGrayscale: _realtimeInputGrayscale,
+        realtimeCropFacesFromCameraImage: _realtimeCropFacesFromCameraImage,
         autoTuneMaxSharpenAmount: _parseDoubleField(
           'autoTuneMaxSharpenAmount',
           'Sharpen toi da cua auto tune',
@@ -1783,6 +1789,7 @@ class _ImageRecognitionTestScreenState
       'enableTraceLogs' => _enableTraceLogs,
       'enablePerfLogs' => _enablePerfLogs,
       'realtimeInputGrayscale' => _realtimeInputGrayscale,
+      'realtimeCropFacesFromCameraImage' => _realtimeCropFacesFromCameraImage,
       _ => false,
     };
 
@@ -1812,6 +1819,9 @@ class _ImageRecognitionTestScreenState
                 break;
               case 'realtimeInputGrayscale':
                 _realtimeInputGrayscale = nextValue;
+                break;
+              case 'realtimeCropFacesFromCameraImage':
+                _realtimeCropFacesFromCameraImage = nextValue;
                 break;
             }
           });

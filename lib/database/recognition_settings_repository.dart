@@ -51,6 +51,7 @@ class RecognitionRuntimeConfig {
     this.realtimeInputGamma = 1.0,
     this.realtimeInputSaturation = 1.0,
     this.realtimeInputGrayscale = false,
+    this.realtimeCropFacesFromCameraImage = false,
     this.autoTuneMaxSharpenAmount = 1.0,
     this.autoTuneLowLightThreshold = 0.40,
     this.autoTuneOverExposureThreshold = 0.74,
@@ -100,6 +101,7 @@ class RecognitionRuntimeConfig {
   final double realtimeInputGamma;
   final double realtimeInputSaturation;
   final bool realtimeInputGrayscale;
+  final bool realtimeCropFacesFromCameraImage;
   final double autoTuneMaxSharpenAmount;
   final double autoTuneLowLightThreshold;
   final double autoTuneOverExposureThreshold;
@@ -149,6 +151,7 @@ class RecognitionRuntimeConfig {
     double? realtimeInputGamma,
     double? realtimeInputSaturation,
     bool? realtimeInputGrayscale,
+    bool? realtimeCropFacesFromCameraImage,
     double? autoTuneMaxSharpenAmount,
     double? autoTuneLowLightThreshold,
     double? autoTuneOverExposureThreshold,
@@ -184,7 +187,8 @@ class RecognitionRuntimeConfig {
           minRealtimeFrameQuality ?? this.minRealtimeFrameQuality,
       minRealtimeFaceAreaRatio:
           minRealtimeFaceAreaRatio ?? this.minRealtimeFaceAreaRatio,
-        minRealtimeFacePixels: minRealtimeFacePixels ?? this.minRealtimeFacePixels,
+      minRealtimeFacePixels:
+          minRealtimeFacePixels ?? this.minRealtimeFacePixels,
       minEnrollmentFaceAreaRatio:
           minEnrollmentFaceAreaRatio ?? this.minEnrollmentFaceAreaRatio,
       maxEnrollmentFaceAreaRatio:
@@ -219,11 +223,14 @@ class RecognitionRuntimeConfig {
           realtimeInputSaturation ?? this.realtimeInputSaturation,
       realtimeInputGrayscale:
           realtimeInputGrayscale ?? this.realtimeInputGrayscale,
-        autoTuneMaxSharpenAmount:
+      realtimeCropFacesFromCameraImage:
+          realtimeCropFacesFromCameraImage ??
+          this.realtimeCropFacesFromCameraImage,
+      autoTuneMaxSharpenAmount:
           autoTuneMaxSharpenAmount ?? this.autoTuneMaxSharpenAmount,
-        autoTuneLowLightThreshold:
+      autoTuneLowLightThreshold:
           autoTuneLowLightThreshold ?? this.autoTuneLowLightThreshold,
-        autoTuneOverExposureThreshold:
+      autoTuneOverExposureThreshold:
           autoTuneOverExposureThreshold ?? this.autoTuneOverExposureThreshold,
     );
   }
@@ -274,6 +281,7 @@ class RecognitionRuntimeConfig {
       'realtimeInputGamma': realtimeInputGamma,
       'realtimeInputSaturation': realtimeInputSaturation,
       'realtimeInputGrayscale': realtimeInputGrayscale,
+      'realtimeCropFacesFromCameraImage': realtimeCropFacesFromCameraImage,
       'autoTuneMaxSharpenAmount': autoTuneMaxSharpenAmount,
       'autoTuneLowLightThreshold': autoTuneLowLightThreshold,
       'autoTuneOverExposureThreshold': autoTuneOverExposureThreshold,
@@ -352,6 +360,10 @@ class RecognitionRuntimeConfig {
       realtimeInputGamma: d('realtimeInputGamma', 1.0),
       realtimeInputSaturation: d('realtimeInputSaturation', 1.0),
       realtimeInputGrayscale: b('realtimeInputGrayscale', false),
+      realtimeCropFacesFromCameraImage: b(
+        'realtimeCropFacesFromCameraImage',
+        false,
+      ),
       autoTuneMaxSharpenAmount: d('autoTuneMaxSharpenAmount', 1.0),
       autoTuneLowLightThreshold: d('autoTuneLowLightThreshold', 0.40),
       autoTuneOverExposureThreshold: d('autoTuneOverExposureThreshold', 0.74),
