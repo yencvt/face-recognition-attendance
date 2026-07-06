@@ -75,6 +75,8 @@ class _ImageRecognitionTestScreenState
       'Chu kỳ chụp fallback (ms)': 'Fallback capture interval (ms)',
       'Cạnh tối đa ảnh fallback (px)': 'Fallback max input edge (px)',
       'Chu kỳ xử lý khung hình (ms)': 'Frame processing interval (ms)',
+      'Số luồng xử lý nhận diện song song':
+        'Parallel recognition worker count',
       'Số khung hình giữ lại của xử lý đơn luồng': 'Keep-latest frame count',
       'Chiều rộng đầu vào bộ phát hiện': 'Detector input width',
       'Chiều cao đầu vào bộ phát hiện': 'Detector input height',
@@ -142,6 +144,8 @@ class _ImageRecognitionTestScreenState
       'enablePerfLogs': 'Enable performance logs',
       'realtimeCropFacesFromCameraImage':
           'Realtime: crop faces directly from camera image',
+        'enableIsolatePreprocessing':
+          'Enable isolate preprocessing and fallback vector embedding',
     };
     return _l(context, vi, en[key] ?? vi);
   }
@@ -154,6 +158,8 @@ class _ImageRecognitionTestScreenState
     'enablePerfLogs': 'Bật nhật ký hiệu năng độ trễ',
     'realtimeCropFacesFromCameraImage':
         'Thời gian thực: cắt từng khuôn mặt trực tiếp từ ảnh camera',
+    'enableIsolatePreprocessing':
+      'Bật isolate preprocessing và fallback vector embedding',
   };
 
   static const List<_RecognitionSectionDef> _configSections = [
@@ -213,6 +219,11 @@ class _ImageRecognitionTestScreenState
         _RecognitionFieldDef(
           key: 'processFrameIntervalMs',
           label: 'Chu kỳ xử lý khung hình (ms)',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
+          key: 'maxConcurrentFrameWorkers',
+          label: 'Số luồng xử lý nhận diện song song',
           isInt: true,
         ),
         _RecognitionFieldDef(
@@ -393,6 +404,7 @@ class _ImageRecognitionTestScreenState
         'enableTraceLogs',
         'enablePerfLogs',
         'realtimeCropFacesFromCameraImage',
+        'enableIsolatePreprocessing',
       ],
     ),
   ];
@@ -418,6 +430,7 @@ class _ImageRecognitionTestScreenState
   bool _enableTraceLogs = false;
   bool _enablePerfLogs = false;
   bool _realtimeCropFacesFromCameraImage = false;
+  bool _enableIsolatePreprocessing = true;
   final Set<String> _expandedConfigSections = <String>{
     'Ngưỡng nhận diện',
     'Chất lượng thời gian thực',
@@ -512,6 +525,9 @@ class _ImageRecognitionTestScreenState
     _configControllers['processFrameIntervalMs']!.text = config
         .processFrameIntervalMs
         .toString();
+    _configControllers['maxConcurrentFrameWorkers']!.text = config
+      .maxConcurrentFrameWorkers
+      .toString();
     _configControllers['singleFlightKeepLatestFrames']!.text = config
         .singleFlightKeepLatestFrames
         .toString();
@@ -603,6 +619,7 @@ class _ImageRecognitionTestScreenState
     _enableTraceLogs = config.enableTraceLogs;
     _enablePerfLogs = config.enablePerfLogs;
     _realtimeCropFacesFromCameraImage = config.realtimeCropFacesFromCameraImage;
+    _enableIsolatePreprocessing = config.enableIsolatePreprocessing;
   }
 
   int _parseIntField(String key, String label) {
@@ -640,7 +657,9 @@ class _ImageRecognitionTestScreenState
     onStateChanged?.call();
 
     try {
-      final config = RecognitionRuntimeConfig(
+      final currentConfig =
+          await RecognitionSettingsRepository.getOrCreateDefaultConfig();
+      final config = currentConfig.copyWith(
         knownMatchThreshold: _parseDoubleField(
           'knownMatchThreshold',
           'Ngưỡng khớp khuôn mặt',
@@ -680,6 +699,10 @@ class _ImageRecognitionTestScreenState
         processFrameIntervalMs: _parseIntField(
           'processFrameIntervalMs',
           'Chu kỳ xử lý khung hình (ms)',
+        ),
+        maxConcurrentFrameWorkers: _parseIntField(
+          'maxConcurrentFrameWorkers',
+          'Số luồng xử lý nhận diện song song',
         ),
         singleFlightKeepLatestFrames: _parseIntField(
           'singleFlightKeepLatestFrames',
@@ -802,6 +825,7 @@ class _ImageRecognitionTestScreenState
         enableTraceLogs: _enableTraceLogs,
         enablePerfLogs: _enablePerfLogs,
         realtimeCropFacesFromCameraImage: _realtimeCropFacesFromCameraImage,
+        enableIsolatePreprocessing: _enableIsolatePreprocessing,
         autoTuneMaxSharpenAmount: _parseDoubleField(
           'autoTuneMaxSharpenAmount',
           'Mức làm sắc nét tự động tối đa',
@@ -2322,6 +2346,7 @@ class _ImageRecognitionTestScreenState
       'enableTraceLogs' => _enableTraceLogs,
       'enablePerfLogs' => _enablePerfLogs,
       'realtimeCropFacesFromCameraImage' => _realtimeCropFacesFromCameraImage,
+      'enableIsolatePreprocessing' => _enableIsolatePreprocessing,
       _ => false,
     };
 
@@ -2352,6 +2377,9 @@ class _ImageRecognitionTestScreenState
                 break;
               case 'realtimeCropFacesFromCameraImage':
                 _realtimeCropFacesFromCameraImage = nextValue;
+                break;
+              case 'enableIsolatePreprocessing':
+                _enableIsolatePreprocessing = nextValue;
                 break;
             }
           });

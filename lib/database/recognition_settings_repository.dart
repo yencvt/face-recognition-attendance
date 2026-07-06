@@ -17,6 +17,7 @@ class RecognitionRuntimeConfig {
     this.fallbackCaptureIntervalMs = 100,
     this.fallbackMaxInputEdge = 960,
     this.processFrameIntervalMs = 82,
+    this.maxConcurrentFrameWorkers = 2,
     this.singleFlightKeepLatestFrames = 1,
     this.detectorInputWidth = 640,
     this.detectorInputHeight = 480,
@@ -53,7 +54,9 @@ class RecognitionRuntimeConfig {
     this.debugRealtimeOverlay = true,
     this.enableTraceLogs = false,
     this.enablePerfLogs = false,
+    this.showRealtimeFpsBadge = true,
     this.realtimeCropFacesFromCameraImage = false,
+    this.enableIsolatePreprocessing = true,
     this.autoTuneMaxSharpenAmount = 1.0,
   });
 
@@ -67,6 +70,7 @@ class RecognitionRuntimeConfig {
   final int fallbackCaptureIntervalMs;
   final int fallbackMaxInputEdge;
   final int processFrameIntervalMs;
+  final int maxConcurrentFrameWorkers;
   final int singleFlightKeepLatestFrames;
   final int detectorInputWidth;
   final int detectorInputHeight;
@@ -102,7 +106,9 @@ class RecognitionRuntimeConfig {
   final bool debugRealtimeOverlay;
   final bool enableTraceLogs;
   final bool enablePerfLogs;
+  final bool showRealtimeFpsBadge;
   final bool realtimeCropFacesFromCameraImage;
+  final bool enableIsolatePreprocessing;
   final double autoTuneMaxSharpenAmount;
 
   RecognitionRuntimeConfig copyWith({
@@ -116,6 +122,7 @@ class RecognitionRuntimeConfig {
     int? fallbackCaptureIntervalMs,
     int? fallbackMaxInputEdge,
     int? processFrameIntervalMs,
+    int? maxConcurrentFrameWorkers,
     int? singleFlightKeepLatestFrames,
     int? detectorInputWidth,
     int? detectorInputHeight,
@@ -151,7 +158,9 @@ class RecognitionRuntimeConfig {
     bool? debugRealtimeOverlay,
     bool? enableTraceLogs,
     bool? enablePerfLogs,
+    bool? showRealtimeFpsBadge,
     bool? realtimeCropFacesFromCameraImage,
+    bool? enableIsolatePreprocessing,
     double? autoTuneMaxSharpenAmount,
   }) {
     return RecognitionRuntimeConfig(
@@ -171,6 +180,8 @@ class RecognitionRuntimeConfig {
       fallbackMaxInputEdge: fallbackMaxInputEdge ?? this.fallbackMaxInputEdge,
       processFrameIntervalMs:
           processFrameIntervalMs ?? this.processFrameIntervalMs,
+        maxConcurrentFrameWorkers:
+          maxConcurrentFrameWorkers ?? this.maxConcurrentFrameWorkers,
       singleFlightKeepLatestFrames:
           singleFlightKeepLatestFrames ?? this.singleFlightKeepLatestFrames,
       detectorInputWidth: detectorInputWidth ?? this.detectorInputWidth,
@@ -225,9 +236,12 @@ class RecognitionRuntimeConfig {
       debugRealtimeOverlay: debugRealtimeOverlay ?? this.debugRealtimeOverlay,
       enableTraceLogs: enableTraceLogs ?? this.enableTraceLogs,
       enablePerfLogs: enablePerfLogs ?? this.enablePerfLogs,
+        showRealtimeFpsBadge: showRealtimeFpsBadge ?? this.showRealtimeFpsBadge,
       realtimeCropFacesFromCameraImage:
           realtimeCropFacesFromCameraImage ??
           this.realtimeCropFacesFromCameraImage,
+        enableIsolatePreprocessing:
+          enableIsolatePreprocessing ?? this.enableIsolatePreprocessing,
       autoTuneMaxSharpenAmount:
           autoTuneMaxSharpenAmount ?? this.autoTuneMaxSharpenAmount,
     );
@@ -245,6 +259,7 @@ class RecognitionRuntimeConfig {
       'fallbackCaptureIntervalMs': fallbackCaptureIntervalMs,
       'fallbackMaxInputEdge': fallbackMaxInputEdge,
       'processFrameIntervalMs': processFrameIntervalMs,
+      'maxConcurrentFrameWorkers': maxConcurrentFrameWorkers,
       'singleFlightKeepLatestFrames': singleFlightKeepLatestFrames,
       'detectorInputWidth': detectorInputWidth,
       'detectorInputHeight': detectorInputHeight,
@@ -280,7 +295,9 @@ class RecognitionRuntimeConfig {
       'debugRealtimeOverlay': debugRealtimeOverlay,
       'enableTraceLogs': enableTraceLogs,
       'enablePerfLogs': enablePerfLogs,
+      'showRealtimeFpsBadge': showRealtimeFpsBadge,
       'realtimeCropFacesFromCameraImage': realtimeCropFacesFromCameraImage,
+      'enableIsolatePreprocessing': enableIsolatePreprocessing,
       'autoTuneMaxSharpenAmount': autoTuneMaxSharpenAmount,
     };
   }
@@ -332,6 +349,7 @@ class RecognitionRuntimeConfig {
       fallbackCaptureIntervalMs: i('fallbackCaptureIntervalMs', 100),
       fallbackMaxInputEdge: i('fallbackMaxInputEdge', 960),
       processFrameIntervalMs: i('processFrameIntervalMs', 82),
+      maxConcurrentFrameWorkers: i('maxConcurrentFrameWorkers', 2),
       singleFlightKeepLatestFrames: i('singleFlightKeepLatestFrames', 1),
       detectorInputWidth: i('detectorInputWidth', 640),
       detectorInputHeight: i('detectorInputHeight', 480),
@@ -373,10 +391,12 @@ class RecognitionRuntimeConfig {
       debugRealtimeOverlay: b('debugRealtimeOverlay', true),
       enableTraceLogs: b('enableTraceLogs', false),
       enablePerfLogs: b('enablePerfLogs', false),
+      showRealtimeFpsBadge: b('showRealtimeFpsBadge', true),
       realtimeCropFacesFromCameraImage: b(
         'realtimeCropFacesFromCameraImage',
         false,
       ),
+      enableIsolatePreprocessing: b('enableIsolatePreprocessing', true),
       autoTuneMaxSharpenAmount: d('autoTuneMaxSharpenAmount', 1.0),
     );
   }

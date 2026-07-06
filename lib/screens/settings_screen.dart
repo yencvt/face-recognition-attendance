@@ -39,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'fallbackCaptureIntervalMs': 'Chu kỳ chụp fallback (ms)',
     'fallbackMaxInputEdge': 'Cạnh tối đa ảnh fallback (px)',
     'processFrameIntervalMs': 'Chu kỳ xử lý frame (ms)',
+    'maxConcurrentFrameWorkers': 'Số luồng xử lý nhận diện song song',
     'detectorInputWidth': 'Chiều rộng input detector',
     'detectorInputHeight': 'Chiều cao input detector',
     'trackKeepAliveMs': 'Thời gian giữ track (ms)',
@@ -66,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'enableRealtimeAutoSharpen': 'Bật auto sharpen realtime',
     'enableTraceLogs': 'Bật trace log chi tiết realtime',
     'enablePerfLogs': 'Bật perf log độ trễ (Perf[...])',
+    'enableIsolatePreprocessing': 'Bật isolate preprocessing realtime',
     'autoTuneMaxSharpenAmount':
       'enableRealtimeAutoSharpenMaxAmount (0.0..1.0)',
   };
@@ -89,6 +91,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'Giới hạn cạnh lớn nhất của frame fallback trước khi xử lý để giảm tải CPU.',
     'processFrameIntervalMs':
       'Khoảng cách xử lý giữa 2 frame, nhỏ hơn thì nhanh hơn nhưng nặng máy.',
+    'maxConcurrentFrameWorkers':
+      'Số luồng xử lý song song từ detect đến so khớp.',
     'detectorInputWidth':
       'Độ rộng ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
     'detectorInputHeight':
@@ -140,6 +144,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'Bật các log DecisionTrace/Match/GateSkip/CalibTop2 để debug. Tắt để giảm lag.',
     'enablePerfLogs':
       'Bật log hiệu năng Perf[ws]/Perf[db]. Tắt để tránh IO log không cần thiết.',
+    'enableIsolatePreprocessing':
+      'Tách preprocessing và fallback vector embedding sang isolate để giảm giật UI.',
     'autoTuneMaxSharpenAmount':
       'Giới hạn mức sharpen tối đa khi bật enableRealtimeAutoSharpen.',
   };
@@ -160,6 +166,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _fallbackCaptureIntervalMsController;
   late TextEditingController _fallbackMaxInputEdgeController;
   late TextEditingController _processFrameIntervalMsController;
+  late TextEditingController _maxConcurrentFrameWorkersController;
   late TextEditingController _detectorInputWidthController;
   late TextEditingController _detectorInputHeightController;
   late TextEditingController _trackKeepAliveMsController;
@@ -196,9 +203,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _debugRealtimeOverlay = true;
   bool _enableTraceLogs = false;
   bool _enablePerfLogs = false;
+  bool _enableIsolatePreprocessing = true;
   bool _enableScheduledReportExport = false;
   bool _enablePublicReportApi = true;
-  bool _isRecognitionAdvancedExpanded = false;
+  final bool _isRecognitionAdvancedExpanded = false;
   bool _isLoading = true;
 
   String _recognitionLabel(String key) =>
@@ -249,6 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _fallbackCaptureIntervalMsController = TextEditingController();
     _fallbackMaxInputEdgeController = TextEditingController();
     _processFrameIntervalMsController = TextEditingController();
+    _maxConcurrentFrameWorkersController = TextEditingController();
     _detectorInputWidthController = TextEditingController();
     _detectorInputHeightController = TextEditingController();
     _trackKeepAliveMsController = TextEditingController();
@@ -324,6 +333,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _processFrameIntervalMsController.text = recognitionConfig
             .processFrameIntervalMs
             .toString();
+        _maxConcurrentFrameWorkersController.text = recognitionConfig
+          .maxConcurrentFrameWorkers
+          .toString();
         _detectorInputWidthController.text = recognitionConfig
             .detectorInputWidth
             .toString();
@@ -398,6 +410,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _debugRealtimeOverlay = recognitionConfig.debugRealtimeOverlay;
         _enableTraceLogs = recognitionConfig.enableTraceLogs;
         _enablePerfLogs = recognitionConfig.enablePerfLogs;
+        _enableIsolatePreprocessing =
+          recognitionConfig.enableIsolatePreprocessing;
         _reportExportDirectoryController.text =
             reportConfig.scheduledExportDirectory;
         _reportExportTimeController.text = reportConfig.scheduledExportTime;
@@ -553,6 +567,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _processFrameIntervalMsController,
           'processFrameIntervalMs',
         ),
+        maxConcurrentFrameWorkers: parseInt(
+          _maxConcurrentFrameWorkersController,
+          'maxConcurrentFrameWorkers',
+        ),
         detectorInputWidth: parseInt(
           _detectorInputWidthController,
           'detectorInputWidth',
@@ -644,6 +662,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         debugRealtimeOverlay: _debugRealtimeOverlay,
         enableTraceLogs: _enableTraceLogs,
         enablePerfLogs: _enablePerfLogs,
+        enableIsolatePreprocessing: _enableIsolatePreprocessing,
         autoTuneMaxSharpenAmount: parseDouble(
           _autoTuneMaxSharpenAmountController,
           'autoTuneMaxSharpenAmount',
@@ -740,6 +759,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .toString();
     _processFrameIntervalMsController.text = config.processFrameIntervalMs
         .toString();
+    _maxConcurrentFrameWorkersController.text = config
+      .maxConcurrentFrameWorkers
+      .toString();
     _detectorInputWidthController.text = config.detectorInputWidth.toString();
     _detectorInputHeightController.text = config.detectorInputHeight.toString();
     _trackKeepAliveMsController.text = config.trackKeepAliveMs.toString();
@@ -787,6 +809,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _debugRealtimeOverlay = config.debugRealtimeOverlay;
     _enableTraceLogs = config.enableTraceLogs;
     _enablePerfLogs = config.enablePerfLogs;
+    _enableIsolatePreprocessing = config.enableIsolatePreprocessing;
   }
 
   RecognitionRuntimeConfig _presetAccuracyConfig() {
@@ -1087,6 +1110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _fallbackCaptureIntervalMsController.dispose();
     _fallbackMaxInputEdgeController.dispose();
     _processFrameIntervalMsController.dispose();
+    _maxConcurrentFrameWorkersController.dispose();
     _detectorInputWidthController.dispose();
     _detectorInputHeightController.dispose();
     _trackKeepAliveMsController.dispose();
@@ -1615,6 +1639,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              _buildTextField(
+                                controller: _maxConcurrentFrameWorkersController,
+                                label: _l(
+                                  context,
+                                  'Số luồng xử lý nhận diện song song',
+                                  'Parallel recognition worker count',
+                                ),
+                                hint: '2',
+                                helperText: _l(
+                                  context,
+                                  'Áp dụng cho toàn pipeline từ detect đến so khớp. Tăng dần 1->2->3 để tránh quá tải CPU.',
+                                  'Applies to the full pipeline from detect to matching. Increase gradually 1->2->3 to avoid CPU overload.',
+                                ),
+                                icon: Icons.hub_outlined,
+                              ),
+                              const SizedBox(height: 12),
+                              Material(
+                                color: Colors.transparent,
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    _l(
+                                      context,
+                                      'Bật isolate preprocessing realtime',
+                                      'Enable isolate preprocessing (realtime)',
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    _l(
+                                      context,
+                                      'Khi bật: preprocessing và fallback vector embedding chạy trên isolate pool để giảm giật giao diện.',
+                                      'When enabled: preprocessing and fallback vector embedding run on isolate pool to reduce UI stutter.',
+                                    ),
+                                  ),
+                                  value: _enableIsolatePreprocessing,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _enableIsolatePreprocessing = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
                               Text(
                                 _l(
                                   context,

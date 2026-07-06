@@ -62,6 +62,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   int? _lastFramePacketAtMs;
   int? _lastFrameReceivedAtMs;
   double _frameFps = 0.0;
+  double _pipelineTotalFps = 0.0;
+  int _pipelineInFlight = 0;
+  int _pipelineMaxWorkers = 0;
+  int _pipelineConfiguredWorkers = 0;
+  bool _pipelineFallbackMode = false;
+  bool _pipelineIsolatePreprocessingEnabled = true;
+  Map<int, double> _workerFpsBySlot = const <int, double>{};
+  bool _showPipelineMetricsBadge = false;
 
   int _total = 0;
   int _known = 0;
@@ -143,6 +151,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         setState(() {
           _liveOverlayPng = null;
           _liveOverlays = const [];
+          _pipelineTotalFps = 0.0;
+          _pipelineInFlight = 0;
+          _pipelineMaxWorkers = 0;
+          _pipelineConfiguredWorkers = 0;
+          _pipelineFallbackMode = false;
+          _pipelineIsolatePreprocessingEnabled = true;
+          _workerFpsBySlot = const <int, double>{};
+          _showPipelineMetricsBadge = false;
         });
       }
       unawaited(_loadZone());
@@ -168,6 +184,27 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           _liveOverlayPng = packet.annotatedOverlayPng;
         }
         _liveOverlays = packet.overlays;
+        final metrics = packet.realtimeMetrics;
+        if (metrics != null) {
+          _pipelineTotalFps = metrics.totalFps;
+          _pipelineInFlight = metrics.inFlight;
+          _pipelineMaxWorkers = metrics.maxWorkers;
+          _pipelineConfiguredWorkers = metrics.configuredMaxWorkers;
+          _pipelineFallbackMode = metrics.fallbackMode;
+            _pipelineIsolatePreprocessingEnabled =
+              metrics.isolatePreprocessingEnabled;
+          _workerFpsBySlot = metrics.workerFpsBySlot;
+          _showPipelineMetricsBadge = true;
+        } else {
+          _pipelineTotalFps = 0.0;
+          _pipelineInFlight = 0;
+          _pipelineMaxWorkers = 0;
+          _pipelineConfiguredWorkers = 0;
+          _pipelineFallbackMode = false;
+          _pipelineIsolatePreprocessingEnabled = true;
+          _workerFpsBySlot = const <int, double>{};
+          _showPipelineMetricsBadge = false;
+        }
         setState(() {});
       }
     });
@@ -359,6 +396,108 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _formatFrameFps() {
     if (_frameFps <= 0) return '0.0 fps';
     return '${_frameFps.toStringAsFixed(_frameFps >= 10 ? 0 : 1)} fps';
+  }
+
+  Widget _buildPipelineMetricsBadge(CameraStreamSession cam) {
+    if (!_showPipelineMetricsBadge ||
+        !_recognitionService.isRunning(cam.id) ||
+        _isFrameStale()) {
+      return const SizedBox.shrink();
+    }
+
+    final configuredWorkers = _pipelineConfiguredWorkers <= 0
+        ? _pipelineMaxWorkers
+        : _pipelineConfiguredWorkers;
+    final totalText =
+        'Total ${_pipelineTotalFps.toStringAsFixed(_pipelineTotalFps >= 10 ? 0 : 1)} fps';
+    final modeText = _pipelineFallbackMode ? 'Mode: fallback' : 'Mode: stream';
+    final isolateText = _pipelineIsolatePreprocessingEnabled
+      ? 'Isolate: on'
+      : 'Isolate: off';
+    final workersText = 'Workers $_pipelineInFlight/$configuredWorkers';
+    final flowText = _pipelineInFlight > 0 ? 'Processing' : 'Idle';
+    final workerFpsEntries = _workerFpsBySlot.entries.toList(growable: false)
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final workerFpsText = workerFpsEntries.isEmpty
+        ? 'Worker fps: -'
+        : 'Worker fps: ${workerFpsEntries.map((e) => 'W${e.key + 1}:${e.value.toStringAsFixed(e.value >= 10 ? 0 : 1)}').join(' | ')}';
+
+    return IgnorePointer(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.42),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.18),
+            width: 0.8,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              totalText,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10.2,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              modeText,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 9.2,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              isolateText,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 9.2,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              workersText,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 9.2,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              workerFpsText,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.88),
+                fontSize: 8.8,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              flowText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.88),
+                fontSize: 8.9,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _selectCamera(String id) async {
@@ -1432,6 +1571,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ..._buildRealtimeTextLabels(
                         constraints,
                         shouldMirrorOverlay,
+                      ),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: _buildPipelineMetricsBadge(cam),
                       ),
                       Positioned(
                         left: 12,

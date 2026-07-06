@@ -22,6 +22,17 @@ import 'package:uuid/uuid.dart';
 import '../database/face_attendance_repository.dart';
 import '../database/recognition_settings_repository.dart';
 import '../log/log_service.dart';
+import 'face_preprocess_isolate_pool.dart';
+
+double averageLuma(img.Image image) {
+  final rgb = image.getBytes(order: img.ChannelOrder.rgb);
+  if (rgb.isEmpty) return 0.0;
+  var sum = 0.0;
+  for (var i = 0; i < rgb.length; i += 3) {
+    sum += (0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2]) / 255.0;
+  }
+  return (sum / (rgb.length / 3)).clamp(0.0, 1.0).toDouble();
+}
 
 class FaceOverlayBox {
   FaceOverlayBox({
@@ -44,6 +55,7 @@ class RecognitionFramePacket {
     required this.createdAt,
     this.annotatedFrameJpeg,
     this.annotatedOverlayPng,
+    this.realtimeMetrics,
   });
 
   final String cameraId;
@@ -51,6 +63,27 @@ class RecognitionFramePacket {
   final int createdAt;
   final Uint8List? annotatedFrameJpeg;
   final Uint8List? annotatedOverlayPng;
+  final RealtimePipelineMetrics? realtimeMetrics;
+}
+
+class RealtimePipelineMetrics {
+  const RealtimePipelineMetrics({
+    required this.totalFps,
+    required this.inFlight,
+    required this.maxWorkers,
+    required this.configuredMaxWorkers,
+    required this.fallbackMode,
+    required this.isolatePreprocessingEnabled,
+    required this.workerFpsBySlot,
+  });
+
+  final double totalFps;
+  final int inFlight;
+  final int maxWorkers;
+  final int configuredMaxWorkers;
+  final bool fallbackMode;
+  final bool isolatePreprocessingEnabled;
+  final Map<int, double> workerFpsBySlot;
 }
 
 class FaceRecognitionNotification {
@@ -771,12 +804,83 @@ class _Processor {
   bool draining = false;
   int frameCount = 0;
   int lastProcessAtMs = 0;
+  int inFlightStreamFrames = 0;
+  int maxObservedInFlight = 0;
+  int completedStreamFramesSinceLog = 0;
+  int logWindowStartedAtMs = 0;
+  int lastConcurrencyLogAtMs = 0;
+  bool parallelExecutionLogged = false;
+  int nextStreamFrameSequence = 0;
+  int nextStreamFrameEmitSequence = 0;
+  int nextWorkerSlotCursor = 0;
+  final Map<int, bool> streamWorkerBusyBySlot = <int, bool>{};
+  final Map<int, Timer> streamWorkerTimersBySlot = <int, Timer>{};
+  final Set<int> activeWorkerSlots = <int>{};
+  final Map<int, _PendingFrameOutput> pendingOrderedFrameOutputs =
+      <int, _PendingFrameOutput>{};
+  final Map<int, double> workerFpsBySlot = <int, double>{};
+  final Map<int, int> workerLastCompletedAtMs = <int, int>{};
+  double totalFps = 0.0;
+  int totalLastCompletedAtMs = 0;
+  bool overlayRenderBusy = false;
+  bool captureBusy = false;
+  bool drainingFallback = false;
+  int inFlightFallbackFrames = 0;
+  int fallbackWarmupUntilMs = 0;
+  int lastFallbackCaptureAtMs = 0;
   int lastAnnotatedFrameAtMs = 0;
   String lastOverlaySignature = '';
   Uint8List? lastOverlayPng;
-  final List<CameraImage> pendingFrames = <CameraImage>[];
+  final List<_QueuedStreamFrame> pendingFrames = <_QueuedStreamFrame>[];
+  final List<_QueuedFallbackFrame> pendingFallbackFrames =
+      <_QueuedFallbackFrame>[];
   Timer? pendingDrainTimer;
+  Timer? pendingFallbackDrainTimer;
   Timer? stillCaptureTimer;
+}
+
+class _QueuedStreamFrame {
+  _QueuedStreamFrame({
+    required this.image,
+    required this.sequence,
+    required this.createdAtMs,
+  });
+
+  final CameraImage image;
+  final int sequence;
+  final int createdAtMs;
+}
+
+class _QueuedFallbackFrame {
+  _QueuedFallbackFrame({
+    required this.frame,
+    required this.zone,
+    required this.frameIndex,
+    required this.sequence,
+    required this.createdAtMs,
+  });
+
+  final img.Image frame;
+  final RecognitionZone zone;
+  final int frameIndex;
+  final int sequence;
+  final int createdAtMs;
+}
+
+class _PendingFrameOutput {
+  _PendingFrameOutput({
+    required this.overlays,
+    required this.createdAtMs,
+    this.annotatedFrameJpeg,
+    this.annotatedOverlayPng,
+    this.realtimeMetrics,
+  });
+
+  final List<FaceOverlayBox> overlays;
+  final int createdAtMs;
+  final Uint8List? annotatedFrameJpeg;
+  final Uint8List? annotatedOverlayPng;
+  final RealtimePipelineMetrics? realtimeMetrics;
 }
 
 class _CameraFrameInput {
@@ -850,6 +954,7 @@ class FaceRecognitionService {
   static final FaceRecognitionService instance = FaceRecognitionService._();
 
   final OnnxRuntime _onnxRuntime = OnnxRuntime();
+  final FacePreprocessIsolatePool _preprocessPool = FacePreprocessIsolatePool();
   final LogService _log = LogService();
   final Uuid _uuid = const Uuid();
   static const MethodChannel _windowsCameraExtChannel = MethodChannel(
@@ -934,6 +1039,32 @@ class FaceRecognitionService {
       _runtimeConfig.fallbackCaptureIntervalMs;
   int get _fallbackMaxInputEdge => _runtimeConfig.fallbackMaxInputEdge;
   int get _processFrameIntervalMs => _runtimeConfig.processFrameIntervalMs;
+  int get _maxConcurrentFrameWorkers =>
+      _runtimeConfig.maxConcurrentFrameWorkers.clamp(1, 8).toInt();
+  int get _effectiveFallbackWorkers => _maxConcurrentFrameWorkers;
+  static const int _fallbackStartupWarmupMs = 8000;
+  int get _effectiveDispatchIntervalMs {
+    final scaled = (_processFrameIntervalMs / _maxConcurrentFrameWorkers)
+        .round();
+    return scaled < 1 ? 1 : scaled;
+  }
+
+  bool _isFallbackWarmup(_Processor processor) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return now < processor.fallbackWarmupUntilMs;
+  }
+
+  int _effectiveFallbackWorkersFor(_Processor processor) {
+    if (_isFallbackWarmup(processor)) {
+      return 1;
+    }
+    return _effectiveFallbackWorkers;
+  }
+
+  bool _shouldUseFastFallbackEmbedding(_Processor? processor) {
+    // Keep fallback recognition quality stable by always using full embedding.
+    return false;
+  }
   int get _singleFlightKeepLatestFrames =>
       _runtimeConfig.singleFlightKeepLatestFrames.clamp(1, 24).toInt();
   int get _detectorInputWidth => _runtimeConfig.detectorInputWidth;
@@ -945,6 +1076,7 @@ class FaceRecognitionService {
       _runtimeConfig.annotatedFrameMinIntervalMs;
   static const int _overlayRendererVersion = 3;
   static const int _bboxOverlayOffsetXPx = 1;
+  static const int _realtimeTrackReuseMs = 650;
   static const int _adaptiveFarDistanceActivationStreak = 3;
   static const int _adaptiveFarDistanceActiveMs = 8000;
   static const double _adaptiveFarDistanceFaceAreaRatio = 0.010;
@@ -1018,8 +1150,11 @@ class FaceRecognitionService {
   double get _mouthRegionMinQuality => _runtimeConfig.mouthRegionMinQuality;
   bool get _debugRealtimeOverlay => _runtimeConfig.debugRealtimeOverlay;
   bool get _traceLogsEnabled => _runtimeConfig.enableTraceLogs;
+  bool get _showRealtimeFpsBadge => _runtimeConfig.showRealtimeFpsBadge;
   bool get _realtimeCropFacesFromCameraImage =>
       _runtimeConfig.realtimeCropFacesFromCameraImage;
+    bool get _enableIsolatePreprocessing =>
+      _runtimeConfig.enableIsolatePreprocessing;
   double get _autoTuneMaxSharpenAmount =>
       _runtimeConfig.autoTuneMaxSharpenAmount;
 
@@ -1048,6 +1183,13 @@ class FaceRecognitionService {
         if (old.fallbackCaptureIntervalMs != cfg.fallbackCaptureIntervalMs) {
           _restartFallbackCaptureTimers();
         }
+        if (old.processFrameIntervalMs != cfg.processFrameIntervalMs ||
+            old.maxConcurrentFrameWorkers != cfg.maxConcurrentFrameWorkers ||
+            old.enableIsolatePreprocessing !=
+                cfg.enableIsolatePreprocessing) {
+          _restartStreamWorkerSchedulers();
+          unawaited(_restartPreprocessPool());
+        }
 
         final thresholdInputsChanged =
             old.knownMatchThreshold != cfg.knownMatchThreshold ||
@@ -1073,6 +1215,7 @@ class FaceRecognitionService {
         _log.info('Recognition runtime config hot-updated');
       });
       _log.info('Recognition runtime config loaded from persisted settings');
+      await _restartPreprocessPool();
 
       _availableCameras = await availableCameras();
       if (_supportsNativeFacePipeline) {
@@ -1097,6 +1240,22 @@ class FaceRecognitionService {
     } catch (_) {
       // Keep app startup stable when detector initialization fails.
       _log.error('FaceRecognitionService initialization failed');
+    }
+  }
+
+  Future<void> _restartPreprocessPool() async {
+    if (!_enableIsolatePreprocessing) {
+      await _preprocessPool.dispose();
+      _log.info('Preprocess isolate pool disabled by runtime config');
+      return;
+    }
+    try {
+      await _preprocessPool.start(workerCount: _maxConcurrentFrameWorkers);
+      _log.info(
+        'Preprocess isolate pool started workers=$_maxConcurrentFrameWorkers',
+      );
+    } catch (e) {
+      _log.error('Cannot start preprocess isolate pool error=$e');
     }
   }
 
@@ -1471,7 +1630,7 @@ class FaceRecognitionService {
       matches.add(
         UploadedImageRecognitionFaceMatch(
           rect: rect,
-          name: isRecognized && top1 != null ? top1.personName : 'Unknown',
+          name: isRecognized ? top1.personName : 'Unknown',
           personId: recognizedPersonId,
           score: top1?.score ?? 0.0,
         ),
@@ -1495,8 +1654,8 @@ class FaceRecognitionService {
               (rect.width * rect.height) / (decoded.width * decoded.height),
           aspectRatio: rect.width / rect.height,
           minFacePixels: math.min(rect.width, rect.height).round(),
-          originalLuma: _averageLuma(originalCrop),
-          cleanedLuma: _averageLuma(cleanedCrop),
+          originalLuma: averageLuma(originalCrop),
+          cleanedLuma: averageLuma(cleanedCrop),
           originalSharpness: _imageSharpness(originalCrop),
           cleanedSharpness: _imageSharpness(cleanedCrop),
           matchThreshold: matchThreshold,
@@ -1993,11 +2152,13 @@ class FaceRecognitionService {
         await controller.startImageStream((image) {
           _enqueueStreamFrame(cameraId, processor, image);
         });
+        _startStreamWorkerScheduler(cameraId, processor);
       } catch (_) {
         _streamUnavailableByCameraId[cameraId] = true;
         _log.info(
           'Failed to start image stream camera=$cameraId; switching to in-memory preview-frame fallback',
         );
+        _stopStreamWorkerScheduler(processor);
         _startStillCaptureFallback(cameraId, processor);
       }
     } finally {
@@ -2016,9 +2177,19 @@ class FaceRecognitionService {
     }
     processor.stillCaptureTimer?.cancel();
     processor.stillCaptureTimer = null;
+    _stopStreamWorkerScheduler(processor);
     processor.pendingDrainTimer?.cancel();
     processor.pendingDrainTimer = null;
+    processor.pendingFallbackDrainTimer?.cancel();
+    processor.pendingFallbackDrainTimer = null;
     processor.pendingFrames.clear();
+    processor.pendingFallbackFrames.clear();
+    processor.pendingOrderedFrameOutputs.clear();
+    processor.nextStreamFrameSequence = 0;
+    processor.nextStreamFrameEmitSequence = 0;
+    processor.inFlightFallbackFrames = 0;
+    processor.captureBusy = false;
+    processor.drainingFallback = false;
     await processor.controller.dispose();
     _streamUnavailableByCameraId.remove(cameraId);
     _overlaysByCameraId.remove(cameraId);
@@ -2033,6 +2204,46 @@ class FaceRecognitionService {
     _emitFrame(cameraId, const []);
   }
 
+  void _restartStreamWorkerSchedulers() {
+    for (final entry in _processorsByCameraId.entries) {
+      final cameraId = entry.key;
+      final processor = entry.value;
+      if (_streamUnavailableByCameraId[cameraId] == true) {
+        continue;
+      }
+      _startStreamWorkerScheduler(cameraId, processor);
+    }
+  }
+
+  void _stopStreamWorkerScheduler(_Processor processor) {
+    for (final timer in processor.streamWorkerTimersBySlot.values) {
+      timer.cancel();
+    }
+    processor.streamWorkerTimersBySlot.clear();
+    processor.streamWorkerBusyBySlot.clear();
+  }
+
+  void _startStreamWorkerScheduler(String cameraId, _Processor processor) {
+    _stopStreamWorkerScheduler(processor);
+    final workerCount = _maxConcurrentFrameWorkers;
+    final intervalMs = _processFrameIntervalMs.clamp(30, 5000);
+    for (var workerSlot = 0; workerSlot < workerCount; workerSlot++) {
+      processor.streamWorkerBusyBySlot[workerSlot] = false;
+      processor.streamWorkerTimersBySlot[workerSlot] = Timer.periodic(
+        Duration(milliseconds: intervalMs),
+        (_) {
+          unawaited(
+            _onStreamWorkerTick(
+              cameraId,
+              processor,
+              workerSlot: workerSlot,
+            ),
+          );
+        },
+      );
+    }
+  }
+
   void _enqueueStreamFrame(
     String cameraId,
     _Processor processor,
@@ -2040,13 +2251,55 @@ class FaceRecognitionService {
   ) {
     if (!processor.controller.value.isInitialized) return;
 
-    processor.pendingFrames.add(image);
-    final maxPending = _singleFlightKeepLatestFrames;
+    final queuedFrame = _QueuedStreamFrame(
+      image: image,
+      sequence: processor.nextStreamFrameSequence++,
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    processor.pendingFrames.add(queuedFrame);
+    final maxPending = math.max(
+      _singleFlightKeepLatestFrames,
+      _maxConcurrentFrameWorkers * 2,
+    );
     if (processor.pendingFrames.length > maxPending) {
       final overflow = processor.pendingFrames.length - maxPending;
       processor.pendingFrames.removeRange(0, overflow);
     }
-    unawaited(_drainPendingFrames(cameraId, processor));
+  }
+
+  Future<void> _onStreamWorkerTick(
+    String cameraId,
+    _Processor processor, {
+    required int workerSlot,
+  }) async {
+    if (!processor.controller.value.isInitialized) return;
+    if (processor.streamWorkerBusyBySlot[workerSlot] == true) return;
+    if (processor.pendingFrames.isEmpty) return;
+
+    final queuedFrame = processor.pendingFrames.removeAt(0);
+    processor.streamWorkerBusyBySlot[workerSlot] = true;
+    processor.inFlightStreamFrames++;
+    _maybeLogRealtimeConcurrency(cameraId, processor);
+
+    try {
+      await _processFrame(
+        cameraId,
+        processor,
+        queuedFrame.image,
+        workerSlot: workerSlot,
+        frameSequence: queuedFrame.sequence,
+        frameCreatedAtMs: queuedFrame.createdAtMs,
+      );
+    } finally {
+      _recordWorkerFps(processor, workerSlot);
+      processor.inFlightStreamFrames = math.max(
+        0,
+        processor.inFlightStreamFrames - 1,
+      );
+      processor.completedStreamFramesSinceLog++;
+      processor.streamWorkerBusyBySlot[workerSlot] = false;
+      _maybeLogRealtimeConcurrency(cameraId, processor);
+    }
   }
 
   Future<void> _drainPendingFrames(
@@ -2057,16 +2310,20 @@ class FaceRecognitionService {
     processor.draining = true;
     try {
       while (true) {
-        if (!processor.controller.value.isInitialized || processor.busy) {
+        if (!processor.controller.value.isInitialized) {
           return;
         }
         if (processor.pendingFrames.isEmpty) {
           return;
         }
 
+        if (processor.inFlightStreamFrames >= _maxConcurrentFrameWorkers) {
+          return;
+        }
+
         final nowMs = DateTime.now().millisecondsSinceEpoch;
         final waitMs =
-            _processFrameIntervalMs - (nowMs - processor.lastProcessAtMs);
+          _effectiveDispatchIntervalMs - (nowMs - processor.lastProcessAtMs);
         if (waitMs > 0) {
           processor.pendingDrainTimer?.cancel();
           processor.pendingDrainTimer = Timer(
@@ -2079,17 +2336,167 @@ class FaceRecognitionService {
           return;
         }
 
-        final nextFrame = processor.pendingFrames.removeAt(0);
-        await _processFrame(cameraId, processor, nextFrame);
+        processor.lastProcessAtMs = nowMs;
+        final queuedFrame = processor.pendingFrames.removeAt(0);
+        final workerSlot = _acquireWorkerSlot(processor);
+        if (workerSlot == null) {
+          processor.pendingFrames.insert(0, queuedFrame);
+          return;
+        }
+        processor.inFlightStreamFrames++;
+        _maybeLogRealtimeConcurrency(cameraId, processor);
+        unawaited(
+          _processStreamFrameTask(
+            cameraId,
+            processor,
+            queuedFrame,
+            workerSlot: workerSlot,
+          ),
+        );
       }
     } finally {
       processor.draining = false;
     }
   }
 
+  Future<void> _processStreamFrameTask(
+    String cameraId,
+    _Processor processor,
+    _QueuedStreamFrame queuedFrame,
+    {required int workerSlot}
+  ) async {
+    try {
+      await _processFrame(
+        cameraId,
+        processor,
+        queuedFrame.image,
+        workerSlot: workerSlot,
+        frameSequence: queuedFrame.sequence,
+        frameCreatedAtMs: queuedFrame.createdAtMs,
+      );
+    } finally {
+      _recordWorkerFps(processor, workerSlot);
+      _releaseWorkerSlot(processor, workerSlot);
+      processor.inFlightStreamFrames = math.max(
+        0,
+        processor.inFlightStreamFrames - 1,
+      );
+      processor.completedStreamFramesSinceLog++;
+      _maybeLogRealtimeConcurrency(cameraId, processor);
+      unawaited(_drainPendingFrames(cameraId, processor));
+    }
+  }
+
+  int? _acquireWorkerSlot(_Processor processor) {
+    final maxWorkers = _maxConcurrentFrameWorkers;
+    if (processor.activeWorkerSlots.length >= maxWorkers) {
+      return null;
+    }
+    for (var i = 0; i < maxWorkers; i++) {
+      final candidate = (processor.nextWorkerSlotCursor + i) % maxWorkers;
+      if (processor.activeWorkerSlots.add(candidate)) {
+        processor.nextWorkerSlotCursor = (candidate + 1) % maxWorkers;
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  void _releaseWorkerSlot(_Processor processor, int workerSlot) {
+    processor.activeWorkerSlots.remove(workerSlot);
+  }
+
+  void _recordWorkerFps(_Processor processor, int workerSlot) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+    final workerLast = processor.workerLastCompletedAtMs[workerSlot];
+    if (workerLast != null) {
+      final delta = nowMs - workerLast;
+      if (delta > 0) {
+        final instant = 1000.0 / delta;
+        final current = processor.workerFpsBySlot[workerSlot] ?? instant;
+        processor.workerFpsBySlot[workerSlot] =
+            (current * 0.82) + (instant * 0.18);
+      }
+    }
+    processor.workerLastCompletedAtMs[workerSlot] = nowMs;
+
+    _recordTotalFps(processor, nowMs: nowMs);
+  }
+
+  void _recordTotalFps(_Processor processor, {int? nowMs}) {
+    final currentMs = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+    if (processor.totalLastCompletedAtMs != 0) {
+      final totalDelta = currentMs - processor.totalLastCompletedAtMs;
+      if (totalDelta > 0) {
+        final instantTotal = 1000.0 / totalDelta;
+        processor.totalFps = processor.totalFps == 0
+            ? instantTotal
+            : (processor.totalFps * 0.82) + (instantTotal * 0.18);
+      }
+    }
+    processor.totalLastCompletedAtMs = currentMs;
+  }
+
+  String _workerFpsDebugText(_Processor processor, {int? workerSlot}) {
+    if (workerSlot == null) {
+      return 'T:${processor.totalFps.toStringAsFixed(1)}fps';
+    }
+    final workerFps = processor.workerFpsBySlot[workerSlot] ?? 0.0;
+    return 'W${workerSlot + 1}:${workerFps.toStringAsFixed(1)}fps '
+        'T:${processor.totalFps.toStringAsFixed(1)}fps';
+  }
+
+  void _maybeLogRealtimeConcurrency(String cameraId, _Processor processor) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (processor.inFlightStreamFrames > processor.maxObservedInFlight) {
+      processor.maxObservedInFlight = processor.inFlightStreamFrames;
+    }
+    if (!processor.parallelExecutionLogged &&
+        processor.maxObservedInFlight > 1) {
+      processor.parallelExecutionLogged = true;
+      _log.info(
+        'Realtime parallel execution active camera=$cameraId peakInFlight=${processor.maxObservedInFlight} workers=$_maxConcurrentFrameWorkers',
+      );
+    }
+
+    if (!_perfProbeEnabled) return;
+    if (processor.logWindowStartedAtMs == 0) {
+      processor.logWindowStartedAtMs = nowMs;
+    }
+    if (nowMs - processor.lastConcurrencyLogAtMs < 1500) {
+      return;
+    }
+
+    final elapsedMs = nowMs - processor.logWindowStartedAtMs;
+    final fps = elapsedMs <= 0
+        ? 0.0
+        : (processor.completedStreamFramesSinceLog * 1000.0 / elapsedMs);
+    _log.debug(
+      'Perf[rt] camera=$cameraId workers=$_maxConcurrentFrameWorkers '
+      'inFlight=${processor.inFlightStreamFrames} peak=${processor.maxObservedInFlight} '
+      'pending=${processor.pendingFrames.length} dispatchMs=$_effectiveDispatchIntervalMs '
+      'fpsWindow=${fps.toStringAsFixed(1)}',
+    );
+    processor.lastConcurrencyLogAtMs = nowMs;
+    processor.logWindowStartedAtMs = nowMs;
+    processor.completedStreamFramesSinceLog = 0;
+    processor.maxObservedInFlight = processor.inFlightStreamFrames;
+  }
+
   void _startStillCaptureFallback(String cameraId, _Processor processor) {
     processor.stillCaptureTimer?.cancel();
-    final intervalMs = _fallbackCaptureIntervalMs.clamp(50, 5000);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    processor.fallbackWarmupUntilMs = math.max(
+      processor.fallbackWarmupUntilMs,
+      now + _fallbackStartupWarmupMs,
+    );
+    final baseIntervalMs = _fallbackCaptureIntervalMs.clamp(80, 5000);
+    final intervalMs = _isFallbackWarmup(processor)
+        ? math.max(baseIntervalMs, 260)
+        : (_effectiveFallbackWorkers >= 3
+              ? math.max(baseIntervalMs, 140)
+              : baseIntervalMs);
     processor.stillCaptureTimer = Timer.periodic(
       Duration(milliseconds: intervalMs),
       (_) {
@@ -2099,29 +2506,125 @@ class FaceRecognitionService {
   }
 
   Future<void> _captureStillFrame(String cameraId, _Processor processor) async {
-    if (processor.busy || !processor.controller.value.isInitialized) return;
+    if (processor.captureBusy || !processor.controller.value.isInitialized) {
+      return;
+    }
 
-    processor.busy = true;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final minCaptureGapMs = _isFallbackWarmup(processor) ? 260 : 120;
+    if (nowMs - processor.lastFallbackCaptureAtMs < minCaptureGapMs) {
+      return;
+    }
+
+    final backlog =
+        processor.inFlightFallbackFrames + processor.pendingFallbackFrames.length;
+    final maxBacklog = math.max(1, _effectiveFallbackWorkersFor(processor));
+    if (backlog >= maxBacklog) {
+      // Backpressure: skip capture when processing is saturated to keep UI responsive.
+      return;
+    }
+
+    processor.lastFallbackCaptureAtMs = nowMs;
+    processor.captureBusy = true;
     try {
       processor.frameCount++;
       final decoded = await _capturePreviewFrameFromWindows(processor);
       if (decoded == null) return;
       final optimizedFrame = _optimizeFallbackFrame(decoded);
-
       final zone = await _resolveZone(cameraId);
-      await _processFallbackImage(
-        cameraId,
-        zone,
-        optimizedFrame,
+      final queuedFrame = _QueuedFallbackFrame(
+        frame: optimizedFrame,
+        zone: zone,
         frameIndex: processor.frameCount,
+        sequence: processor.nextStreamFrameSequence++,
+        createdAtMs: nowMs,
       );
+      processor.pendingFallbackFrames.add(queuedFrame);
+      final maxPending = math.max(
+        _singleFlightKeepLatestFrames,
+        _effectiveFallbackWorkersFor(processor) * 2,
+      );
+      if (processor.pendingFallbackFrames.length > maxPending) {
+        final overflow = processor.pendingFallbackFrames.length - maxPending;
+        processor.pendingFallbackFrames.removeRange(0, overflow);
+      }
+      unawaited(_drainPendingFallbackFrames(cameraId, processor));
     } catch (e, st) {
       final stLine = st.toString().split('\n').first;
       _log.error(
         'Still-image fallback failed camera=$cameraId errorType=${e.runtimeType} error=$e stack=$stLine',
       );
     } finally {
-      processor.busy = false;
+      processor.captureBusy = false;
+    }
+  }
+
+  Future<void> _drainPendingFallbackFrames(
+    String cameraId,
+    _Processor processor,
+  ) async {
+    if (processor.drainingFallback) return;
+    processor.drainingFallback = true;
+    try {
+      while (true) {
+        if (!processor.controller.value.isInitialized) {
+          return;
+        }
+        if (processor.pendingFallbackFrames.isEmpty) {
+          return;
+        }
+        final workerCap = _effectiveFallbackWorkersFor(processor);
+        if (processor.inFlightFallbackFrames >= workerCap) {
+          return;
+        }
+
+        final queuedFrame = processor.pendingFallbackFrames.removeAt(0);
+        final workerSlot = _acquireWorkerSlot(processor);
+        if (workerSlot == null) {
+          processor.pendingFallbackFrames.insert(0, queuedFrame);
+          return;
+        }
+
+        processor.inFlightFallbackFrames++;
+        unawaited(
+          _processFallbackFrameTask(
+            cameraId,
+            processor,
+            queuedFrame,
+            workerSlot: workerSlot,
+          ),
+        );
+      }
+    } finally {
+      processor.drainingFallback = false;
+    }
+  }
+
+  Future<void> _processFallbackFrameTask(
+    String cameraId,
+    _Processor processor,
+    _QueuedFallbackFrame queuedFrame, {
+    required int workerSlot,
+  }) async {
+    try {
+      await _processFallbackImage(
+        cameraId,
+        queuedFrame.zone,
+        queuedFrame.frame,
+        frameIndex: queuedFrame.frameIndex,
+        processor: processor,
+        workerSlot: workerSlot,
+        frameSequence: queuedFrame.sequence,
+        frameCreatedAtMs: queuedFrame.createdAtMs,
+      );
+    } finally {
+      _recordWorkerFps(processor, workerSlot);
+      _releaseWorkerSlot(processor, workerSlot);
+      processor.inFlightFallbackFrames = math.max(
+        0,
+        processor.inFlightFallbackFrames - 1,
+      );
+      unawaited(_drainPendingFallbackFrames(cameraId, processor));
     }
   }
 
@@ -2686,25 +3189,34 @@ class FaceRecognitionService {
     String cameraId,
     _Processor processor,
     CameraImage image,
+    {int? workerSlot, int? frameSequence, int? frameCreatedAtMs}
   ) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-
-    processor.lastProcessAtMs = nowMs;
     processor.frameCount++;
 
-    processor.busy = true;
+    void emitEmptyFrame() {
+      _emitFrameWithImage(
+        cameraId,
+        const <FaceOverlayBox>[],
+        streamProcessor: frameSequence == null ? null : processor,
+        frameSequence: frameSequence,
+        frameCreatedAtMs: frameCreatedAtMs,
+      );
+    }
+
     try {
       final zone = await _resolveZone(cameraId);
       if (!zone.enabled) {
         _overlaysByCameraId[cameraId] = const [];
         _overlayTracksByCameraId.remove(cameraId);
-        _emitFrame(cameraId, const []);
+        emitEmptyFrame();
         return;
       }
 
       if (_supportsNativeFacePipeline) {
         final rgb = _cameraImageToRgb(image);
         if (rgb == null) {
+          emitEmptyFrame();
           return;
         }
 
@@ -2719,6 +3231,7 @@ class FaceRecognitionService {
           rotationDegrees: _rotationDegreesFor(cameraId, image),
         );
         if (frameInput == null) {
+          emitEmptyFrame();
           return;
         }
 
@@ -2749,7 +3262,12 @@ class FaceRecognitionService {
           }
 
           final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
-          if (tracked != null && tracked.$2.isStranger) {
+          final trackedLastSeenAt = tracked == null
+              ? nowMs
+              : (previousTracks[tracked.$1]?.lastSeenAt ?? nowMs);
+            if (tracked != null &&
+              tracked.$2.isStranger &&
+              nowMs - trackedLastSeenAt <= _realtimeTrackReuseMs) {
             final smoothedRatio = _smoothTrackedRatio(
               previousTracks[tracked.$1]?.currentRect,
               ratio,
@@ -2791,39 +3309,13 @@ class FaceRecognitionService {
               : _selectRecognitionCrop(source: rgb, rect: rect, mesh: f);
           if (crop == null) continue;
 
-          var workingCrop = crop;
-          var luminance = _robustFaceLuminance(workingCrop);
-          if (luminance < 0.34) {
-            workingCrop = _boostRealtimeFaceExposure(workingCrop, luminance);
-            luminance = _robustFaceLuminance(workingCrop);
-          }
-          workingCrop = _applyRealtimeInputProcessing(workingCrop);
-          luminance = _robustFaceLuminance(workingCrop);
-          final preSharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
-              .clamp(0.0, 1.0)
-              .toDouble();
-          final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
-          final autoSharpenAmount = _computeRealtimeAutoSharpenAmount(
-            sharpnessQuality: preSharpnessQuality,
-            lumaStdDev: preLumaStdDev,
+          final prep = await _preprocessRealtimeCropInIsolate(
+            crop,
+            adaptiveFarDistance: adaptiveFarDistance,
           );
-          workingCrop = _applyAutoTuneRealtimeInputProcessing(
-            workingCrop,
-            autoSharpenAmount,
-          );
-          luminance = _robustFaceLuminance(workingCrop);
-          final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
-              .clamp(0.0, 1.0)
-              .toDouble();
-          final regionQuality = _regionQuality(
-            workingCrop,
-            minSharpness:
-                _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45),
-          );
-          final frameQuality = math
-              .min(sharpnessQuality, regionQuality)
-              .clamp(0.0, 1.0)
-              .toDouble();
+          final workingCrop = prep.image;
+          if (workingCrop == null) continue;
+          final frameQuality = prep.frameQuality;
           final spoofAssessment = _assessSpoof(
             cameraId,
             '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}',
@@ -2928,6 +3420,10 @@ class FaceRecognitionService {
                   match: match,
                   frameQuality: frameQuality,
                   spoofScore: spoofAssessment.score,
+                  workerFpsText: _workerFpsDebugText(
+                    processor,
+                    workerSlot: workerSlot,
+                  ),
                 )
               : null;
           final confidence =
@@ -2988,6 +3484,13 @@ class FaceRecognitionService {
           cameraId,
           overlays,
           annotatedOverlayPng: annotatedOverlayPng,
+          realtimeMetrics: _buildRealtimePipelineMetrics(
+            cameraId,
+            processor,
+          ),
+          streamProcessor: frameSequence == null ? null : processor,
+          frameSequence: frameSequence,
+          frameCreatedAtMs: frameCreatedAtMs,
         );
         if (_traceLogsEnabled && processor.frameCount % 60 == 0) {
           _log.debug(
@@ -2996,23 +3499,29 @@ class FaceRecognitionService {
         }
       } else {
         final rgb = _cameraImageToRgb(image);
-        if (rgb == null) return;
+        if (rgb == null) {
+          emitEmptyFrame();
+          return;
+        }
         await _processFallbackImage(
           cameraId,
           zone,
           rgb,
           frameIndex: processor.frameCount,
+          processor: processor,
+          workerSlot: workerSlot,
+          frameSequence: frameSequence,
+          frameCreatedAtMs: frameCreatedAtMs,
         );
       }
     } catch (_) {
       // Keep frame pipeline alive when one frame fails.
+      emitEmptyFrame();
       if (processor.frameCount % 60 == 0) {
         _log.error(
           'Frame processing failed camera=$cameraId mode=$runtimeModeLabel',
         );
       }
-    } finally {
-      processor.busy = false;
     }
   }
 
@@ -3020,7 +3529,13 @@ class FaceRecognitionService {
     String cameraId,
     RecognitionZone zone,
     img.Image rgb,
-    {int frameIndex = 0}
+    {
+      int frameIndex = 0,
+      _Processor? processor,
+      int? workerSlot,
+      int? frameSequence,
+      int? frameCreatedAtMs,
+    }
   ) async {
     try {
       final detections = await _detectFacesForFallback(rgb, cameraId);
@@ -3033,6 +3548,7 @@ class FaceRecognitionService {
       final nextTracks = <String, _CameraTrack>{};
       final previousTracks =
           _overlayTracksByCameraId[cameraId] ?? const <String, _CameraTrack>{};
+      final fastFallbackEmbedding = _shouldUseFastFallbackEmbedding(processor);
       for (final detected in filteredDetections) {
         try {
           final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -3058,6 +3574,34 @@ class FaceRecognitionService {
 
           if (!_isInsideZone(ratio, zone)) continue;
 
+          final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
+          final trackedLastSeenAt = tracked == null
+              ? nowMs
+              : (previousTracks[tracked.$1]?.lastSeenAt ?? nowMs);
+            if (tracked != null &&
+              tracked.$2.isStranger &&
+              nowMs - trackedLastSeenAt <= _realtimeTrackReuseMs) {
+            final smoothedRatio = _smoothTrackedRatio(
+              previousTracks[tracked.$1]?.currentRect,
+              ratio,
+            );
+            nextTracks[tracked.$1] = _CameraTrack(
+              key: tracked.$1,
+              currentRect: smoothedRatio,
+              targetRect: smoothedRatio,
+              event: tracked.$2,
+              lastSeenAt: nowMs,
+            );
+            overlays.add(
+              FaceOverlayBox(
+                trackKey: tracked.$1,
+                rectRatio: smoothedRatio,
+                event: tracked.$2,
+              ),
+            );
+            continue;
+          }
+
           final crop = _selectRecognitionCrop(
             source: rgb,
             rect: rect,
@@ -3065,39 +3609,13 @@ class FaceRecognitionService {
           );
           if (crop == null) continue;
 
-          var workingCrop = crop;
-          var luminance = _robustFaceLuminance(workingCrop);
-          if (luminance < 0.34) {
-            workingCrop = _boostRealtimeFaceExposure(workingCrop, luminance);
-            luminance = _robustFaceLuminance(workingCrop);
-          }
-          workingCrop = _applyRealtimeInputProcessing(workingCrop);
-          luminance = _robustFaceLuminance(workingCrop);
-          final preSharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
-              .clamp(0.0, 1.0)
-              .toDouble();
-          final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
-          final autoSharpenAmount = _computeRealtimeAutoSharpenAmount(
-            sharpnessQuality: preSharpnessQuality,
-            lumaStdDev: preLumaStdDev,
+          final prep = await _preprocessRealtimeCropInIsolate(
+            crop,
+            adaptiveFarDistance: adaptiveFarDistance,
           );
-          workingCrop = _applyAutoTuneRealtimeInputProcessing(
-            workingCrop,
-            autoSharpenAmount,
-          );
-          luminance = _robustFaceLuminance(workingCrop);
-          final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
-              .clamp(0.0, 1.0)
-              .toDouble();
-          final regionQuality = _regionQuality(
-            workingCrop,
-            minSharpness:
-                _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45),
-          );
-          final frameQuality = math
-              .min(sharpnessQuality, regionQuality)
-              .clamp(0.0, 1.0)
-              .toDouble();
+          final workingCrop = prep.image;
+          if (workingCrop == null) continue;
+          final frameQuality = prep.frameQuality;
           final spoofAssessment = _assessSpoof(
             cameraId,
             '${(ratio.center.dx * 100).round()}_${(ratio.center.dy * 100).round()}',
@@ -3155,7 +3673,11 @@ class FaceRecognitionService {
             continue;
           }
           final vector = _alignVectorDimension(
-            await _embeddingFromImage(workingCrop, robust: false),
+            await _embeddingFromImage(
+              workingCrop,
+              robust: false,
+              forceFallbackVector: fastFallbackEmbedding,
+            ),
             _templateVectorDimension,
           );
           if (vector.isEmpty) continue;
@@ -3165,7 +3687,7 @@ class FaceRecognitionService {
             frameQuality: frameQuality,
             adaptiveFarDistance: adaptiveFarDistance,
             frameIndex: frameIndex,
-          );
+          ) && !fastFallbackEmbedding;
           final partialBundle = shouldComputePartials
               ? await _buildPartialEmbeddingsFromFace(
                   workingCrop,
@@ -3175,7 +3697,6 @@ class FaceRecognitionService {
                   faceAlreadyPrepared: true,
                 )
               : const _PartialEmbeddingBundle();
-          final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
           final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
           final assignedKnownIds = nextTracks.values
               .map((track) => track.event.personId)
@@ -3203,6 +3724,12 @@ class FaceRecognitionService {
                   match: match,
                   frameQuality: frameQuality,
                   spoofScore: spoofAssessment.score,
+                  workerFpsText: processor == null
+                      ? null
+                      : _workerFpsDebugText(
+                          processor,
+                          workerSlot: workerSlot,
+                        ),
                 )
               : null;
           final confidence =
@@ -3269,22 +3796,40 @@ class FaceRecognitionService {
       _overlayTracksByCameraId[cameraId] = nextTracks;
       _overlaysByCameraId[cameraId] = overlays;
       final nowMs = DateTime.now().millisecondsSinceEpoch;
-      final annotatedOverlayPng = _maybeBuildOverlayPng(
-        _processorsByCameraId[cameraId],
-        rgb,
-        overlays,
-        zone,
-        nowMs,
-      );
+      final ownerProcessor = processor ?? _processorsByCameraId[cameraId];
+      final annotatedOverlayPng =
+          ownerProcessor != null && _isFallbackWarmup(ownerProcessor)
+          ? null
+          : _maybeBuildOverlayPng(
+              ownerProcessor,
+              rgb,
+              overlays,
+              zone,
+              nowMs,
+            );
       _emitFrameWithImage(
         cameraId,
         overlays,
         annotatedOverlayPng: annotatedOverlayPng,
+        realtimeMetrics: _buildRealtimePipelineMetrics(
+          cameraId,
+          ownerProcessor,
+        ),
+        streamProcessor: frameSequence == null ? null : processor,
+        frameSequence: frameSequence,
+        frameCreatedAtMs: frameCreatedAtMs,
       );
     } catch (e, st) {
       final stLine = st.toString().split('\n').first;
       _log.error(
         'Fallback processing failed camera=$cameraId errorType=${e.runtimeType} error=$e stack=$stLine',
+      );
+      _emitFrameWithImage(
+        cameraId,
+        const <FaceOverlayBox>[],
+        streamProcessor: frameSequence == null ? null : processor,
+        frameSequence: frameSequence,
+        frameCreatedAtMs: frameCreatedAtMs,
       );
     }
   }
@@ -3864,13 +4409,17 @@ class FaceRecognitionService {
     required _MatchResult? match,
     required double frameQuality,
     double? spoofScore,
+    String? workerFpsText,
   }) {
     final threshold = _knownMatchThreshold.toStringAsFixed(2);
+    final fpsText = workerFpsText == null || workerFpsText.isEmpty
+        ? ''
+        : ' $workerFpsText';
     if (match == null) {
       final spoofText = spoofScore == null
           ? ''
           : ' s:${spoofScore.toStringAsFixed(2)}';
-      return 'top1:- th:$threshold q:${frameQuality.toStringAsFixed(2)}$spoofText';
+      return 'top1:- th:$threshold q:${frameQuality.toStringAsFixed(2)}$spoofText$fpsText';
     }
 
     final top1 = match.score.toStringAsFixed(3);
@@ -3878,7 +4427,7 @@ class FaceRecognitionService {
     final spoofText = spoofScore == null
         ? ''
         : ' s:${spoofScore.toStringAsFixed(2)}';
-    return 'top1:$top1 th:$threshold m:$margin q:${frameQuality.toStringAsFixed(2)}$spoofText';
+    return 'top1:$top1 th:$threshold m:$margin q:${frameQuality.toStringAsFixed(2)}$spoofText$fpsText';
   }
 
   RecognitionEvent _buildEventWithSnapshot(
@@ -4487,8 +5036,25 @@ class FaceRecognitionService {
     img.Image source, {
     bool alreadyPrepared = false,
     bool robust = false,
+    bool forceFallbackVector = false,
   }) async {
     final aligned = alreadyPrepared ? source : _prepareFaceForEmbedding(source);
+    if (forceFallbackVector) {
+      if (_enableIsolatePreprocessing && _preprocessPool.isReady) {
+        try {
+          final encoded = Uint8List.fromList(img.encodePng(aligned));
+          final isolateVector = await _preprocessPool.computeFallbackVector(
+            cropPng: encoded,
+          );
+          if (isolateVector != null && isolateVector.isNotEmpty) {
+            return isolateVector;
+          }
+        } catch (_) {
+          // Fall back to local vector extraction.
+        }
+      }
+      return _vectorFromImage(aligned);
+    }
     final session = _arcFaceSession;
     if (session == null) {
       return _vectorFromImage(aligned);
@@ -4604,7 +5170,7 @@ class FaceRecognitionService {
 
   bool _shouldUseRobustEmbedding(img.Image preparedFace) {
     final side = math.min(preparedFace.width, preparedFace.height).toDouble();
-    final luma = _averageLuma(preparedFace);
+    final luma = averageLuma(preparedFace);
     final sharpness = _imageSharpness(preparedFace);
     return side < 92 ||
         side > 216 ||
@@ -4780,6 +5346,73 @@ class FaceRecognitionService {
     return source;
   }
 
+  Future<({img.Image? image, double frameQuality, double luminance})>
+  _preprocessRealtimeCropInIsolate(
+    img.Image crop, {
+    required bool adaptiveFarDistance,
+  }) async {
+    final minSharpness =
+        _minTemplateSharpness * (adaptiveFarDistance ? 0.35 : 0.45);
+
+    if (_enableIsolatePreprocessing && _preprocessPool.isReady) {
+      try {
+        final encoded = Uint8List.fromList(img.encodePng(crop));
+        final result = await _preprocessPool.preprocessCrop(
+          cropPng: encoded,
+          minSharpness: minSharpness,
+          enableAutoSharpen: _enableRealtimeAutoSharpen,
+          maxSharpenAmount: _autoTuneMaxSharpenAmount,
+        );
+        if (result != null) {
+          final decoded = img.decodeImage(result.processedJpeg);
+          if (decoded != null) {
+            return (
+              image: decoded,
+              frameQuality: result.frameQuality,
+              luminance: result.luminance,
+            );
+          }
+        }
+      } catch (_) {
+        // Fallback to local path.
+      }
+    }
+
+    var workingCrop = crop;
+    var luminance = _robustFaceLuminance(workingCrop);
+    if (luminance < 0.34) {
+      workingCrop = _boostRealtimeFaceExposure(workingCrop, luminance);
+      luminance = _robustFaceLuminance(workingCrop);
+    }
+    workingCrop = _applyRealtimeInputProcessing(workingCrop);
+    luminance = _robustFaceLuminance(workingCrop);
+    final preSharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final preLumaStdDev = _lumaStdDev(workingCrop, luminance);
+    final autoSharpenAmount = _computeRealtimeAutoSharpenAmount(
+      sharpnessQuality: preSharpnessQuality,
+      lumaStdDev: preLumaStdDev,
+    );
+    workingCrop = _applyAutoTuneRealtimeInputProcessing(
+      workingCrop,
+      autoSharpenAmount,
+    );
+    luminance = _robustFaceLuminance(workingCrop);
+    final sharpnessQuality = (_imageSharpness(workingCrop) / 140.0)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final regionQuality = _regionQuality(
+      workingCrop,
+      minSharpness: minSharpness,
+    );
+    final frameQuality = math
+        .min(sharpnessQuality, regionQuality)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    return (image: workingCrop, frameQuality: frameQuality, luminance: luminance);
+  }
+
   img.Image _applyRealtimeInputProcessing(img.Image source) {
     final adjusted = img.grayscale(source);
     return _materializeRgba8Image(adjusted);
@@ -4905,7 +5538,7 @@ class FaceRecognitionService {
     final width = image.width;
     final height = image.height;
     if (width <= 0 || height <= 0) return 0.0;
-    final m = mean ?? _averageLuma(image);
+    final m = mean ?? averageLuma(image);
     var accum = 0.0;
     final total = width * height;
     for (var y = 0; y < height; y++) {
@@ -4928,16 +5561,103 @@ class FaceRecognitionService {
     List<FaceOverlayBox> overlays, {
     Uint8List? annotatedFrameJpeg,
     Uint8List? annotatedOverlayPng,
+    RealtimePipelineMetrics? realtimeMetrics,
+    _Processor? streamProcessor,
+    int? frameSequence,
+    int? frameCreatedAtMs,
   }) {
     if (_frameQueue.isClosed) return;
+    final createdAtMs =
+        frameCreatedAtMs ?? DateTime.now().millisecondsSinceEpoch;
+    if (streamProcessor == null || frameSequence == null) {
+      _emitFramePacketNow(
+        cameraId,
+        _PendingFrameOutput(
+          overlays: overlays,
+          createdAtMs: createdAtMs,
+          annotatedFrameJpeg: annotatedFrameJpeg,
+          annotatedOverlayPng: annotatedOverlayPng,
+          realtimeMetrics: realtimeMetrics,
+        ),
+      );
+      return;
+    }
+
+    streamProcessor.pendingOrderedFrameOutputs[frameSequence] =
+        _PendingFrameOutput(
+          overlays: overlays,
+          createdAtMs: createdAtMs,
+          annotatedFrameJpeg: annotatedFrameJpeg,
+          annotatedOverlayPng: annotatedOverlayPng,
+          realtimeMetrics: realtimeMetrics,
+        );
+    _flushOrderedFrameOutputs(cameraId, streamProcessor);
+  }
+
+  void _flushOrderedFrameOutputs(String cameraId, _Processor processor) {
+    final outputs = processor.pendingOrderedFrameOutputs;
+    while (true) {
+      final nextSequence = processor.nextStreamFrameEmitSequence;
+      final nextOutput = outputs.remove(nextSequence);
+      if (nextOutput != null) {
+        _emitFramePacketNow(cameraId, nextOutput);
+        processor.nextStreamFrameEmitSequence = nextSequence + 1;
+        continue;
+      }
+
+      final maxBuffered = math.max(6, _maxConcurrentFrameWorkers * 3);
+      if (outputs.length > maxBuffered) {
+        final minSequence = outputs.keys.reduce(math.min);
+        if (minSequence > nextSequence) {
+          _log.debug(
+            'Ordered frame delivery skip gap camera=$cameraId '
+            'expected=$nextSequence jumpTo=$minSequence buffered=${outputs.length}',
+          );
+          processor.nextStreamFrameEmitSequence = minSequence;
+          continue;
+        }
+      }
+      break;
+    }
+  }
+
+  void _emitFramePacketNow(String cameraId, _PendingFrameOutput output) {
     _frameQueue.add(
       RecognitionFramePacket(
         cameraId: cameraId,
-        overlays: overlays,
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        annotatedFrameJpeg: annotatedFrameJpeg,
-        annotatedOverlayPng: annotatedOverlayPng,
+        overlays: output.overlays,
+        createdAt: output.createdAtMs,
+        annotatedFrameJpeg: output.annotatedFrameJpeg,
+        annotatedOverlayPng: output.annotatedOverlayPng,
+        realtimeMetrics: output.realtimeMetrics,
       ),
+    );
+  }
+
+  RealtimePipelineMetrics? _buildRealtimePipelineMetrics(
+    String cameraId,
+    _Processor? processor,
+  ) {
+    if (processor == null || !_showRealtimeFpsBadge) return null;
+    final streamUnavailable = _streamUnavailableByCameraId[cameraId] == true;
+    final effectiveInFlight = streamUnavailable
+        ? processor.inFlightFallbackFrames
+        : processor.inFlightStreamFrames;
+    final effectiveMaxWorkers = streamUnavailable
+      ? _effectiveFallbackWorkersFor(processor)
+      : _maxConcurrentFrameWorkers;
+    final workerMap = Map<int, double>.from(processor.workerFpsBySlot);
+    if (workerMap.isEmpty) {
+      workerMap[0] = processor.totalFps;
+    }
+    return RealtimePipelineMetrics(
+      totalFps: processor.totalFps,
+      inFlight: effectiveInFlight,
+      maxWorkers: effectiveMaxWorkers,
+      configuredMaxWorkers: _maxConcurrentFrameWorkers,
+      fallbackMode: streamUnavailable,
+      isolatePreprocessingEnabled: _enableIsolatePreprocessing,
+      workerFpsBySlot: workerMap,
     );
   }
 
@@ -4966,7 +5686,17 @@ class FaceRecognitionService {
       return cached;
     }
 
-    final rebuilt = _buildOverlayPng(rgb.width, rgb.height, overlays, zone);
+    if (processor.overlayRenderBusy) {
+      return null;
+    }
+
+    processor.overlayRenderBusy = true;
+    Uint8List? rebuilt;
+    try {
+      rebuilt = _buildOverlayPng(rgb.width, rgb.height, overlays, zone);
+    } finally {
+      processor.overlayRenderBusy = false;
+    }
     if (rebuilt != null && rebuilt.isNotEmpty) {
       processor.lastAnnotatedFrameAtMs = nowMs;
       processor.lastOverlaySignature = signature;
@@ -5421,10 +6151,8 @@ class FaceRecognitionService {
     final matchThreshold = _knownMatchThreshold;
 
     final templateConsensus =
-        bestByTemplate != null &&
         bestByTemplate.bucket.person.id == best.bucket.person.id;
     final centroidConsensus =
-        bestByCentroid != null &&
         bestByCentroid.bucket.person.id == best.bucket.person.id;
     final dualConsensus = templateConsensus && centroidConsensus;
 
@@ -5545,30 +6273,29 @@ class FaceRecognitionService {
       endsAtMs: now + _cameraCalibrationDuration.inMilliseconds,
     );
     window.timer = Timer(_cameraCalibrationDuration, () {
-      _finalizeCameraCalibration(cameraId);
+      finalizeCameraCalibration(cameraId);
     });
     _calibrationWindows[cameraId] = window;
     _log.info(
-      'Calibration started camera=$cameraId duration=${_cameraCalibrationDuration.inSeconds}s (top-2 logs enabled)',
+      'Calibration window started camera=$cameraId durationMs=${_cameraCalibrationDuration.inMilliseconds}',
     );
   }
 
-  void _recordCalibrationSample({
-    required String? cameraId,
-    required String? faceLogKey,
+  void recordCalibrationSample({
+    required String cameraId,
     required _CandidateScore top1,
     required _CandidateScore? top2,
     required double margin,
     required double frameQuality,
     required bool accepted,
+    required String? faceLogKey,
   }) {
-    if (cameraId == null) return;
     final window = _calibrationWindows[cameraId];
     if (window == null) return;
 
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now > window.endsAtMs) {
-      _finalizeCameraCalibration(cameraId);
+      finalizeCameraCalibration(cameraId);
       return;
     }
 
@@ -5606,7 +6333,7 @@ class FaceRecognitionService {
     }
   }
 
-  void _finalizeCameraCalibration(String cameraId) {
+  void finalizeCameraCalibration(String cameraId) {
     final window = _calibrationWindows.remove(cameraId);
     if (window == null) return;
     window.timer?.cancel();
@@ -5647,13 +6374,13 @@ class FaceRecognitionService {
     if (impostorRaw.isNotEmpty) {
       lockedMatch = math.max(
         lockedMatch,
-        _percentile(impostorRaw, 0.98) + 0.012,
+        percentile(impostorRaw, 0.98) + 0.012,
       );
     }
     if (acceptedRaw.isNotEmpty) {
       lockedMatch = math.min(
         lockedMatch,
-        _percentile(acceptedRaw, 0.12) - 0.008,
+        percentile(acceptedRaw, 0.12) - 0.008,
       );
     }
     lockedMatch = lockedMatch.clamp(0.86, 0.94);
@@ -5661,19 +6388,19 @@ class FaceRecognitionService {
     if (impostorCal.isNotEmpty) {
       lockedCalibrated = math.max(
         lockedCalibrated,
-        _percentile(impostorCal, 0.985) + 0.06,
+        percentile(impostorCal, 0.985) + 0.06,
       );
     }
     if (acceptedCal.isNotEmpty) {
       lockedCalibrated = math.min(
         lockedCalibrated,
-        _percentile(acceptedCal, 0.12) - 0.05,
+        percentile(acceptedCal, 0.12) - 0.05,
       );
     }
     lockedCalibrated = lockedCalibrated.clamp(0.55, 1.35);
 
     if (allMargins.isNotEmpty) {
-      lockedMargin = math.max(lockedMargin, _percentile(allMargins, 0.28));
+      lockedMargin = math.max(lockedMargin, percentile(allMargins, 0.28));
     }
     lockedMargin = lockedMargin.clamp(0.05, 0.14);
 
@@ -5697,7 +6424,7 @@ class FaceRecognitionService {
     );
   }
 
-  double _percentile(List<double> input, double p) {
+  double percentile(List<double> input, double p) {
     if (input.isEmpty) return 0.0;
     if (input.length == 1) return input.first;
     final values = [...input]..sort();
@@ -5710,7 +6437,7 @@ class FaceRecognitionService {
     return values[low] * (1 - ratio) + values[high] * ratio;
   }
 
-  double? _toFiniteDouble(dynamic value) {
+  double? toFiniteDouble(dynamic value) {
     if (value is num) {
       final v = value.toDouble();
       return v.isFinite ? v : null;
@@ -5727,63 +6454,133 @@ class FaceRecognitionService {
     dynamic face,
     int imageWidth,
     int imageHeight,
+  ) => extractFallbackFaceRect(face, imageWidth, imageHeight);
+
+  bool _isInsideZone(Rect rectRatio, RecognitionZone zone) =>
+      isInsideZone(rectRatio, zone);
+
+  img.Image _centerCropSquare(img.Image input) => centerCropSquare(input);
+
+  img.Image? _cropFaceTight(
+    img.Image source,
+    Rect rect, {
+    double paddingRatio = -0.06,
+  }) => cropFaceTight(source, rect, paddingRatio: paddingRatio);
+
+  img.Image? _selectRecognitionCrop({
+    required img.Image source,
+    required Rect rect,
+    _DetectedFace? detectedFace,
+    FaceMeshResult? mesh,
+  }) => selectRecognitionCrop(
+    source: source,
+    rect: rect,
+    detectedFace: detectedFace,
+    mesh: mesh,
+  );
+
+  Offset? _landmarkPixel(FaceMeshResult mesh, int index) =>
+      landmarkPixel(mesh, index);
+
+  Offset _rotatePoint(
+    Offset point,
+    Offset sourceCenter,
+    double angleDeg,
+    Offset targetCenter,
+  ) => rotatePoint(point, sourceCenter, angleDeg, targetCenter);
+
+  Future<_PartialEmbeddingBundle> _buildPartialEmbeddingsFromFace(
+    img.Image face, {
+    required int targetDimension,
+    double frameQuality = 1.0,
+    bool forRealtime = false,
+    bool faceAlreadyPrepared = false,
+  }) => buildPartialEmbeddingsFromFace(
+    face,
+    targetDimension: targetDimension,
+    frameQuality: frameQuality,
+    forRealtime: forRealtime,
+    faceAlreadyPrepared: faceAlreadyPrepared,
+  );
+
+  double _regionQuality(img.Image image, {required double minSharpness}) =>
+      regionQuality(image, minSharpness: minSharpness);
+
+  double _robustFaceLuminance(img.Image image) => robustFaceLuminance(image);
+
+  List<double> _alignVectorDimension(
+    List<double> vector,
+    int targetDimension,
+  ) => alignVectorDimension(vector, targetDimension);
+
+  List<double> _vectorFromImage(img.Image source) => vectorFromImage(source);
+
+  img.Image? _cameraImageToRgb(CameraImage image) => cameraImageToRgb(image);
+
+  img.Image? _cameraImageFaceToRgb(CameraImage image, Rect rect) =>
+      cameraImageFaceToRgb(image, rect);
+
+  Rect? extractFallbackFaceRect(
+    dynamic face,
+    int imageWidth,
+    int imageHeight,
   ) {
-    final bbox = _readDynamicMember(face, 'boundingBox');
+    final bbox = readDynamicMember(face, 'boundingBox');
     if (bbox == null) return null;
 
-    final left = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'left'),
-      _readDynamicMember(bbox, 'x'),
-      _readMapValue(bbox, 'left'),
-      _readMapValue(bbox, 'x'),
-      _readMapValue(bbox, 'xmin'),
-      _readNestedPointValue(bbox, 'topLeft', 'x'),
-      _readNestedPointValue(bbox, 'topLeft', 'dx'),
-      _readNestedPointValue(bbox, 'leftTop', 'x'),
-      _readNestedPointValue(bbox, 'leftTop', 'dx'),
-      _readListValue(bbox, 0),
+    final left = firstFiniteDouble(<dynamic>[
+      readDynamicMember(bbox, 'left'),
+      readDynamicMember(bbox, 'x'),
+      readMapValue(bbox, 'left'),
+      readMapValue(bbox, 'x'),
+      readMapValue(bbox, 'xmin'),
+      readNestedPointValue(bbox, 'topLeft', 'x'),
+      readNestedPointValue(bbox, 'topLeft', 'dx'),
+      readNestedPointValue(bbox, 'leftTop', 'x'),
+      readNestedPointValue(bbox, 'leftTop', 'dx'),
+      readListValue(bbox, 0),
     ]);
 
-    final top = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'top'),
-      _readDynamicMember(bbox, 'y'),
-      _readMapValue(bbox, 'top'),
-      _readMapValue(bbox, 'y'),
-      _readMapValue(bbox, 'ymin'),
-      _readNestedPointValue(bbox, 'topLeft', 'y'),
-      _readNestedPointValue(bbox, 'topLeft', 'dy'),
-      _readNestedPointValue(bbox, 'leftTop', 'y'),
-      _readNestedPointValue(bbox, 'leftTop', 'dy'),
-      _readListValue(bbox, 1),
+    final top = firstFiniteDouble(<dynamic>[
+      readDynamicMember(bbox, 'top'),
+      readDynamicMember(bbox, 'y'),
+      readMapValue(bbox, 'top'),
+      readMapValue(bbox, 'y'),
+      readMapValue(bbox, 'ymin'),
+      readNestedPointValue(bbox, 'topLeft', 'y'),
+      readNestedPointValue(bbox, 'topLeft', 'dy'),
+      readNestedPointValue(bbox, 'leftTop', 'y'),
+      readNestedPointValue(bbox, 'leftTop', 'dy'),
+      readListValue(bbox, 1),
     ]);
 
-    final width = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'width'),
-      _readMapValue(bbox, 'width'),
-      _readListValue(bbox, 2),
-      _deriveSizeFromBounds(
-        _firstFiniteDouble(<dynamic>[
-          _readDynamicMember(bbox, 'right'),
-          _readMapValue(bbox, 'right'),
-          _readMapValue(bbox, 'xmax'),
-          _readNestedPointValue(bbox, 'bottomRight', 'x'),
-          _readNestedPointValue(bbox, 'bottomRight', 'dx'),
+    final width = firstFiniteDouble(<dynamic>[
+      readDynamicMember(bbox, 'width'),
+      readMapValue(bbox, 'width'),
+      readListValue(bbox, 2),
+      deriveSizeFromBounds(
+        firstFiniteDouble(<dynamic>[
+          readDynamicMember(bbox, 'right'),
+          readMapValue(bbox, 'right'),
+          readMapValue(bbox, 'xmax'),
+          readNestedPointValue(bbox, 'bottomRight', 'x'),
+          readNestedPointValue(bbox, 'bottomRight', 'dx'),
         ]),
         left,
       ),
     ]);
 
-    final height = _firstFiniteDouble(<dynamic>[
-      _readDynamicMember(bbox, 'height'),
-      _readMapValue(bbox, 'height'),
-      _readListValue(bbox, 3),
-      _deriveSizeFromBounds(
-        _firstFiniteDouble(<dynamic>[
-          _readDynamicMember(bbox, 'bottom'),
-          _readMapValue(bbox, 'bottom'),
-          _readMapValue(bbox, 'ymax'),
-          _readNestedPointValue(bbox, 'bottomRight', 'y'),
-          _readNestedPointValue(bbox, 'bottomRight', 'dy'),
+    final height = firstFiniteDouble(<dynamic>[
+      readDynamicMember(bbox, 'height'),
+      readMapValue(bbox, 'height'),
+      readListValue(bbox, 3),
+      deriveSizeFromBounds(
+        firstFiniteDouble(<dynamic>[
+          readDynamicMember(bbox, 'bottom'),
+          readMapValue(bbox, 'bottom'),
+          readMapValue(bbox, 'ymax'),
+          readNestedPointValue(bbox, 'bottomRight', 'y'),
+          readNestedPointValue(bbox, 'bottomRight', 'dy'),
         ]),
         top,
       ),
@@ -5804,20 +6601,20 @@ class FaceRecognitionService {
     return Rect.fromLTWH(clampedLeft, clampedTop, clampedWidth, clampedHeight);
   }
 
-  double? _firstFiniteDouble(List<dynamic> values) {
+  double? firstFiniteDouble(List<dynamic> values) {
     for (final value in values) {
-      final parsed = _toFiniteDouble(value);
+      final parsed = toFiniteDouble(value);
       if (parsed != null) return parsed;
     }
     return null;
   }
 
-  double? _deriveSizeFromBounds(double? maxValue, double? minValue) {
+  double? deriveSizeFromBounds(double? maxValue, double? minValue) {
     if (maxValue == null || minValue == null) return null;
     return maxValue - minValue;
   }
 
-  dynamic _readDynamicMember(dynamic source, String member) {
+  dynamic readDynamicMember(dynamic source, String member) {
     if (source == null) return null;
     try {
       switch (member) {
@@ -5852,46 +6649,46 @@ class FaceRecognitionService {
     return null;
   }
 
-  dynamic _readMapValue(dynamic source, String key) {
+  dynamic readMapValue(dynamic source, String key) {
     if (source is Map) {
       return source[key];
     }
     return null;
   }
 
-  dynamic _readListValue(dynamic source, int index) {
+  dynamic readListValue(dynamic source, int index) {
     if (source is List && index >= 0 && index < source.length) {
       return source[index];
     }
     return null;
   }
 
-  dynamic _readNestedPointValue(
+  dynamic readNestedPointValue(
     dynamic source,
     String pointMember,
     String axis,
   ) {
     final point =
-        _readDynamicMember(source, pointMember) ??
-        _readMapValue(source, pointMember);
+        readDynamicMember(source, pointMember) ??
+        readMapValue(source, pointMember);
     if (point == null) return null;
 
     if (axis == 'x') {
-      return _readDynamicMember(point, 'x') ?? _readMapValue(point, 'x');
+      return readDynamicMember(point, 'x') ?? readMapValue(point, 'x');
     }
     if (axis == 'dx') {
-      return _readDynamicMember(point, 'dx') ?? _readMapValue(point, 'dx');
+      return readDynamicMember(point, 'dx') ?? readMapValue(point, 'dx');
     }
     if (axis == 'y') {
-      return _readDynamicMember(point, 'y') ?? _readMapValue(point, 'y');
+      return readDynamicMember(point, 'y') ?? readMapValue(point, 'y');
     }
     if (axis == 'dy') {
-      return _readDynamicMember(point, 'dy') ?? _readMapValue(point, 'dy');
+      return readDynamicMember(point, 'dy') ?? readMapValue(point, 'dy');
     }
     return null;
   }
 
-  bool _isInsideZone(Rect rectRatio, RecognitionZone zone) {
+  bool isInsideZone(Rect rectRatio, RecognitionZone zone) {
     final cx = rectRatio.center.dx;
     final cy = rectRatio.center.dy;
     final centerX = zone.leftRatio + zone.widthRatio / 2;
@@ -5909,14 +6706,14 @@ class FaceRecognitionService {
         localY <= zone.topRatio + zone.heightRatio;
   }
 
-  img.Image _centerCropSquare(img.Image input) {
+  img.Image centerCropSquare(img.Image input) {
     final side = math.min(input.width, input.height);
     final x = ((input.width - side) / 2).round();
     final y = ((input.height - side) / 2).round();
     return img.copyCrop(input, x: x, y: y, width: side, height: side);
   }
 
-  Rect _expandRect(
+  Rect expandRect(
     Rect rect, {
     required int imageWidth,
     required int imageHeight,
@@ -5931,7 +6728,7 @@ class FaceRecognitionService {
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
-  img.Image? _cropFace(img.Image source, Rect rect) {
+  img.Image? cropFace(img.Image source, Rect rect) {
     final x = rect.left.floor().clamp(0, source.width - 1);
     final y = rect.top.floor().clamp(0, source.height - 1);
     final w = rect.width.ceil().clamp(8, source.width - x);
@@ -5940,7 +6737,7 @@ class FaceRecognitionService {
     return img.copyCrop(source, x: x, y: y, width: w, height: h);
   }
 
-  img.Image? _cropFaceTight(
+  img.Image? cropFaceTight(
     img.Image source,
     Rect rect, {
     double paddingRatio = -0.06,
@@ -5955,7 +6752,7 @@ class FaceRecognitionService {
         : shortestSide < 256
         ? 0.03
         : 0.05;
-    final tightRect = _expandRect(
+    final tightRect = expandRect(
       rect,
       imageWidth: source.width,
       imageHeight: source.height,
@@ -5969,7 +6766,7 @@ class FaceRecognitionService {
     return img.copyCrop(source, x: x, y: y, width: w, height: h);
   }
 
-  img.Image? _selectRecognitionCrop({
+  img.Image? selectRecognitionCrop({
     required img.Image source,
     required Rect rect,
     _DetectedFace? detectedFace,
@@ -5981,24 +6778,24 @@ class FaceRecognitionService {
     }
 
     if (mesh != null) {
-      final alignedFromMesh = _alignedCropFromMesh(source, mesh);
+      final alignedFromMesh = alignedCropFromMesh(source, mesh);
       if (alignedFromMesh != null) {
         return alignedFromMesh;
       }
     }
 
-    return _cropFaceTight(source, rect);
+    return cropFaceTight(source, rect);
   }
 
-  img.Image? _alignedCropFromMesh(img.Image source, FaceMeshResult mesh) {
+  img.Image? alignedCropFromMesh(img.Image source, FaceMeshResult mesh) {
     if (mesh.landmarks.length < 363) {
       return null;
     }
 
-    final left = _landmarkPixel(mesh, 33);
-    final leftOuter = _landmarkPixel(mesh, 133);
-    final right = _landmarkPixel(mesh, 263);
-    final rightOuter = _landmarkPixel(mesh, 362);
+    final left = landmarkPixel(mesh, 33);
+    final leftOuter = landmarkPixel(mesh, 133);
+    final right = landmarkPixel(mesh, 263);
+    final rightOuter = landmarkPixel(mesh, 362);
     if (left == null ||
         leftOuter == null ||
         right == null ||
@@ -6034,13 +6831,13 @@ class FaceRecognitionService {
 
     final srcCenter = Offset(source.width / 2, source.height / 2);
     final dstCenter = Offset(rotated.width / 2, rotated.height / 2);
-    final leftEyeRotated = _rotatePoint(
+    final leftEyeRotated = rotatePoint(
       leftEye,
       srcCenter,
       -angleDeg,
       dstCenter,
     );
-    final rightEyeRotated = _rotatePoint(
+    final rightEyeRotated = rotatePoint(
       rightEye,
       srcCenter,
       -angleDeg,
@@ -6060,10 +6857,10 @@ class FaceRecognitionService {
       width: side,
       height: side,
     );
-    return _cropFaceTight(rotated, rect, paddingRatio: -0.08);
+    return cropFaceTight(rotated, rect, paddingRatio: -0.08);
   }
 
-  Offset? _landmarkPixel(FaceMeshResult mesh, int index) {
+  Offset? landmarkPixel(FaceMeshResult mesh, int index) {
     if (index < 0 || index >= mesh.landmarks.length) {
       return null;
     }
@@ -6071,7 +6868,7 @@ class FaceRecognitionService {
     return Offset(lm.x * mesh.imageWidth, lm.y * mesh.imageHeight);
   }
 
-  Offset _rotatePoint(
+  Offset rotatePoint(
     Offset point,
     Offset sourceCenter,
     double angleDeg,
@@ -6087,7 +6884,7 @@ class FaceRecognitionService {
     return Offset(targetCenter.dx + x, targetCenter.dy + y);
   }
 
-  Future<_PartialEmbeddingBundle> _buildPartialEmbeddingsFromFace(
+  Future<_PartialEmbeddingBundle> buildPartialEmbeddingsFromFace(
     img.Image face, {
     required int targetDimension,
     double frameQuality = 1.0,
@@ -6103,14 +6900,14 @@ class FaceRecognitionService {
       return const _PartialEmbeddingBundle();
     }
 
-    final foreheadCrop = _cropNormalized(square, 0.18, 0.02, 0.64, 0.18);
-    final leftEyeCrop = _cropNormalized(square, 0.06, 0.10, 0.32, 0.22);
-    final rightEyeCrop = _cropNormalized(square, 0.62, 0.10, 0.32, 0.22);
-    final noseCrop = _cropNormalized(square, 0.30, 0.28, 0.40, 0.30);
-    final leftCheekCrop = _cropNormalized(square, 0.04, 0.28, 0.28, 0.30);
-    final rightCheekCrop = _cropNormalized(square, 0.68, 0.28, 0.28, 0.30);
-    final mouthCrop = _cropNormalized(square, 0.22, 0.56, 0.56, 0.22);
-    final chinCrop = _cropNormalized(square, 0.28, 0.74, 0.44, 0.18);
+    final foreheadCrop = cropNormalized(square, 0.18, 0.02, 0.64, 0.18);
+    final leftEyeCrop = cropNormalized(square, 0.06, 0.10, 0.32, 0.22);
+    final rightEyeCrop = cropNormalized(square, 0.62, 0.10, 0.32, 0.22);
+    final noseCrop = cropNormalized(square, 0.30, 0.28, 0.40, 0.30);
+    final leftCheekCrop = cropNormalized(square, 0.04, 0.28, 0.28, 0.30);
+    final rightCheekCrop = cropNormalized(square, 0.68, 0.28, 0.28, 0.30);
+    final mouthCrop = cropNormalized(square, 0.22, 0.56, 0.56, 0.22);
+    final chinCrop = cropNormalized(square, 0.28, 0.74, 0.44, 0.18);
 
     Future<(List<double>?, double)> buildRegion(
       img.Image? region,
@@ -6119,7 +6916,7 @@ class FaceRecognitionService {
     ) async {
       if (region == null) return (null, 0.0);
       final prepared = _prepareFaceForEmbedding(region);
-      final quality = _regionQuality(
+      final quality = regionQuality(
         prepared,
         minSharpness: _minTemplateSharpness * 0.40,
       );
@@ -6136,7 +6933,7 @@ class FaceRecognitionService {
         alreadyPrepared: true,
         robust: robustRegionEmbedding,
       );
-      vector = _alignVectorDimension(vector, targetDimension);
+      vector = alignVectorDimension(vector, targetDimension);
       if (vector.isEmpty) return (null, 0.0);
 
       var weight = (baseWeight * quality).clamp(0.0, 1.0).toDouble();
@@ -6159,7 +6956,7 @@ class FaceRecognitionService {
     final mouth = await buildRegion(mouthCrop, 0.15, _mouthRegionMinQuality);
     final chin = await buildRegion(chinCrop, 0.13, 0.20);
 
-    final eyeVector = _averageVectors(<List<double>?>[leftEye.$1, rightEye.$1]);
+    final eyeVector = averageVectors(<List<double>?>[leftEye.$1, rightEye.$1]);
     final eyeWeightRaw = (leftEye.$2 + rightEye.$2).clamp(0.0, 1.0).toDouble();
 
     if (forRealtime) {
@@ -6276,7 +7073,7 @@ class FaceRecognitionService {
     );
   }
 
-  List<double>? _averageVectors(List<List<double>?> vectors) {
+  List<double>? averageVectors(List<List<double>?> vectors) {
     final present = vectors.whereType<List<double>>().toList(growable: false);
     if (present.isEmpty) return null;
     final length = present.first.length;
@@ -6297,7 +7094,7 @@ class FaceRecognitionService {
     return _normalizeVector(sum);
   }
 
-  img.Image? _cropNormalized(
+  img.Image? cropNormalized(
     img.Image source,
     double x,
     double y,
@@ -6312,12 +7109,12 @@ class FaceRecognitionService {
     return img.copyCrop(source, x: left, y: top, width: width, height: height);
   }
 
-  double _regionQuality(img.Image image, {required double minSharpness}) {
+  double regionQuality(img.Image image, {required double minSharpness}) {
     final sharpnessScore = (_imageSharpness(image) / minSharpness).clamp(
       0.0,
       1.0,
     );
-    final luminance = _robustFaceLuminance(image);
+    final luminance = robustFaceLuminance(image);
     final lightBalance = (1.0 - ((luminance - 0.5).abs() * 2.0)).clamp(
       0.0,
       1.0,
@@ -6327,7 +7124,7 @@ class FaceRecognitionService {
         .toDouble();
   }
 
-  double _robustFaceLuminance(img.Image image) {
+  double robustFaceLuminance(img.Image image) {
     final width = image.width;
     final height = image.height;
     if (width <= 0 || height <= 0) return 0.0;
@@ -6351,7 +7148,7 @@ class FaceRecognitionService {
         count++;
       }
     }
-    if (count <= 0) return _averageLuma(image);
+    if (count <= 0) return averageLuma(image);
 
     final lowTrim = (count * 0.08).round();
     final highTrim = (count * 0.92).round();
@@ -6374,21 +7171,11 @@ class FaceRecognitionService {
       kept += keep;
     }
 
-    if (kept <= 0) return _averageLuma(image);
+    if (kept <= 0) return averageLuma(image);
     return (weighted / kept / 255.0).clamp(0.0, 1.0).toDouble();
   }
 
-  double _averageLuma(img.Image image) {
-    final rgb = image.getBytes(order: img.ChannelOrder.rgb);
-    if (rgb.isEmpty) return 0.0;
-    var sum = 0.0;
-    for (var i = 0; i < rgb.length; i += 3) {
-      sum += (0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2]) / 255.0;
-    }
-    return (sum / (rgb.length / 3)).clamp(0.0, 1.0).toDouble();
-  }
-
-  List<double> _alignVectorDimension(List<double> vector, int targetDimension) {
+  List<double> alignVectorDimension(List<double> vector, int targetDimension) {
     if (vector.isEmpty) return const <double>[];
     if (targetDimension <= 0 || vector.length == targetDimension) {
       return vector;
@@ -6417,8 +7204,8 @@ class FaceRecognitionService {
     return aligned;
   }
 
-  List<double> _vectorFromImage(img.Image source) {
-    final square = _centerCropSquare(source);
+  List<double> vectorFromImage(img.Image source) {
+    final square = centerCropSquare(source);
     final resized = img.copyResize(
       square,
       width: 24,
@@ -6447,7 +7234,7 @@ class FaceRecognitionService {
     return vector;
   }
 
-  img.Image? _cameraImageToRgb(CameraImage image) {
+  img.Image? cameraImageToRgb(CameraImage image) {
     if (image.format.group == ImageFormatGroup.bgra8888 &&
         image.planes.isNotEmpty) {
       final plane = image.planes.first;
@@ -6504,7 +7291,7 @@ class FaceRecognitionService {
     return output;
   }
 
-  img.Image? _cameraImageFaceToRgb(CameraImage image, Rect rect) {
+  img.Image? cameraImageFaceToRgb(CameraImage image, Rect rect) {
     final shortestSide = math.min(rect.width, rect.height);
     final adaptivePadding = shortestSide < 64
         ? 0.14
@@ -6515,7 +7302,7 @@ class FaceRecognitionService {
         : shortestSide < 256
         ? 0.03
         : 0.05;
-    final paddedRect = _expandRect(
+    final paddedRect = expandRect(
       rect,
       imageWidth: image.width,
       imageHeight: image.height,
@@ -6590,6 +7377,7 @@ class FaceRecognitionService {
   }
 
   Future<void> dispose() async {
+    await _preprocessPool.dispose();
     await _runtimeConfigSub?.cancel();
     _runtimeConfigSub = null;
     _templateMonitorTimer?.cancel();
