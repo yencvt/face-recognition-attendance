@@ -58,10 +58,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   final List<_DiscoveredCamera> _discovered = [];
   bool _isScanning = false;
   Uint8List? _liveOverlayPng;
+  CameraTrackRuntimeStats? _liveTrackStats;
+  CameraWorkerRuntimeStats? _liveWorkerStats;
   RecognitionZone? _zone;
   int? _lastFramePacketAtMs;
   int? _lastFrameReceivedAtMs;
   double _frameFps = 0.0;
+  double _inputFps = 0.0;
+  double _recognitionFps = 0.0;
 
   int _total = 0;
   int _known = 0;
@@ -93,7 +97,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _bootstrap();
   }
 
-  Future<void> _ensureRecognitionForSelectedSafe({bool forceStart = false}) async {
+  Future<void> _ensureRecognitionForSelectedSafe({
+    bool forceStart = false,
+  }) async {
     try {
       await _ensureRecognitionForSelected(forceStart: forceStart);
     } catch (e) {
@@ -143,6 +149,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         setState(() {
           _liveOverlayPng = null;
           _liveOverlays = const [];
+          _liveTrackStats = null;
+          _liveWorkerStats = null;
+          _inputFps = 0.0;
+          _recognitionFps = 0.0;
         });
       }
       unawaited(_loadZone());
@@ -168,6 +178,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           _liveOverlayPng = packet.annotatedOverlayPng;
         }
         _liveOverlays = packet.overlays;
+        _liveTrackStats = packet.trackStats;
+        _liveWorkerStats = packet.workerStats;
+        _inputFps = packet.inputFps;
+        _recognitionFps = packet.recognitionFps;
         setState(() {});
       }
     });
@@ -184,13 +198,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
 
     _previewStatusRefreshTimer?.cancel();
-    _previewStatusRefreshTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) {
-        if (!mounted) return;
-        setState(() {});
-      },
-    );
+    _previewStatusRefreshTimer = Timer.periodic(const Duration(seconds: 1), (
+      _,
+    ) {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   Future<void> _refreshSummary() async {
@@ -268,7 +281,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final running = _recognitionService.isRunning(cam.id);
     final onColor = running ? Colors.lightGreenAccent : Colors.redAccent;
     final statsText = 'T $_total  N $_known  L $_stranger';
-    final frameStateText = _formatFrameFps();
+    final frameStateText = _formatPipelineFps();
+    final trackStatsText = _formatTrackStatsBadge(_liveTrackStats);
+    final workerStatsText = _formatWorkerStatsBadge(_liveWorkerStats);
 
     return IgnorePointer(
       child: Container(
@@ -282,54 +297,87 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             width: 0.8,
           ),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              cam.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9.6,
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    cam.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.6,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _statusPill(running ? 'ON' : 'OFF', onColor),
+                const SizedBox(width: 8),
+                Text(
+                  frameStateText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 9.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  statsText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 9.3,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  statusText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: statusColor.withValues(alpha: 0.95),
+                    fontSize: 9.2,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            _statusPill(running ? 'ON' : 'OFF', onColor),
-            const SizedBox(width: 8),
-            Text(
-              frameStateText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 9.4,
-                fontWeight: FontWeight.w600,
+            if (trackStatsText.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                trackStatsText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.cyanAccent.withValues(alpha: 0.95),
+                  fontSize: 9.0,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              statsText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 9.3,
-                fontWeight: FontWeight.w500,
+            ],
+            if (workerStatsText.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(
+                workerStatsText,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.amberAccent.withValues(alpha: 0.96),
+                  fontSize: 8.9,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              statusText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: statusColor.withValues(alpha: 0.95),
-                fontSize: 9.2,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -361,9 +409,75 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return '${_frameFps.toStringAsFixed(_frameFps >= 10 ? 0 : 1)} fps';
   }
 
+  String _formatPipelineFps() {
+    final inText = _inputFps <= 0
+        ? 'In 0.0'
+        : 'In ${_inputFps.toStringAsFixed(_inputFps >= 10 ? 0 : 1)}';
+    final recText = _recognitionFps <= 0
+        ? 'Rec 0.0'
+        : 'Rec ${_recognitionFps.toStringAsFixed(_recognitionFps >= 10 ? 0 : 1)}';
+    return '$inText/$recText';
+  }
+
+  String _formatTrackStatsBadge(CameraTrackRuntimeStats? stats) {
+    if (stats == null || stats.observedFaces <= 0) {
+      return '';
+    }
+    final reusePct = (stats.reuseRate * 100).clamp(0.0, 100.0);
+    return 'BT ${reusePct.toStringAsFixed(0)}% '
+        'R:${stats.reusedFaces}/${stats.observedFaces} '
+        'T:${stats.refreshByTtl} P:${stats.refreshByPose} A:${stats.refreshByAssociation} G:${stats.refreshByGeometry}';
+  }
+
+  String _formatTrackStatsCompact(CameraTrackRuntimeStats? stats) {
+    if (stats == null || stats.observedFaces <= 0) {
+      return 'ByteTrack: chua co du lieu';
+    }
+    final reusePct = (stats.reuseRate * 100).clamp(0.0, 100.0);
+    return 'ByteTrack reuse ${reusePct.toStringAsFixed(0)}% '
+        '(${stats.reusedFaces}/${stats.observedFaces}) '
+        '• refresh TTL ${stats.refreshByTtl} '
+        'Pose ${stats.refreshByPose} '
+        'Assoc ${stats.refreshByAssociation} '
+        'Geo ${stats.refreshByGeometry}';
+  }
+
+  String _formatWorkerStatsBadge(CameraWorkerRuntimeStats? stats) {
+    if (stats == null) {
+      return '';
+    }
+    final perWorkerText = stats.perWorkerFps.isEmpty
+        ? '0.0'
+        : stats.perWorkerFps
+              .map((fps) => fps.toStringAsFixed(fps >= 10 ? 0 : 1))
+              .join(' | ');
+    final totalText = stats.totalWorkerFps.toStringAsFixed(
+      stats.totalWorkerFps >= 10 ? 0 : 1,
+    );
+    return 'W ${stats.activeWorkers}/${stats.configuredWorkers} '
+        'WFPS [$perWorkerText] Sum $totalText';
+  }
+
+  String _formatWorkerStatsCompact(CameraWorkerRuntimeStats? stats) {
+    if (stats == null) {
+      return 'Workers: chua co du lieu';
+    }
+    final perWorkerText = stats.perWorkerFps.isEmpty
+        ? '0.0'
+        : stats.perWorkerFps
+              .map((fps) => fps.toStringAsFixed(fps >= 10 ? 0 : 1))
+              .join(' / ');
+    return 'Workers ${stats.activeWorkers}/${stats.configuredWorkers} '
+        '• fps $perWorkerText';
+  }
+
   Future<void> _selectCamera(String id) async {
     await _streamService.selectCamera(id);
     _liveOverlayPng = null;
+    _liveTrackStats = null;
+    _liveWorkerStats = null;
+    _inputFps = 0.0;
+    _recognitionFps = 0.0;
     await _ensureRecognitionForSelected();
   }
 
@@ -375,7 +489,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     try {
       final cameras = await availableCameras();
-      final localDiscovered = cameras.asMap().entries
+      final localDiscovered = cameras
+          .asMap()
+          .entries
           .map((entry) {
             final index = entry.key;
             final camera = entry.value;
@@ -424,15 +540,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return const <_DiscoveredCamera>[];
     }
 
-    final hosts = List<String>.generate(80, (index) => '$subnetPrefix.${index + 2}');
+    final hosts = List<String>.generate(
+      80,
+      (index) => '$subnetPrefix.${index + 2}',
+    );
     final found = <_DiscoveredCamera>[];
     const chunkSize = 16;
 
     for (var i = 0; i < hosts.length; i += chunkSize) {
       final chunk = hosts.sublist(i, (i + chunkSize).clamp(0, hosts.length));
-      final result = await Future.wait(
-        chunk.map(_probeLanCameraHost),
-      );
+      final result = await Future.wait(chunk.map(_probeLanCameraHost));
       for (final item in result) {
         if (item != null) {
           found.add(item);
@@ -549,14 +666,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _friendlyCameraName(CameraDescription camera, int index) {
     final raw = camera.name.trim();
     final lower = raw.toLowerCase();
-    if (lower.contains('integrated') || lower.contains('built-in') ||
-        lower.contains('internal') || lower.contains('laptop')) {
+    if (lower.contains('integrated') ||
+        lower.contains('built-in') ||
+        lower.contains('internal') ||
+        lower.contains('laptop')) {
       return 'Camera laptop';
     }
     if (lower.contains('usb')) {
       return 'Camera USB ${index + 1}';
     }
-    if (lower.contains('virtual') || lower.contains('obs') ||
+    if (lower.contains('virtual') ||
+        lower.contains('obs') ||
         lower.contains('droidcam')) {
       return 'Camera ao ${index + 1}';
     }
@@ -578,10 +698,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         endpoint.startsWith('https://');
   }
 
-  String _cameraConfigKey({
-    required String source,
-    required String endpoint,
-  }) {
+  String _cameraConfigKey({required String source, required String endpoint}) {
     return '${source.trim().toLowerCase()}|${endpoint.trim().toLowerCase()}';
   }
 
@@ -694,7 +811,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             if (selected == _CameraInputMode.ip) {
                               sourceController.text = 'ip-camera';
                               if (nameController.text.trim().isEmpty ||
-                                  nameController.text.trim() == 'Default camera') {
+                                  nameController.text.trim() ==
+                                      'Default camera') {
                                 nameController.text = 'Camera IP';
                               }
                             } else if (_discovered.isNotEmpty) {
@@ -781,7 +899,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         width: double.infinity,
                         child: FilledButton.icon(
                           onPressed: () async {
-                            final messenger = ScaffoldMessenger.of(this.context);
+                            final messenger = ScaffoldMessenger.of(
+                              this.context,
+                            );
                             final name = nameController.text.trim();
                             if (name.isEmpty) return;
 
@@ -798,7 +918,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             )) {
                               messenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text('Camera nay da duoc them. Khong the them trung cau hinh.'),
+                                  content: Text(
+                                    'Camera nay da duoc them. Khong the them trung cau hinh.',
+                                  ),
                                 ),
                               );
                               return;
@@ -807,7 +929,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             if (isIpMode && !_isValidIpEndpoint(endpoint)) {
                               messenger.showSnackBar(
                                 const SnackBar(
-                                  content: Text('URL camera IP khong hop le. Dung rtsp:// hoac http(s)://'),
+                                  content: Text(
+                                    'URL camera IP khong hop le. Dung rtsp:// hoac http(s)://',
+                                  ),
                                 ),
                               );
                               return;
@@ -815,10 +939,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
                             final id = DateTime.now().microsecondsSinceEpoch
                                 .toString();
-                            final color = Colors.primaries[_snapshot
-                                    .sessions
-                                    .length %
-                                Colors.primaries.length];
+                            final color =
+                                Colors.primaries[_snapshot.sessions.length %
+                                    Colors.primaries.length];
                             await _streamService.saveCamera({
                               'id': id,
                               'name': name,
@@ -881,7 +1004,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         orElse: () => _selected,
       );
       await _releaseLocalStreamBeforeRecognition(session);
-      final selectedIndex = _snapshot.sessions.indexWhere((s) => s.id == cameraId);
+      final selectedIndex = _snapshot.sessions.indexWhere(
+        (s) => s.id == cameraId,
+      );
       final cameraIndex = selectedIndex >= 0 ? selectedIndex : 0;
       await _recognitionService.ensureProcessorForCamera(
         cameraId,
@@ -953,7 +1078,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 )) {
                   messenger.showSnackBar(
                     const SnackBar(
-                      content: Text('Da ton tai camera khac co cung source/endpoint.'),
+                      content: Text(
+                        'Da ton tai camera khac co cung source/endpoint.',
+                      ),
                     ),
                   );
                   return;
@@ -1231,7 +1358,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     itemCount: _logs.length,
                     separatorBuilder: (context, index) =>
                         const Divider(height: 8),
-                    itemBuilder: (context, index) => _buildLogTile(_logs[index]),
+                    itemBuilder: (context, index) =>
+                        _buildLogTile(_logs[index]),
                   ),
           ),
         ],
@@ -1309,82 +1437,95 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return const [];
     }
 
-    return _liveOverlays.expand((overlay) {
-      var ratio = overlay.rectRatio;
-      if (mirror) {
-        ratio = Rect.fromLTWH(
-          (1 - ratio.right).clamp(0.0, 1.0),
-          ratio.top,
-          ratio.width,
-          ratio.height,
-        );
-      }
+    return _liveOverlays
+        .expand((overlay) {
+          var ratio = overlay.rectRatio;
+          if (mirror) {
+            ratio = Rect.fromLTWH(
+              (1 - ratio.right).clamp(0.0, 1.0),
+              ratio.top,
+              ratio.width,
+              ratio.height,
+            );
+          }
 
-      final left = (ratio.left * width).clamp(0.0, width - 1.0);
-      final top = (ratio.top * height - 22).clamp(0.0, height - 22.0);
-      final isStranger = overlay.event.isStranger;
-      final color = isStranger ? Colors.orangeAccent : Colors.lightGreenAccent;
-      final label =
-          '${overlay.event.personName} ${(overlay.event.confidence * 100).toStringAsFixed(0)}%';
-      final debugLabel = overlay.debugLabel;
-      final maxLabelWidth = (width * 0.40).clamp(120.0, 260.0);
-      final clampedLeft = left.clamp(0.0, (width - maxLabelWidth).clamp(0.0, width));
-      final debugTop = (ratio.bottom * height + 4).clamp(0.0, height - 18.0);
+          final left = (ratio.left * width).clamp(0.0, width - 1.0);
+          final top = (ratio.top * height - 22).clamp(0.0, height - 22.0);
+          final isStranger = overlay.event.isStranger;
+          final color = isStranger
+              ? Colors.orangeAccent
+              : Colors.lightGreenAccent;
+          final label =
+              '${overlay.event.personName} ${(overlay.event.confidence * 100).toStringAsFixed(0)}%';
+          final debugLabel = overlay.debugLabel;
+          final maxLabelWidth = (width * 0.40).clamp(120.0, 260.0);
+          final clampedLeft = left.clamp(
+            0.0,
+            (width - maxLabelWidth).clamp(0.0, width),
+          );
+          final debugTop = (ratio.bottom * height + 4).clamp(
+            0.0,
+            height - 18.0,
+          );
 
-      final widgets = <Widget>[
-        Positioned(
-          left: clampedLeft,
-          top: top,
-          child: IgnorePointer(
-            child: Container(
-              constraints: BoxConstraints(maxWidth: maxLabelWidth),
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.58),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: color.withValues(alpha: 0.75)),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-        ),
-      ];
-
-      if (debugLabel != null && debugLabel.isNotEmpty) {
-        widgets.add(
-          Positioned(
-            left: clampedLeft,
-            top: debugTop,
-            child: IgnorePointer(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxLabelWidth),
-                child: Text(
-                  debugLabel,
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.92),
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w500,
+          final widgets = <Widget>[
+            Positioned(
+              left: clampedLeft,
+              top: top,
+              child: IgnorePointer(
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: maxLabelWidth),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.58),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: color.withValues(alpha: 0.75)),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }
+          ];
 
-      return widgets;
-    }).toList(growable: false);
+          if (debugLabel != null && debugLabel.isNotEmpty) {
+            widgets.add(
+              Positioned(
+                left: clampedLeft,
+                top: debugTop,
+                child: IgnorePointer(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxLabelWidth),
+                    child: Text(
+                      debugLabel,
+                      style: TextStyle(
+                        color: color.withValues(alpha: 0.92),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return widgets;
+        })
+        .toList(growable: false);
   }
 
   Widget _preview() {
@@ -1436,7 +1577,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       Positioned(
                         left: 12,
                         bottom: 12,
-                        child: _buildPreviewInfoBadge(cam, status.$1, status.$2),
+                        child: _buildPreviewInfoBadge(
+                          cam,
+                          status.$1,
+                          status.$2,
+                        ),
                       ),
                     ],
                   );
@@ -1507,9 +1652,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       backgroundColor: const Color(0xFFF3F6FB),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Text(
-          i18n.t('attendance.title'),
-        ),
+        title: Text(i18n.t('attendance.title')),
         actions: [
           _buildLanguageSelector(context),
           IconButton(
@@ -1519,9 +1662,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
           IconButton(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
             icon: const Icon(Icons.settings),
             tooltip: i18n.t('attendance.systemConfig'),
@@ -1572,8 +1715,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       flex: 2,
                       child: Column(
                         children: [
-                                  Expanded(flex: 4, child: _preview()),
-                                  const SizedBox(height: 10),
+                          Expanded(flex: 4, child: _preview()),
+                          const SizedBox(height: 10),
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
@@ -1644,13 +1787,70 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                 itemCount: _snapshot.sessions.length,
                                 itemBuilder: (context, i) {
                                   final c = _snapshot.sessions[i];
-                                  final running = _recognitionService.isRunning(c.id);
+                                  final running = _recognitionService.isRunning(
+                                    c.id,
+                                  );
                                   final status = _cameraStatusView(c);
+                                  final trackLine = c.id == _selectedId
+                                      ? _formatTrackStatsCompact(
+                                          _liveTrackStats,
+                                        )
+                                      : null;
+                                  final fpsLine = c.id == _selectedId
+                                      ? _formatPipelineFps()
+                                      : null;
+                                  final workerLine = c.id == _selectedId
+                                      ? _formatWorkerStatsCompact(
+                                          _liveWorkerStats,
+                                        )
+                                      : null;
                                   return ListTile(
                                     selected: c.id == _selectedId,
                                     onTap: () => _selectCamera(c.id),
                                     title: Text(c.name),
-                                    subtitle: Text(status.$1, style: TextStyle(color: status.$2)),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          status.$1,
+                                          style: TextStyle(color: status.$2),
+                                        ),
+                                        if (fpsLine != null)
+                                          Text(
+                                            fpsLine,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.teal.shade700,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        if (workerLine != null)
+                                          Text(
+                                            workerLine,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.amber.shade800,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        if (trackLine != null)
+                                          Text(
+                                            trackLine,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: Colors.blueGrey.shade700,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                     leading: CircleAvatar(
                                       backgroundColor: c.color,
                                     ),
@@ -1667,7 +1867,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                       itemBuilder: (context) => [
                                         PopupMenuItem(
                                           value: 'toggle',
-                                          child: Text(running ? 'Tat nhan dien' : 'Bat nhan dien'),
+                                          child: Text(
+                                            running
+                                                ? 'Tat nhan dien'
+                                                : 'Bat nhan dien',
+                                          ),
                                         ),
                                         const PopupMenuItem(
                                           value: 'edit',
@@ -1693,8 +1897,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 )
               : Column(
                   children: [
-                      Expanded(flex: 3, child: _preview()),
-                      const SizedBox(height: 8),
+                    Expanded(flex: 3, child: _preview()),
+                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
@@ -1736,9 +1940,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     const SizedBox(height: 8),
                     Expanded(
                       flex: 2,
-                      child: _DailyLogsCard(
-                        itemBuilder: _buildCompactLogTile,
-                      ),
+                      child: _DailyLogsCard(itemBuilder: _buildCompactLogTile),
                     ),
                     const SizedBox(height: 8),
                     Expanded(flex: 2, child: _buildRealtimeLogsCard()),
@@ -1759,7 +1961,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           height: 34,
           padding: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+            color: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: Theme.of(context).dividerColor.withValues(alpha: 0.55),
@@ -1921,7 +2125,11 @@ class _DailyLogsCardState extends State<_DailyLogsCard> {
     if (picked == null) return;
 
     setState(() {
-      _startDate = DateTime(picked.start.year, picked.start.month, picked.start.day);
+      _startDate = DateTime(
+        picked.start.year,
+        picked.start.month,
+        picked.start.day,
+      );
       _endDate = DateTime(picked.end.year, picked.end.month, picked.end.day);
     });
     await _loadLogs();
@@ -1950,14 +2158,14 @@ class _DailyLogsCardState extends State<_DailyLogsCard> {
             'attendance_range_${_startDate.year.toString().padLeft(4, '0')}${_startDate.month.toString().padLeft(2, '0')}${_startDate.day.toString().padLeft(2, '0')}_${_endDate.year.toString().padLeft(4, '0')}${_endDate.month.toString().padLeft(2, '0')}${_endDate.day.toString().padLeft(2, '0')}.csv',
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Da xuat CSV: $outputPath')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Da xuat CSV: $outputPath')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Xuat CSV that bai: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Xuat CSV that bai: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -2041,20 +2249,20 @@ class _DailyLogsCardState extends State<_DailyLogsCard> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredLogs.isEmpty
-                    ? const Center(
-                        child: Text('Khong co log trong khoang ngay da chon.'),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        itemCount: filteredLogs.length,
-                        separatorBuilder: (context, index) =>
-                            const Divider(height: 3),
-                        itemBuilder: (context, index) =>
-                            widget.itemBuilder(filteredLogs[index]),
-                      ),
+                ? const Center(
+                    child: Text('Khong co log trong khoang ngay da chon.'),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    itemCount: filteredLogs.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 3),
+                    itemBuilder: (context, index) =>
+                        widget.itemBuilder(filteredLogs[index]),
+                  ),
           ),
         ],
       ),

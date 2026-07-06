@@ -42,6 +42,10 @@ class RecognitionFramePacket {
     required this.cameraId,
     required this.overlays,
     required this.createdAt,
+    this.trackStats,
+    this.workerStats,
+    this.inputFps = 0,
+    this.recognitionFps = 0,
     this.annotatedFrameJpeg,
     this.annotatedOverlayPng,
   });
@@ -49,9 +53,190 @@ class RecognitionFramePacket {
   final String cameraId;
   final List<FaceOverlayBox> overlays;
   final int createdAt;
+  final CameraTrackRuntimeStats? trackStats;
+  final CameraWorkerRuntimeStats? workerStats;
+  final double inputFps;
+  final double recognitionFps;
   final Uint8List? annotatedFrameJpeg;
   final Uint8List? annotatedOverlayPng;
 }
+
+class CameraTrackRuntimeStats {
+  const CameraTrackRuntimeStats({
+    required this.windowStartedAtMs,
+    required this.windowDurationMs,
+    required this.observedFaces,
+    required this.reusedFaces,
+    required this.refreshedFaces,
+    required this.refreshByAssociation,
+    required this.refreshByTtl,
+    required this.refreshByPose,
+    required this.refreshByGeometry,
+  });
+
+  final int windowStartedAtMs;
+  final int windowDurationMs;
+  final int observedFaces;
+  final int reusedFaces;
+  final int refreshedFaces;
+  final int refreshByAssociation;
+  final int refreshByTtl;
+  final int refreshByPose;
+  final int refreshByGeometry;
+
+  double get reuseRate =>
+      observedFaces <= 0 ? 0.0 : reusedFaces / observedFaces;
+}
+
+class CameraWorkerRuntimeStats {
+  const CameraWorkerRuntimeStats({
+    required this.activeWorkers,
+    required this.configuredWorkers,
+    required this.totalWorkerFps,
+    required this.perWorkerFps,
+  });
+
+  final int activeWorkers;
+  final int configuredWorkers;
+  final double totalWorkerFps;
+  final List<double> perWorkerFps;
+}
+
+class _WorkerRuntimeAccumulator {
+  _WorkerRuntimeAccumulator({required this.maxWorkers});
+
+  static const double _emaKeep = 0.80;
+  static const double _emaAdd = 0.20;
+
+  int maxWorkers;
+  int activeWorkers = 0;
+  int configuredWorkers = 1;
+  final List<double> _perWorkerFpsEma = <double>[];
+
+  void resetForMaxWorkers(int value) {
+    maxWorkers = value;
+    configuredWorkers = value;
+    activeWorkers = 0;
+    for (var i = 0; i < _perWorkerFpsEma.length; i++) {
+      _perWorkerFpsEma[i] *= _emaKeep;
+      if (_perWorkerFpsEma[i] < 0.01) {
+        _perWorkerFpsEma[i] = 0.0;
+      }
+    }
+  }
+
+  void updateBatch({
+    required int configured,
+    required int active,
+    required int elapsedMs,
+    required List<int> processedPerWorker,
+  }) {
+    configuredWorkers = configured;
+    activeWorkers = active;
+    if (_perWorkerFpsEma.length < processedPerWorker.length) {
+      _perWorkerFpsEma.addAll(
+        List<double>.filled(
+          processedPerWorker.length - _perWorkerFpsEma.length,
+          0.0,
+        ),
+      );
+    }
+    final safeElapsed = math.max(1, elapsedMs);
+
+    for (var i = 0; i < _perWorkerFpsEma.length; i++) {
+      final processed = i < processedPerWorker.length
+          ? processedPerWorker[i]
+          : 0;
+      final instant = processed <= 0 ? 0.0 : (processed * 1000.0) / safeElapsed;
+      final prev = _perWorkerFpsEma[i];
+      _perWorkerFpsEma[i] = prev <= 0
+          ? instant
+          : (prev * _emaKeep) + (instant * _emaAdd);
+      if (_perWorkerFpsEma[i] < 0.01) {
+        _perWorkerFpsEma[i] = 0.0;
+      }
+    }
+  }
+
+  CameraWorkerRuntimeStats snapshot() {
+    final visibleCount = math
+        .max(activeWorkers, configuredWorkers)
+        .clamp(0, _perWorkerFpsEma.length);
+    final perWorker = List<double>.generate(
+      visibleCount,
+      (index) => _perWorkerFpsEma[index],
+      growable: false,
+    );
+    final total = perWorker.fold<double>(0.0, (sum, value) => sum + value);
+    return CameraWorkerRuntimeStats(
+      activeWorkers: activeWorkers,
+      configuredWorkers: configuredWorkers,
+      totalWorkerFps: total,
+      perWorkerFps: perWorker,
+    );
+  }
+}
+
+class _TrackStatsAccumulator {
+  _TrackStatsAccumulator({required this.windowStartedAtMs});
+
+  static const int windowDurationMs = 10000;
+  int windowStartedAtMs;
+  int observedFaces = 0;
+  int reusedFaces = 0;
+  int refreshedFaces = 0;
+  int refreshByAssociation = 0;
+  int refreshByTtl = 0;
+  int refreshByPose = 0;
+  int refreshByGeometry = 0;
+
+  void reset(int nowMs) {
+    windowStartedAtMs = nowMs;
+    observedFaces = 0;
+    reusedFaces = 0;
+    refreshedFaces = 0;
+    refreshByAssociation = 0;
+    refreshByTtl = 0;
+    refreshByPose = 0;
+    refreshByGeometry = 0;
+  }
+
+  void onReuse() {
+    observedFaces++;
+    reusedFaces++;
+  }
+
+  void onRefresh(_TrackReuseRejectReason reason) {
+    observedFaces++;
+    refreshedFaces++;
+    switch (reason) {
+      case _TrackReuseRejectReason.association:
+        refreshByAssociation++;
+      case _TrackReuseRejectReason.ttl:
+        refreshByTtl++;
+      case _TrackReuseRejectReason.pose:
+        refreshByPose++;
+      case _TrackReuseRejectReason.geometry:
+        refreshByGeometry++;
+    }
+  }
+
+  CameraTrackRuntimeStats snapshot() {
+    return CameraTrackRuntimeStats(
+      windowStartedAtMs: windowStartedAtMs,
+      windowDurationMs: windowDurationMs,
+      observedFaces: observedFaces,
+      reusedFaces: reusedFaces,
+      refreshedFaces: refreshedFaces,
+      refreshByAssociation: refreshByAssociation,
+      refreshByTtl: refreshByTtl,
+      refreshByPose: refreshByPose,
+      refreshByGeometry: refreshByGeometry,
+    );
+  }
+}
+
+enum _TrackReuseRejectReason { association, ttl, pose, geometry }
 
 class FaceRecognitionNotification {
   FaceRecognitionNotification({required this.cameraId, required this.event});
@@ -777,6 +962,10 @@ class _Processor {
   final List<CameraImage> pendingFrames = <CameraImage>[];
   Timer? pendingDrainTimer;
   Timer? stillCaptureTimer;
+  int lastInputFrameAtMs = 0;
+  int lastRecognitionFrameAtMs = 0;
+  double inputFpsEma = 0.0;
+  double recognitionFpsEma = 0.0;
 }
 
 class _CameraFrameInput {
@@ -793,6 +982,13 @@ class _CameraTrack {
     required this.targetRect,
     required this.event,
     required this.lastSeenAt,
+    required this.lastRecognitionAt,
+    required this.lastTrackingConfidence,
+    this.lastYawDeg,
+    this.lastPitchDeg,
+    this.reuseCount = 0,
+    this.cachedEmbedding,
+    this.cachedEmbeddingAtMs = 0,
   });
 
   final String key;
@@ -800,6 +996,13 @@ class _CameraTrack {
   Rect targetRect;
   RecognitionEvent event;
   int lastSeenAt;
+  int lastRecognitionAt;
+  double lastTrackingConfidence;
+  double? lastYawDeg;
+  double? lastPitchDeg;
+  int reuseCount;
+  List<double>? cachedEmbedding;
+  int cachedEmbeddingAtMs;
 }
 
 class _DetectedFace {
@@ -808,6 +1011,100 @@ class _DetectedFace {
   final Rect rect;
   final img.Image? alignedCrop;
   final double score;
+}
+
+class _NativePendingRecognition {
+  _NativePendingRecognition({
+    required this.tracked,
+    required this.ratio,
+    required this.rect,
+    required this.pose,
+    required this.relaxedAssociation,
+    required this.minFacePixels,
+    required this.faceAreaRatio,
+    required this.adaptiveFarDistance,
+    required this.frameQuality,
+    required this.spoofScore,
+    required this.workingCrop,
+  });
+
+  final (String, _CameraTrack, double)? tracked;
+  final Rect ratio;
+  final Rect rect;
+  final (double?, double?) pose;
+  final bool relaxedAssociation;
+  final int minFacePixels;
+  final double faceAreaRatio;
+  final bool adaptiveFarDistance;
+  final double frameQuality;
+  final double spoofScore;
+  final img.Image workingCrop;
+}
+
+class _NativeComputedRecognition {
+  _NativeComputedRecognition({
+    required this.pending,
+    required this.vector,
+    required this.partialBundle,
+  });
+
+  final _NativePendingRecognition pending;
+  final List<double> vector;
+  final _PartialEmbeddingBundle partialBundle;
+}
+
+class _FallbackPendingRecognition {
+  _FallbackPendingRecognition({
+    required this.tracked,
+    required this.ratio,
+    required this.rect,
+    required this.relaxedAssociation,
+    required this.minFacePixels,
+    required this.faceAreaRatio,
+    required this.adaptiveFarDistance,
+    required this.frameQuality,
+    required this.spoofScore,
+    required this.workingCrop,
+  });
+
+  final (String, _CameraTrack, double)? tracked;
+  final Rect ratio;
+  final Rect rect;
+  final bool relaxedAssociation;
+  final int minFacePixels;
+  final double faceAreaRatio;
+  final bool adaptiveFarDistance;
+  final double frameQuality;
+  final double spoofScore;
+  final img.Image workingCrop;
+}
+
+class _FallbackComputedRecognition {
+  _FallbackComputedRecognition({
+    required this.pending,
+    required this.vector,
+    required this.partialBundle,
+  });
+
+  final _FallbackPendingRecognition pending;
+  final List<double> vector;
+  final _PartialEmbeddingBundle partialBundle;
+}
+
+class _ConcurrencyRunResult<R> {
+  const _ConcurrencyRunResult({
+    required this.results,
+    required this.workerCount,
+    required this.activeWorkers,
+    required this.processedPerWorker,
+    required this.elapsedMs,
+  });
+
+  final List<R> results;
+  final int workerCount;
+  final int activeWorkers;
+  final List<int> processedPerWorker;
+  final int elapsedMs;
 }
 
 class _SpoofAssessment {
@@ -874,6 +1171,8 @@ class FaceRecognitionService {
   final Map<String, RecognitionZone> _zoneByCameraId = {};
   final Map<String, _SpoofState> _spoofStates = {};
   final Map<String, _AdaptiveDistanceState> _adaptiveDistanceStates = {};
+  final Map<String, _TrackStatsAccumulator> _trackStatsByCameraId = {};
+  final Map<String, _WorkerRuntimeAccumulator> _workerStatsByCameraId = {};
   final Map<String, int> _missingTemplateGuardLogAtByCameraId = {};
   final List<RecognitionEvent> _realtimeEventCache = <RecognitionEvent>[];
   final List<RecognitionEvent> _pendingDbEvents = <RecognitionEvent>[];
@@ -936,6 +1235,8 @@ class FaceRecognitionService {
   int get _processFrameIntervalMs => _runtimeConfig.processFrameIntervalMs;
   int get _singleFlightKeepLatestFrames =>
       _runtimeConfig.singleFlightKeepLatestFrames.clamp(1, 24).toInt();
+  int get _faceMeshMaxWorkers =>
+      _runtimeConfig.faceMeshMaxWorkers.clamp(1, 8).toInt();
   int get _detectorInputWidth => _runtimeConfig.detectorInputWidth;
   int get _detectorInputHeight => _runtimeConfig.detectorInputHeight;
   int get _trackKeepAliveMs => _runtimeConfig.trackKeepAliveMs;
@@ -955,6 +1256,17 @@ class FaceRecognitionService {
   static const int _realtimePartialModeDisabled = 2;
   int get _eventPublishIntervalMs =>
       _runtimeConfig.eventPublishIntervalMs.clamp(1000, 20000).toInt();
+  int get _trackReuseKnownMs =>
+      _runtimeConfig.trackReuseKnownMs.clamp(200, 5000).toInt();
+  int get _trackReuseStrangerMs =>
+      _runtimeConfig.trackReuseStrangerMs.clamp(120, 3000).toInt();
+  double get _trackPoseRefreshDeltaDeg =>
+      _runtimeConfig.trackPoseRefreshDeltaDeg.clamp(3.0, 45.0).toDouble();
+  double get _trackReuseMinIoU =>
+      (_trackMatchMinScore + 0.10).clamp(0.46, 0.84).toDouble();
+  double get _trackReuseMaxCenterDistance => 0.20;
+  double get _trackAssociationMinScore =>
+      (_trackMatchMinScore - 0.12).clamp(0.22, 0.78).toDouble();
   double get _minRealtimeFrameQuality => _runtimeConfig.minRealtimeFrameQuality;
   double get _minRealtimeFaceAreaRatio =>
       _runtimeConfig.minRealtimeFaceAreaRatio;
@@ -987,6 +1299,7 @@ class FaceRecognitionService {
     final valid = parsed.intersection(fallback);
     return valid.isEmpty ? fallback : valid;
   }
+
   int get _realtimePartialFrameCycle =>
       _runtimeConfig.realtimePartialFrameCycle;
   double get _minEnrollmentFaceAreaRatio =>
@@ -998,7 +1311,7 @@ class FaceRecognitionService {
   double get _maxEnrollmentFaceAspectRatio =>
       _runtimeConfig.maxEnrollmentFaceAspectRatio;
   int get _minEnrollmentFacePixels => _runtimeConfig.minEnrollmentFacePixels;
-    bool get _enableRealtimeAutoSharpen =>
+  bool get _enableRealtimeAutoSharpen =>
       _runtimeConfig.enableRealtimeAutoSharpen;
   static const List<String> _scrfdModelAssets = <String>[
     'assets/models/scrfd_2.5g_bnkps.onnx',
@@ -2028,6 +2341,8 @@ class FaceRecognitionService {
     _zoneByCameraId.remove(cameraId);
     _spoofStates.removeWhere((key, _) => key.startsWith('$cameraId|'));
     _adaptiveDistanceStates.remove(cameraId);
+    _trackStatsByCameraId.remove(cameraId);
+    _workerStatsByCameraId.remove(cameraId);
     final window = _calibrationWindows.remove(cameraId);
     window?.timer?.cancel();
     _emitFrame(cameraId, const []);
@@ -2039,6 +2354,8 @@ class FaceRecognitionService {
     CameraImage image,
   ) {
     if (!processor.controller.value.isInitialized) return;
+
+    _markInputFrame(processor, DateTime.now().millisecondsSinceEpoch);
 
     processor.pendingFrames.add(image);
     final maxPending = _singleFlightKeepLatestFrames;
@@ -2093,6 +2410,7 @@ class FaceRecognitionService {
     processor.stillCaptureTimer = Timer.periodic(
       Duration(milliseconds: intervalMs),
       (_) {
+        _markInputFrame(processor, DateTime.now().millisecondsSinceEpoch);
         unawaited(_captureStillFrame(cameraId, processor));
       },
     );
@@ -2103,6 +2421,8 @@ class FaceRecognitionService {
 
     processor.busy = true;
     try {
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      _markRecognitionFrame(processor, nowMs);
       processor.frameCount++;
       final decoded = await _capturePreviewFrameFromWindows(processor);
       if (decoded == null) return;
@@ -2689,6 +3009,7 @@ class FaceRecognitionService {
   ) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
+    _markRecognitionFrame(processor, nowMs);
     processor.lastProcessAtMs = nowMs;
     processor.frameCount++;
 
@@ -2727,9 +3048,11 @@ class FaceRecognitionService {
         final previousTracks =
             _overlayTracksByCameraId[cameraId] ??
             const <String, _CameraTrack>{};
+        final trackStats = _statsForCamera(cameraId, nowMs);
 
         final overlays = <FaceOverlayBox>[];
         final nextTracks = <String, _CameraTrack>{};
+        final pendingRecognitions = <_NativePendingRecognition>[];
         for (final f in faces) {
           final detectorRect = f.boundingRect(
             targetSize: Size(
@@ -2748,8 +3071,31 @@ class FaceRecognitionService {
             continue;
           }
 
-          final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
-          if (tracked != null && tracked.$2.isStranger) {
+          final pose = _estimateFacePoseDegrees(f);
+
+          final tracked = _resolveTrackedTrack(previousTracks, ratio, nowMs);
+          if (tracked == null && _hasLiveTracks(previousTracks, nowMs)) {
+            trackStats.onRefresh(_TrackReuseRejectReason.association);
+          }
+          final rejectReason = tracked == null
+              ? _TrackReuseRejectReason.association
+              : _trackReuseRejectReason(
+                  track: tracked.$2,
+                  currentRatio: ratio,
+                  currentYawDeg: pose.$1,
+                  currentPitchDeg: pose.$2,
+                  nowMs: nowMs,
+                  relaxedAssociation: tracked.$3 < _trackAssociationMinScore,
+                );
+          final relaxedAssociation =
+              tracked != null && tracked.$3 < _trackAssociationMinScore;
+          if (tracked != null && rejectReason == null) {
+            trackStats.onReuse();
+            final reusedEvent = _refreshTrackedEvent(
+              cameraId,
+              tracked.$2.event,
+              nowMs,
+            );
             final smoothedRatio = _smoothTrackedRatio(
               previousTracks[tracked.$1]?.currentRect,
               ratio,
@@ -2758,17 +3104,36 @@ class FaceRecognitionService {
               key: tracked.$1,
               currentRect: smoothedRatio,
               targetRect: smoothedRatio,
-              event: tracked.$2,
+              event: reusedEvent,
               lastSeenAt: nowMs,
+              lastRecognitionAt: tracked.$2.lastRecognitionAt,
+              lastTrackingConfidence: tracked.$3,
+              lastYawDeg: pose.$1,
+              lastPitchDeg: pose.$2,
+              reuseCount: tracked.$2.reuseCount + 1,
+              cachedEmbedding: tracked.$2.cachedEmbedding,
+              cachedEmbeddingAtMs: tracked.$2.cachedEmbeddingAtMs,
             );
             overlays.add(
               FaceOverlayBox(
                 trackKey: tracked.$1,
                 rectRatio: smoothedRatio,
-                event: tracked.$2,
+                event: reusedEvent,
+                debugLabel: _debugRealtimeOverlay
+                    ? 'cache:${tracked.$2.reuseCount + 1}'
+                    : null,
               ),
             );
+            _publishRecognitionEvent(
+              cameraId,
+              smoothedRatio,
+              reusedEvent,
+              nowMs,
+            );
             continue;
+          }
+          if (tracked != null && rejectReason != null) {
+            trackStats.onRefresh(rejectReason);
           }
 
           final rect = _rectFromRatio(ratio, rgb.width, rgb.height);
@@ -2861,6 +3226,15 @@ class FaceRecognitionService {
               targetRect: smoothedSpoofRatio,
               event: spoofEvent,
               lastSeenAt: nowMs,
+              lastRecognitionAt: nowMs,
+              lastTrackingConfidence: _associationTrackingConfidence(
+                previousTracks[spoofKey]?.currentRect,
+                ratio,
+              ),
+              lastYawDeg: pose.$1,
+              lastPitchDeg: pose.$2,
+              cachedEmbedding: null,
+              cachedEmbeddingAtMs: 0,
             );
             overlays.add(
               FaceOverlayBox(
@@ -2880,99 +3254,143 @@ class FaceRecognitionService {
             );
             continue;
           }
-          final vector = _alignVectorDimension(
-            await _embeddingFromImage(workingCrop, robust: false),
-            _templateVectorDimension,
-          );
-          if (vector.isEmpty) continue;
-          final shouldComputePartials = _shouldComputeRealtimePartials(
-            minFacePixels: minFacePixels,
-            faceAreaRatio: faceAreaRatio,
-            frameQuality: frameQuality,
-            adaptiveFarDistance: adaptiveFarDistance,
-            frameIndex: processor.frameCount,
-          );
-          final partialBundle = shouldComputePartials
-              ? await _buildPartialEmbeddingsFromFace(
-                  workingCrop,
-                  targetDimension: _templateVectorDimension,
-                  frameQuality: frameQuality,
-                  forRealtime: true,
-                  faceAlreadyPrepared: true,
-                )
-              : const _PartialEmbeddingBundle();
-          final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
-          final assignedKnownIds = nextTracks.values
-              .map((track) => track.event.personId)
-              .whereType<String>()
-              .toSet();
-          final match = _findBestMatch(
-            vector,
-            partialBundle: partialBundle,
-            excludedPersonIds: assignedKnownIds,
-            frameQuality: frameQuality,
-            cameraId: cameraId,
-            faceLogKey: faceLogKey,
-          );
-          final effectiveKnown = match != null;
-          _logRealtimeDecisionTrace(
-            cameraId: cameraId,
-            faceLogKey: faceLogKey,
-            match: match,
-            isKnown: effectiveKnown,
-            frameQuality: frameQuality,
-          );
-          final acceptedMatch = effectiveKnown ? match : null;
-          final debugLabel = _debugRealtimeOverlay
-              ? _buildRealtimeDebugLabel(
-                  match: match,
-                  frameQuality: frameQuality,
-                  spoofScore: spoofAssessment.score,
-                )
-              : null;
-          final confidence =
-              (acceptedMatch != null
-                      ? acceptedMatch.score.clamp(0.0, 0.99)
-                      : _strangerConfidence(
-                          match: match,
-                          frameQuality: frameQuality,
-                        ))
-                  .toDouble();
-          final event = _buildRecognitionEvent(
-            cameraId,
-            acceptedMatch,
-            nowMs,
-            unknownConfidence: confidence,
-          );
-
-          final key = _matchTrackKey(cameraId, ratio, event, nextTracks);
-          final smoothedRatio = _smoothTrackedRatio(
-            previousTracks[key]?.currentRect,
-            ratio,
-          );
-          nextTracks[key] = _CameraTrack(
-            key: key,
-            currentRect: smoothedRatio,
-            targetRect: smoothedRatio,
-            event: event,
-            lastSeenAt: nowMs,
-          );
-          overlays.add(
-            FaceOverlayBox(
-              trackKey: key,
-              rectRatio: smoothedRatio,
-              event: event,
-              debugLabel: debugLabel,
+          pendingRecognitions.add(
+            _NativePendingRecognition(
+              tracked: tracked,
+              ratio: ratio,
+              rect: rect,
+              pose: pose,
+              relaxedAssociation: relaxedAssociation,
+              minFacePixels: minFacePixels,
+              faceAreaRatio: faceAreaRatio,
+              adaptiveFarDistance: adaptiveFarDistance,
+              frameQuality: frameQuality,
+              spoofScore: spoofAssessment.score,
+              workingCrop: workingCrop,
             ),
           );
-          _publishRecognitionEvent(
+        }
+
+        if (pendingRecognitions.isNotEmpty) {
+          final concurrencyRun =
+              await _runWithMaxConcurrency<
+                _NativePendingRecognition,
+                _NativeComputedRecognition?
+              >(
+                pendingRecognitions,
+                _faceMeshMaxWorkers,
+                (pending) => _computeNativeRecognitionCandidate(
+                  pending,
+                  nowMs: nowMs,
+                  frameIndex: processor.frameCount,
+                ),
+              );
+          _updateWorkerStats(
             cameraId,
-            smoothedRatio,
-            event,
-            nowMs,
-            eventBuilder: () =>
-                _buildEventWithSnapshot(event, rgb: rgb, rect: rect),
+            configuredWorkers: _faceMeshMaxWorkers,
+            run: concurrencyRun,
           );
+
+          for (final computed in concurrencyRun.results) {
+            if (computed == null) {
+              continue;
+            }
+
+            final pending = computed.pending;
+            final tracked = pending.tracked;
+            final vector = computed.vector;
+            final partialBundle = computed.partialBundle;
+            final faceLogKey =
+                tracked?.$1 ?? _faceLogKeyFromRatio(pending.ratio);
+            final assignedKnownIds = nextTracks.values
+                .map((track) => track.event.personId)
+                .whereType<String>()
+                .toSet();
+            final match = _findBestMatch(
+              vector,
+              partialBundle: partialBundle,
+              excludedPersonIds: assignedKnownIds,
+              frameQuality: pending.frameQuality,
+              cameraId: cameraId,
+              faceLogKey: faceLogKey,
+            );
+            final effectiveKnown = match != null;
+            _logRealtimeDecisionTrace(
+              cameraId: cameraId,
+              faceLogKey: faceLogKey,
+              match: match,
+              isKnown: effectiveKnown,
+              frameQuality: pending.frameQuality,
+            );
+            final acceptedMatch = effectiveKnown ? match : null;
+            final debugLabel = _debugRealtimeOverlay
+                ? _buildRealtimeDebugLabel(
+                    match: match,
+                    frameQuality: pending.frameQuality,
+                    spoofScore: pending.spoofScore,
+                  )
+                : null;
+            final confidence =
+                (acceptedMatch != null
+                        ? acceptedMatch.score.clamp(0.0, 0.99)
+                        : _strangerConfidence(
+                            match: match,
+                            frameQuality: pending.frameQuality,
+                          ))
+                    .toDouble();
+            final event = _buildRecognitionEvent(
+              cameraId,
+              acceptedMatch,
+              nowMs,
+              unknownConfidence: confidence,
+            );
+
+            final key = _matchTrackKey(
+              cameraId,
+              pending.ratio,
+              event,
+              nextTracks,
+            );
+            final smoothedRatio = _smoothTrackedRatio(
+              previousTracks[key]?.currentRect,
+              pending.ratio,
+            );
+            final persistEmbedding = !event.isStranger;
+            nextTracks[key] = _CameraTrack(
+              key: key,
+              currentRect: smoothedRatio,
+              targetRect: smoothedRatio,
+              event: event,
+              lastSeenAt: nowMs,
+              lastRecognitionAt: nowMs,
+              lastTrackingConfidence: _associationTrackingConfidence(
+                previousTracks[key]?.currentRect,
+                pending.ratio,
+              ),
+              lastYawDeg: pending.pose.$1,
+              lastPitchDeg: pending.pose.$2,
+              cachedEmbedding: persistEmbedding
+                  ? List<double>.from(vector, growable: false)
+                  : null,
+              cachedEmbeddingAtMs: persistEmbedding ? nowMs : 0,
+            );
+            overlays.add(
+              FaceOverlayBox(
+                trackKey: key,
+                rectRatio: smoothedRatio,
+                event: event,
+                debugLabel: debugLabel,
+              ),
+            );
+            _publishRecognitionEvent(
+              cameraId,
+              smoothedRatio,
+              event,
+              nowMs,
+              eventBuilder: () =>
+                  _buildEventWithSnapshot(event, rgb: rgb, rect: pending.rect),
+            );
+          }
         }
 
         _overlayTracksByCameraId[cameraId] = nextTracks;
@@ -2987,6 +3405,8 @@ class FaceRecognitionService {
         _emitFrameWithImage(
           cameraId,
           overlays,
+          trackStats: trackStats.snapshot(),
+          workerStats: _workerStatsForCamera(cameraId),
           annotatedOverlayPng: annotatedOverlayPng,
         );
         if (_traceLogsEnabled && processor.frameCount % 60 == 0) {
@@ -3019,9 +3439,9 @@ class FaceRecognitionService {
   Future<void> _processFallbackImage(
     String cameraId,
     RecognitionZone zone,
-    img.Image rgb,
-    {int frameIndex = 0}
-  ) async {
+    img.Image rgb, {
+    int frameIndex = 0,
+  }) async {
     try {
       final detections = await _detectFacesForFallback(rgb, cameraId);
       final filteredDetections = _filterFallbackDetectionsForRealtime(
@@ -3033,6 +3453,9 @@ class FaceRecognitionService {
       final nextTracks = <String, _CameraTrack>{};
       final previousTracks =
           _overlayTracksByCameraId[cameraId] ?? const <String, _CameraTrack>{};
+      final frameNowMs = DateTime.now().millisecondsSinceEpoch;
+      final trackStats = _statsForCamera(cameraId, frameNowMs);
+      final pendingRecognitions = <_FallbackPendingRecognition>[];
       for (final detected in filteredDetections) {
         try {
           final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -3057,6 +3480,68 @@ class FaceRecognitionService {
           );
 
           if (!_isInsideZone(ratio, zone)) continue;
+
+          final tracked = _resolveTrackedTrack(previousTracks, ratio, nowMs);
+          if (tracked == null && _hasLiveTracks(previousTracks, nowMs)) {
+            trackStats.onRefresh(_TrackReuseRejectReason.association);
+          }
+          final rejectReason = tracked == null
+              ? _TrackReuseRejectReason.association
+              : _trackReuseRejectReason(
+                  track: tracked.$2,
+                  currentRatio: ratio,
+                  nowMs: nowMs,
+                  relaxedAssociation: tracked.$3 < _trackAssociationMinScore,
+                );
+          final relaxedAssociation =
+              tracked != null && tracked.$3 < _trackAssociationMinScore;
+          if (tracked != null && rejectReason == null) {
+            trackStats.onReuse();
+            final reusedEvent = _refreshTrackedEvent(
+              cameraId,
+              tracked.$2.event,
+              nowMs,
+            );
+            final smoothedRatio = _smoothTrackedRatio(
+              previousTracks[tracked.$1]?.currentRect,
+              ratio,
+            );
+            nextTracks[tracked.$1] = _CameraTrack(
+              key: tracked.$1,
+              currentRect: smoothedRatio,
+              targetRect: smoothedRatio,
+              event: reusedEvent,
+              lastSeenAt: nowMs,
+              lastRecognitionAt: tracked.$2.lastRecognitionAt,
+              lastTrackingConfidence: tracked.$3,
+              lastYawDeg: tracked.$2.lastYawDeg,
+              lastPitchDeg: tracked.$2.lastPitchDeg,
+              reuseCount: tracked.$2.reuseCount + 1,
+              cachedEmbedding: tracked.$2.cachedEmbedding,
+              cachedEmbeddingAtMs: tracked.$2.cachedEmbeddingAtMs,
+            );
+            overlays.add(
+              FaceOverlayBox(
+                trackKey: tracked.$1,
+                rectRatio: smoothedRatio,
+                event: reusedEvent,
+                debugLabel: _debugRealtimeOverlay
+                    ? 'cache:${tracked.$2.reuseCount + 1}'
+                    : null,
+              ),
+            );
+
+            _publishRecognitionEvent(
+              cameraId,
+              smoothedRatio,
+              reusedEvent,
+              nowMs,
+            );
+            continue;
+          }
+          if (tracked != null && rejectReason != null) {
+            trackStats.onRefresh(rejectReason);
+          }
 
           final crop = _selectRecognitionCrop(
             source: rgb,
@@ -3135,6 +3620,13 @@ class FaceRecognitionService {
               targetRect: smoothedSpoofRatio,
               event: spoofEvent,
               lastSeenAt: nowMs,
+              lastRecognitionAt: nowMs,
+              lastTrackingConfidence: _associationTrackingConfidence(
+                previousTracks[spoofKey]?.currentRect,
+                ratio,
+              ),
+              cachedEmbedding: null,
+              cachedEmbeddingAtMs: 0,
             );
             overlays.add(
               FaceOverlayBox(
@@ -3154,100 +3646,19 @@ class FaceRecognitionService {
             );
             continue;
           }
-          final vector = _alignVectorDimension(
-            await _embeddingFromImage(workingCrop, robust: false),
-            _templateVectorDimension,
-          );
-          if (vector.isEmpty) continue;
-          final shouldComputePartials = _shouldComputeRealtimePartials(
-            minFacePixels: minFacePixels,
-            faceAreaRatio: faceAreaRatio,
-            frameQuality: frameQuality,
-            adaptiveFarDistance: adaptiveFarDistance,
-            frameIndex: frameIndex,
-          );
-          final partialBundle = shouldComputePartials
-              ? await _buildPartialEmbeddingsFromFace(
-                  workingCrop,
-                  targetDimension: _templateVectorDimension,
-                  frameQuality: frameQuality,
-                  forRealtime: true,
-                  faceAlreadyPrepared: true,
-                )
-              : const _PartialEmbeddingBundle();
-          final tracked = _resolveTrackedEvent(previousTracks, ratio, nowMs);
-          final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(ratio);
-          final assignedKnownIds = nextTracks.values
-              .map((track) => track.event.personId)
-              .whereType<String>()
-              .toSet();
-          final match = _findBestMatch(
-            vector,
-            partialBundle: partialBundle,
-            excludedPersonIds: assignedKnownIds,
-            frameQuality: frameQuality,
-            cameraId: cameraId,
-            faceLogKey: faceLogKey,
-          );
-          final effectiveKnown = match != null;
-          _logRealtimeDecisionTrace(
-            cameraId: cameraId,
-            faceLogKey: faceLogKey,
-            match: match,
-            isKnown: effectiveKnown,
-            frameQuality: frameQuality,
-          );
-          final acceptedMatch = effectiveKnown ? match : null;
-          final debugLabel = _debugRealtimeOverlay
-              ? _buildRealtimeDebugLabel(
-                  match: match,
-                  frameQuality: frameQuality,
-                  spoofScore: spoofAssessment.score,
-                )
-              : null;
-          final confidence =
-              (acceptedMatch != null
-                      ? acceptedMatch.score.clamp(0.0, 0.99)
-                      : _strangerConfidence(
-                          match: match,
-                          frameQuality: frameQuality,
-                        ))
-                  .toDouble();
-          final event = _buildRecognitionEvent(
-            cameraId,
-            acceptedMatch,
-            nowMs,
-            unknownConfidence: confidence,
-          );
-
-          final key = _matchTrackKey(cameraId, ratio, event, nextTracks);
-          final smoothedRatio = _smoothTrackedRatio(
-            previousTracks[key]?.currentRect,
-            ratio,
-          );
-          nextTracks[key] = _CameraTrack(
-            key: key,
-            currentRect: smoothedRatio,
-            targetRect: smoothedRatio,
-            event: event,
-            lastSeenAt: nowMs,
-          );
-          overlays.add(
-            FaceOverlayBox(
-              trackKey: key,
-              rectRatio: smoothedRatio,
-              event: event,
-              debugLabel: debugLabel,
+          pendingRecognitions.add(
+            _FallbackPendingRecognition(
+              tracked: tracked,
+              ratio: ratio,
+              rect: rect,
+              relaxedAssociation: relaxedAssociation,
+              minFacePixels: minFacePixels,
+              faceAreaRatio: faceAreaRatio,
+              adaptiveFarDistance: adaptiveFarDistance,
+              frameQuality: frameQuality,
+              spoofScore: spoofAssessment.score,
+              workingCrop: workingCrop,
             ),
-          );
-
-          _publishRecognitionEvent(
-            cameraId,
-            smoothedRatio,
-            event,
-            nowMs,
-            eventBuilder: () =>
-                _buildEventWithSnapshot(event, rgb: rgb, rect: rect),
           );
         } catch (e, st) {
           final now = DateTime.now().millisecondsSinceEpoch;
@@ -3266,6 +3677,137 @@ class FaceRecognitionService {
         }
       }
 
+      if (pendingRecognitions.isNotEmpty) {
+        final concurrencyRun =
+            await _runWithMaxConcurrency<
+              _FallbackPendingRecognition,
+              _FallbackComputedRecognition?
+            >(
+              pendingRecognitions,
+              _faceMeshMaxWorkers,
+              (pending) => _computeFallbackRecognitionCandidate(
+                pending,
+                nowMs: frameNowMs,
+                frameIndex: frameIndex,
+              ),
+            );
+        _updateWorkerStats(
+          cameraId,
+          configuredWorkers: _faceMeshMaxWorkers,
+          run: concurrencyRun,
+        );
+
+        if (pendingRecognitions.length > 1 &&
+            _faceMeshMaxWorkers > 1 &&
+            frameIndex % 60 == 0) {
+          final workerStats = _workerStatsForCamera(cameraId);
+          final perWorkerText =
+              workerStats?.perWorkerFps
+                  .map((fps) => fps.toStringAsFixed(fps >= 10 ? 0 : 1))
+                  .join(', ') ??
+              '';
+          _log.info(
+            'Worker pool active mode=fallback camera=$cameraId faces=${pendingRecognitions.length} '
+            'workers=${concurrencyRun.activeWorkers}/${concurrencyRun.workerCount} '
+            'workerFps=[$perWorkerText]',
+          );
+        }
+
+        for (final computed in concurrencyRun.results) {
+          if (computed == null) {
+            continue;
+          }
+
+          final pending = computed.pending;
+          final tracked = pending.tracked;
+          final faceLogKey = tracked?.$1 ?? _faceLogKeyFromRatio(pending.ratio);
+          final assignedKnownIds = nextTracks.values
+              .map((track) => track.event.personId)
+              .whereType<String>()
+              .toSet();
+          final match = _findBestMatch(
+            computed.vector,
+            partialBundle: computed.partialBundle,
+            excludedPersonIds: assignedKnownIds,
+            frameQuality: pending.frameQuality,
+            cameraId: cameraId,
+            faceLogKey: faceLogKey,
+          );
+          final effectiveKnown = match != null;
+          _logRealtimeDecisionTrace(
+            cameraId: cameraId,
+            faceLogKey: faceLogKey,
+            match: match,
+            isKnown: effectiveKnown,
+            frameQuality: pending.frameQuality,
+          );
+          final acceptedMatch = effectiveKnown ? match : null;
+          final debugLabel = _debugRealtimeOverlay
+              ? _buildRealtimeDebugLabel(
+                  match: match,
+                  frameQuality: pending.frameQuality,
+                  spoofScore: pending.spoofScore,
+                )
+              : null;
+          final confidence =
+              (acceptedMatch != null
+                      ? acceptedMatch.score.clamp(0.0, 0.99)
+                      : _strangerConfidence(
+                          match: match,
+                          frameQuality: pending.frameQuality,
+                        ))
+                  .toDouble();
+          final event = _buildRecognitionEvent(
+            cameraId,
+            acceptedMatch,
+            frameNowMs,
+            unknownConfidence: confidence,
+          );
+
+          final key = _matchTrackKey(
+            cameraId,
+            pending.ratio,
+            event,
+            nextTracks,
+          );
+          final smoothedRatio = _smoothTrackedRatio(
+            previousTracks[key]?.currentRect,
+            pending.ratio,
+          );
+          nextTracks[key] = _CameraTrack(
+            key: key,
+            currentRect: smoothedRatio,
+            targetRect: smoothedRatio,
+            event: event,
+            lastSeenAt: frameNowMs,
+            lastRecognitionAt: frameNowMs,
+            lastTrackingConfidence: _associationTrackingConfidence(
+              previousTracks[key]?.currentRect,
+              pending.ratio,
+            ),
+            cachedEmbedding: null,
+            cachedEmbeddingAtMs: 0,
+          );
+          overlays.add(
+            FaceOverlayBox(
+              trackKey: key,
+              rectRatio: smoothedRatio,
+              event: event,
+              debugLabel: debugLabel,
+            ),
+          );
+
+          _publishRecognitionEvent(
+            cameraId,
+            smoothedRatio,
+            event,
+            frameNowMs,
+            eventBuilder: () =>
+                _buildEventWithSnapshot(event, rgb: rgb, rect: pending.rect),
+          );
+        }
+      }
+
       _overlayTracksByCameraId[cameraId] = nextTracks;
       _overlaysByCameraId[cameraId] = overlays;
       final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -3279,6 +3821,8 @@ class FaceRecognitionService {
       _emitFrameWithImage(
         cameraId,
         overlays,
+        trackStats: trackStats.snapshot(),
+        workerStats: _workerStatsForCamera(cameraId),
         annotatedOverlayPng: annotatedOverlayPng,
       );
     } catch (e, st) {
@@ -3759,7 +4303,7 @@ class FaceRecognitionService {
     return bestKey;
   }
 
-  (String, RecognitionEvent)? _resolveTrackedEvent(
+  (String, _CameraTrack, double)? _resolveTrackedTrack(
     Map<String, _CameraTrack> previousTracks,
     Rect ratio,
     int nowMs,
@@ -3767,13 +4311,15 @@ class FaceRecognitionService {
     String? bestKey;
     _CameraTrack? bestTrack;
     var bestScore = 0.0;
+    final active = <(String, _CameraTrack)>[];
     for (final entry in previousTracks.entries) {
       final track = entry.value;
       if (nowMs - track.lastSeenAt > _trackKeepAliveMs) continue;
+      active.add((entry.key, track));
       final iou = _rectIoU(track.currentRect, ratio);
       final centerScore =
           1 - _rectCenterDistance(track.currentRect, ratio).clamp(0.0, 1.0);
-      final score = iou * 0.75 + centerScore * 0.25;
+      final score = iou * 0.62 + centerScore * 0.38;
       if (score > bestScore) {
         bestScore = score;
         bestKey = entry.key;
@@ -3781,12 +4327,419 @@ class FaceRecognitionService {
       }
     }
 
-    if (bestKey == null ||
-        bestTrack == null ||
-        bestScore < _trackMatchMinScore) {
+    if (bestKey != null &&
+        bestTrack != null &&
+        bestScore >= _trackAssociationMinScore) {
+      return (bestKey, bestTrack, bestScore);
+    }
+
+    // ByteTrack-like permissive fallback: if only one active track remains,
+    // accept weak association when center displacement is still reasonable.
+    if (active.length == 1) {
+      final only = active.first;
+      final iou = _rectIoU(only.$2.currentRect, ratio);
+      final centerDistance = _rectCenterDistance(only.$2.currentRect, ratio);
+      final looseScore =
+          (iou * 0.52 + (1 - centerDistance.clamp(0.0, 1.0)) * 0.48)
+              .clamp(0.0, 1.0)
+              .toDouble();
+      if (centerDistance <= 0.30 && iou >= 0.05) {
+        return (only.$1, only.$2, looseScore);
+      }
+    }
+
+    if (bestKey == null || bestTrack == null) {
       return null;
     }
-    return (bestKey, bestTrack.event);
+    return null;
+  }
+
+  bool _hasLiveTracks(Map<String, _CameraTrack> previousTracks, int nowMs) {
+    for (final track in previousTracks.values) {
+      if (nowMs - track.lastSeenAt <= _trackKeepAliveMs) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  _TrackStatsAccumulator _statsForCamera(String cameraId, int nowMs) {
+    final current = _trackStatsByCameraId.putIfAbsent(
+      cameraId,
+      () => _TrackStatsAccumulator(windowStartedAtMs: nowMs),
+    );
+    if (nowMs - current.windowStartedAtMs >
+        _TrackStatsAccumulator.windowDurationMs) {
+      current.reset(nowMs);
+    }
+    return current;
+  }
+
+  _TrackReuseRejectReason? _trackReuseRejectReason({
+    required _CameraTrack track,
+    required Rect currentRatio,
+    double? currentYawDeg,
+    double? currentPitchDeg,
+    required int nowMs,
+    bool relaxedAssociation = false,
+  }) {
+    final elapsedMs = nowMs - track.lastRecognitionAt;
+    final maxReuseMs = track.event.isStranger
+        ? _trackReuseStrangerMs
+        : _trackReuseKnownMs;
+    if (elapsedMs > maxReuseMs) {
+      return _TrackReuseRejectReason.ttl;
+    }
+
+    final previousYaw = track.lastYawDeg;
+    if (previousYaw != null && currentYawDeg != null) {
+      if ((currentYawDeg - previousYaw).abs() > _trackPoseRefreshDeltaDeg) {
+        return _TrackReuseRejectReason.pose;
+      }
+    }
+
+    final previousPitch = track.lastPitchDeg;
+    if (previousPitch != null && currentPitchDeg != null) {
+      if ((currentPitchDeg - previousPitch).abs() > _trackPoseRefreshDeltaDeg) {
+        return _TrackReuseRejectReason.pose;
+      }
+    }
+
+    final previous = track.currentRect;
+    final minIoU = relaxedAssociation
+        ? (_trackReuseMinIoU - 0.14).clamp(0.05, 0.84)
+        : _trackReuseMinIoU;
+    final maxCenterDistance = relaxedAssociation
+        ? (_trackReuseMaxCenterDistance + 0.18).clamp(0.20, 0.55)
+        : _trackReuseMaxCenterDistance;
+    final iou = _rectIoU(previous, currentRatio);
+    if (iou < minIoU) {
+      return _TrackReuseRejectReason.geometry;
+    }
+
+    final centerDistance = _rectCenterDistance(previous, currentRatio);
+    if (centerDistance > maxCenterDistance) {
+      return _TrackReuseRejectReason.geometry;
+    }
+
+    final previousArea = (previous.width * previous.height).clamp(1e-6, 1.0);
+    final currentArea = (currentRatio.width * currentRatio.height).clamp(
+      1e-6,
+      1.0,
+    );
+    final areaScale = currentArea / previousArea;
+    final minAreaScale = relaxedAssociation ? 0.40 : 0.60;
+    final maxAreaScale = relaxedAssociation ? 2.30 : 1.70;
+    if (areaScale < minAreaScale || areaScale > maxAreaScale) {
+      return _TrackReuseRejectReason.geometry;
+    }
+
+    if (!track.event.isStranger &&
+        track.event.confidence < 0.62 &&
+        elapsedMs > math.max(120, _processFrameIntervalMs * 2) &&
+        !relaxedAssociation) {
+      return _TrackReuseRejectReason.ttl;
+    }
+
+    return null;
+  }
+
+  bool _shouldReuseTrackedRecognition({
+    required _CameraTrack track,
+    required Rect currentRatio,
+    double? currentYawDeg,
+    double? currentPitchDeg,
+    required int nowMs,
+  }) {
+    return _trackReuseRejectReason(
+          track: track,
+          currentRatio: currentRatio,
+          currentYawDeg: currentYawDeg,
+          currentPitchDeg: currentPitchDeg,
+          nowMs: nowMs,
+        ) ==
+        null;
+  }
+
+  Future<_ConcurrencyRunResult<R>> _runWithMaxConcurrency<T, R>(
+    List<T> items,
+    int maxWorkers,
+    Future<R> Function(T item) op,
+  ) async {
+    if (items.isEmpty) {
+      return _ConcurrencyRunResult<R>(
+        results: <R>[],
+        workerCount: 0,
+        activeWorkers: 0,
+        processedPerWorker: <int>[],
+        elapsedMs: 0,
+      );
+    }
+
+    final workerCount = math.min(maxWorkers.clamp(1, 64), items.length);
+    final results = List<R?>.filled(items.length, null);
+    final processedPerWorker = List<int>.filled(workerCount, 0);
+    var cursor = 0;
+    var activeWorkers = 0;
+    final startedAt = DateTime.now().millisecondsSinceEpoch;
+
+    Future<void> runWorker(int workerIndex) async {
+      while (true) {
+        if (cursor >= items.length) {
+          return;
+        }
+        final index = cursor;
+        cursor++;
+        if (processedPerWorker[workerIndex] == 0) {
+          activeWorkers++;
+        }
+        results[index] = await op(items[index]);
+        processedPerWorker[workerIndex]++;
+      }
+    }
+
+    await Future.wait(List.generate(workerCount, runWorker));
+    final elapsedMs = DateTime.now().millisecondsSinceEpoch - startedAt;
+    return _ConcurrencyRunResult<R>(
+      results: results.cast<R>(),
+      workerCount: workerCount,
+      activeWorkers: activeWorkers,
+      processedPerWorker: processedPerWorker,
+      elapsedMs: elapsedMs,
+    );
+  }
+
+  void _updateWorkerStats(
+    String cameraId, {
+    required int configuredWorkers,
+    required _ConcurrencyRunResult<dynamic> run,
+  }) {
+    final accumulator = _workerStatsByCameraId.putIfAbsent(
+      cameraId,
+      () => _WorkerRuntimeAccumulator(maxWorkers: configuredWorkers),
+    );
+    if (accumulator.maxWorkers != configuredWorkers) {
+      accumulator.resetForMaxWorkers(configuredWorkers);
+    }
+    accumulator.updateBatch(
+      configured: configuredWorkers,
+      active: run.activeWorkers,
+      elapsedMs: run.elapsedMs,
+      processedPerWorker: run.processedPerWorker,
+    );
+  }
+
+  CameraWorkerRuntimeStats? _workerStatsForCamera(String cameraId) {
+    final accumulator = _workerStatsByCameraId[cameraId];
+    if (accumulator == null) {
+      return null;
+    }
+    return accumulator.snapshot();
+  }
+
+  Future<_NativeComputedRecognition?> _computeNativeRecognitionCandidate(
+    _NativePendingRecognition pending, {
+    required int nowMs,
+    required int frameIndex,
+  }) async {
+    final tracked = pending.tracked;
+    final cachedVector = _cachedEmbeddingForTracked(
+      tracked?.$2,
+      nowMs: nowMs,
+      trackingConfidence: tracked?.$3,
+      relaxedAssociation: pending.relaxedAssociation,
+    );
+    final vector =
+        cachedVector ??
+        _alignVectorDimension(
+          await _embeddingFromImage(pending.workingCrop, robust: false),
+          _templateVectorDimension,
+        );
+    if (vector.isEmpty) {
+      return null;
+    }
+
+    final shouldComputePartials =
+        cachedVector == null &&
+        _shouldComputeRealtimePartials(
+          minFacePixels: pending.minFacePixels,
+          faceAreaRatio: pending.faceAreaRatio,
+          frameQuality: pending.frameQuality,
+          adaptiveFarDistance: pending.adaptiveFarDistance,
+          frameIndex: frameIndex,
+        );
+    final partialBundle = shouldComputePartials
+        ? await _buildPartialEmbeddingsFromFace(
+            pending.workingCrop,
+            targetDimension: _templateVectorDimension,
+            frameQuality: pending.frameQuality,
+            forRealtime: true,
+            faceAlreadyPrepared: true,
+          )
+        : const _PartialEmbeddingBundle();
+
+    return _NativeComputedRecognition(
+      pending: pending,
+      vector: vector,
+      partialBundle: partialBundle,
+    );
+  }
+
+  Future<_FallbackComputedRecognition?> _computeFallbackRecognitionCandidate(
+    _FallbackPendingRecognition pending, {
+    required int nowMs,
+    required int frameIndex,
+  }) async {
+    final tracked = pending.tracked;
+    final cachedVector = _cachedEmbeddingForTracked(
+      tracked?.$2,
+      nowMs: nowMs,
+      trackingConfidence: tracked?.$3,
+      relaxedAssociation: pending.relaxedAssociation,
+    );
+    final vector =
+        cachedVector ??
+        _alignVectorDimension(
+          await _embeddingFromImage(pending.workingCrop, robust: false),
+          _templateVectorDimension,
+        );
+    if (vector.isEmpty) {
+      return null;
+    }
+
+    final shouldComputePartials =
+        cachedVector == null &&
+        _shouldComputeRealtimePartials(
+          minFacePixels: pending.minFacePixels,
+          faceAreaRatio: pending.faceAreaRatio,
+          frameQuality: pending.frameQuality,
+          adaptiveFarDistance: pending.adaptiveFarDistance,
+          frameIndex: frameIndex,
+        );
+    final partialBundle = shouldComputePartials
+        ? await _buildPartialEmbeddingsFromFace(
+            pending.workingCrop,
+            targetDimension: _templateVectorDimension,
+            frameQuality: pending.frameQuality,
+            forRealtime: true,
+            faceAlreadyPrepared: true,
+          )
+        : const _PartialEmbeddingBundle();
+
+    return _FallbackComputedRecognition(
+      pending: pending,
+      vector: vector,
+      partialBundle: partialBundle,
+    );
+  }
+
+  List<double>? _cachedEmbeddingForTracked(
+    _CameraTrack? track, {
+    required int nowMs,
+    double? trackingConfidence,
+    bool relaxedAssociation = false,
+  }) {
+    if (track == null) {
+      return null;
+    }
+    if (track.lastYawDeg == null || track.lastPitchDeg == null) {
+      return null;
+    }
+    if (track.event.isStranger) {
+      return null;
+    }
+    final cached = track.cachedEmbedding;
+    if (cached == null || cached.isEmpty) {
+      return null;
+    }
+    if (_templateVectorDimension > 0 &&
+        cached.length != _templateVectorDimension) {
+      return null;
+    }
+    if (!relaxedAssociation &&
+        trackingConfidence != null &&
+        trackingConfidence < _trackAssociationMinScore) {
+      return null;
+    }
+    final cachedAt = track.cachedEmbeddingAtMs > 0
+        ? track.cachedEmbeddingAtMs
+        : track.lastRecognitionAt;
+    final ageMs = nowMs - cachedAt;
+    final cacheTtlMs = track.event.isStranger
+        ? (_trackReuseStrangerMs * 2).clamp(250, 6000).toInt()
+        : (_trackReuseKnownMs * 2).clamp(300, 8000).toInt();
+    if (ageMs <= 0 || ageMs > cacheTtlMs) {
+      return null;
+    }
+    return cached;
+  }
+
+  double _associationTrackingConfidence(Rect? previous, Rect current) {
+    if (previous == null) {
+      return 1.0;
+    }
+    final iou = _rectIoU(previous, current);
+    final center = 1 - _rectCenterDistance(previous, current).clamp(0.0, 1.0);
+    return (iou * 0.75 + center * 0.25).clamp(0.0, 1.0).toDouble();
+  }
+
+  (double?, double?) _estimateFacePoseDegrees(FaceMeshResult mesh) {
+    final leftEyeOuter = _landmarkPixel(mesh, 33);
+    final rightEyeOuter = _landmarkPixel(mesh, 263);
+    final noseTip = _landmarkPixel(mesh, 1);
+    final upperLip = _landmarkPixel(mesh, 13);
+    final chin = _landmarkPixel(mesh, 152);
+    if (leftEyeOuter == null ||
+        rightEyeOuter == null ||
+        noseTip == null ||
+        upperLip == null ||
+        chin == null) {
+      return (null, null);
+    }
+
+    final eyeMid = Offset(
+      (leftEyeOuter.dx + rightEyeOuter.dx) / 2,
+      (leftEyeOuter.dy + rightEyeOuter.dy) / 2,
+    );
+    final eyeDistance = _distance(leftEyeOuter, rightEyeOuter);
+    final faceHeight = _distance(eyeMid, chin);
+    if (eyeDistance < 1.0 || faceHeight < 1.0) {
+      return (null, null);
+    }
+
+    final yawNorm = ((noseTip.dx - eyeMid.dx) / (eyeDistance * 0.55)).clamp(
+      -1.0,
+      1.0,
+    );
+    final yawDeg = (math.asin(yawNorm) * 180.0 / math.pi).clamp(-50.0, 50.0);
+
+    final mouthRefY = (upperLip.dy + chin.dy) / 2;
+    final pitchNorm = ((noseTip.dy - mouthRefY) / (faceHeight * 0.55)).clamp(
+      -1.0,
+      1.0,
+    );
+    final pitchDeg = (math.asin(pitchNorm) * 180.0 / math.pi).clamp(
+      -50.0,
+      50.0,
+    );
+    return (yawDeg.toDouble(), pitchDeg.toDouble());
+  }
+
+  RecognitionEvent _refreshTrackedEvent(
+    String cameraId,
+    RecognitionEvent baseEvent,
+    int nowMs,
+  ) {
+    return RecognitionEvent(
+      id: _uuid.v4(),
+      personId: baseEvent.personId,
+      personName: baseEvent.personName,
+      cameraId: cameraId,
+      confidence: baseEvent.confidence,
+      isStranger: baseEvent.isStranger,
+      createdAt: nowMs,
+      snapshotBase64: '',
+    );
   }
 
   Rect _rectFromRatio(Rect ratio, int imageWidth, int imageHeight) {
@@ -4920,25 +5873,70 @@ class FaceRecognitionService {
   }
 
   void _emitFrame(String cameraId, List<FaceOverlayBox> overlays) {
-    _emitFrameWithImage(cameraId, overlays, annotatedFrameJpeg: null);
+    _emitFrameWithImage(
+      cameraId,
+      overlays,
+      trackStats: null,
+      workerStats: null,
+      annotatedFrameJpeg: null,
+    );
   }
 
   void _emitFrameWithImage(
     String cameraId,
     List<FaceOverlayBox> overlays, {
+    CameraTrackRuntimeStats? trackStats,
+    CameraWorkerRuntimeStats? workerStats,
     Uint8List? annotatedFrameJpeg,
     Uint8List? annotatedOverlayPng,
   }) {
     if (_frameQueue.isClosed) return;
+    final processor = _processorsByCameraId[cameraId];
     _frameQueue.add(
       RecognitionFramePacket(
         cameraId: cameraId,
         overlays: overlays,
         createdAt: DateTime.now().millisecondsSinceEpoch,
+        trackStats: trackStats,
+        workerStats: workerStats,
+        inputFps: processor?.inputFpsEma ?? 0.0,
+        recognitionFps: processor?.recognitionFpsEma ?? 0.0,
         annotatedFrameJpeg: annotatedFrameJpeg,
         annotatedOverlayPng: annotatedOverlayPng,
       ),
     );
+  }
+
+  void _markInputFrame(_Processor processor, int nowMs) {
+    final previous = processor.lastInputFrameAtMs;
+    processor.lastInputFrameAtMs = nowMs;
+    if (previous <= 0 || nowMs <= previous) {
+      return;
+    }
+    final deltaMs = nowMs - previous;
+    if (deltaMs <= 0) {
+      return;
+    }
+    final instant = 1000.0 / deltaMs;
+    processor.inputFpsEma = processor.inputFpsEma <= 0
+        ? instant
+        : (processor.inputFpsEma * 0.85) + (instant * 0.15);
+  }
+
+  void _markRecognitionFrame(_Processor processor, int nowMs) {
+    final previous = processor.lastRecognitionFrameAtMs;
+    processor.lastRecognitionFrameAtMs = nowMs;
+    if (previous <= 0 || nowMs <= previous) {
+      return;
+    }
+    final deltaMs = nowMs - previous;
+    if (deltaMs <= 0) {
+      return;
+    }
+    final instant = 1000.0 / deltaMs;
+    processor.recognitionFpsEma = processor.recognitionFpsEma <= 0
+        ? instant
+        : (processor.recognitionFpsEma * 0.85) + (instant * 0.15);
   }
 
   Uint8List? _maybeBuildOverlayPng(
@@ -6164,27 +7162,28 @@ class FaceRecognitionService {
 
     if (forRealtime) {
       final enabledRegions = _realtimePartialEnabledRegions;
-      final candidates = <({
-        String key,
-        List<double>? vector,
-        double weight,
-      })>[
-        (key: 'forehead', vector: forehead.$1, weight: forehead.$2),
-        (key: 'leftEye', vector: leftEye.$1, weight: leftEye.$2),
-        (key: 'rightEye', vector: rightEye.$1, weight: rightEye.$2),
-        (key: 'nose', vector: nose.$1, weight: nose.$2),
-        (key: 'mouth', vector: mouth.$1, weight: mouth.$2),
-        (key: 'leftCheek', vector: leftCheek.$1, weight: leftCheek.$2),
-        (key: 'rightCheek', vector: rightCheek.$1, weight: rightCheek.$2),
-        (key: 'chin', vector: chin.$1, weight: chin.$2),
-      ]
-          .where(
-            (entry) =>
-                enabledRegions.contains(entry.key) &&
-                entry.vector != null &&
-                entry.weight > 0,
-          )
-          .toList();
+      final candidates =
+          <({String key, List<double>? vector, double weight})>[
+                (key: 'forehead', vector: forehead.$1, weight: forehead.$2),
+                (key: 'leftEye', vector: leftEye.$1, weight: leftEye.$2),
+                (key: 'rightEye', vector: rightEye.$1, weight: rightEye.$2),
+                (key: 'nose', vector: nose.$1, weight: nose.$2),
+                (key: 'mouth', vector: mouth.$1, weight: mouth.$2),
+                (key: 'leftCheek', vector: leftCheek.$1, weight: leftCheek.$2),
+                (
+                  key: 'rightCheek',
+                  vector: rightCheek.$1,
+                  weight: rightCheek.$2,
+                ),
+                (key: 'chin', vector: chin.$1, weight: chin.$2),
+              ]
+              .where(
+                (entry) =>
+                    enabledRegions.contains(entry.key) &&
+                    entry.vector != null &&
+                    entry.weight > 0,
+              )
+              .toList();
 
       if (candidates.isEmpty) {
         return const _PartialEmbeddingBundle();

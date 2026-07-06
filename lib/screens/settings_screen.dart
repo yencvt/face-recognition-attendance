@@ -39,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'fallbackCaptureIntervalMs': 'Chu kỳ chụp fallback (ms)',
     'fallbackMaxInputEdge': 'Cạnh tối đa ảnh fallback (px)',
     'processFrameIntervalMs': 'Chu kỳ xử lý frame (ms)',
+    'faceMeshMaxWorkers': 'Số luồng Face Mesh tối đa',
     'detectorInputWidth': 'Chiều rộng input detector',
     'detectorInputHeight': 'Chiều cao input detector',
     'trackKeepAliveMs': 'Thời gian giữ track (ms)',
@@ -66,82 +67,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'enableRealtimeAutoSharpen': 'Bật auto sharpen realtime',
     'enableTraceLogs': 'Bật trace log chi tiết realtime',
     'enablePerfLogs': 'Bật perf log độ trễ (Perf[...])',
-    'autoTuneMaxSharpenAmount':
-      'enableRealtimeAutoSharpenMaxAmount (0.0..1.0)',
+    'autoTuneMaxSharpenAmount': 'enableRealtimeAutoSharpenMaxAmount (0.0..1.0)',
   };
 
   static const Map<String, String> _recognitionParameterNotes = {
     'knownMatchThreshold':
-      'Ngưỡng điểm so khớp tổng quan để chấp nhận danh tính.',
+        'Ngưỡng điểm so khớp tổng quan để chấp nhận danh tính.',
     'knownCalibratedThreshold':
-      'Ngưỡng điểm sau hiệu chỉnh theo độ tách biệt giữa các người.',
+        'Ngưỡng điểm sau hiệu chỉnh theo độ tách biệt giữa các người.',
     'knownMatchMargin':
-      'Khoảng cách tối thiểu giữa top1 và top2 để tránh nhầm lẫn.',
+        'Khoảng cách tối thiểu giữa top1 và top2 để tránh nhầm lẫn.',
     'minTemplateSharpness': 'Độ nét tối thiểu của ảnh mẫu khi tạo vector.',
     'cameraCalibrationDurationMs':
-      'Thời gian gom mẫu để hiệu chỉnh threshold theo camera.',
+        'Thời gian gom mẫu để hiệu chỉnh threshold theo camera.',
     'calibrationLogThrottleMs': 'Tần suất ghi log trong giai đoạn hiệu chỉnh.',
     'fallbackSkipLogIntervalMs':
-      'Khoảng cách log khi bỏ qua frame lỗi fallback.',
+        'Khoảng cách log khi bỏ qua frame lỗi fallback.',
     'fallbackCaptureIntervalMs':
-      'Khoảng cách giữa 2 lần chụp fallback khi camera không stream được.',
+        'Khoảng cách giữa 2 lần chụp fallback khi camera không stream được.',
     'fallbackMaxInputEdge':
-      'Giới hạn cạnh lớn nhất của frame fallback trước khi xử lý để giảm tải CPU.',
+        'Giới hạn cạnh lớn nhất của frame fallback trước khi xử lý để giảm tải CPU.',
     'processFrameIntervalMs':
-      'Khoảng cách xử lý giữa 2 frame, nhỏ hơn thì nhanh hơn nhưng nặng máy.',
+        'Khoảng cách xử lý giữa 2 frame, nhỏ hơn thì nhanh hơn nhưng nặng máy.',
+    'faceMeshMaxWorkers':
+        'Số worker tối đa chạy song song cho luồng Face Mesh detect/crop/ArcFace.',
     'detectorInputWidth':
-      'Độ rộng ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
+        'Độ rộng ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
     'detectorInputHeight':
-      'Độ cao ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
+        'Độ cao ảnh đưa vào detector; lớn hơn tăng chất lượng nhưng chậm hơn.',
     'trackKeepAliveMs': 'Thời gian giữ đối tượng theo dõi trước khi reset.',
     'trackMatchMinScore':
-      'Điểm tối thiểu để nối bbox hiện tại với track trước đó.',
+        'Điểm tối thiểu để nối bbox hiện tại với track trước đó.',
     'bboxSmoothingAlpha':
-      'Hệ số làm mượt bbox, cao thì bám theo nhanh nhưng dễ rung.',
+        'Hệ số làm mượt bbox, cao thì bám theo nhanh nhưng dễ rung.',
     'annotatedFrameMinIntervalMs':
-      'Chu kỳ tối thiểu vẽ overlay debug, giảm để cập nhật nhanh hơn.',
+        'Chu kỳ tối thiểu vẽ overlay debug, giảm để cập nhật nhanh hơn.',
     'eventPublishIntervalMs':
-      'Khoảng cách tối thiểu giữa 2 sự kiện cùng đối tượng.',
+        'Khoảng cách tối thiểu giữa 2 sự kiện cùng đối tượng.',
     'minRealtimeFrameQuality':
-      'Ngưỡng chất lượng frame realtime để cho phép nhận diện.',
+        'Ngưỡng chất lượng frame realtime để cho phép nhận diện.',
     'minRealtimeFaceAreaRatio':
-      'Tỷ lệ diện tích mặt tối thiểu trên khung hình.',
+        'Tỷ lệ diện tích mặt tối thiểu trên khung hình.',
     'minRealtimeFacePixels':
-      'Cạnh ngắn nhất của mặt (pixel) để tránh nhận diện mặt quá nhỏ.',
+        'Cạnh ngắn nhất của mặt (pixel) để tránh nhận diện mặt quá nhỏ.',
     'minEnrollmentFaceAreaRatio':
-      'Ngưỡng nhỏ nhất cho diện tích mặt khi đăng ký.',
+        'Ngưỡng nhỏ nhất cho diện tích mặt khi đăng ký.',
     'maxEnrollmentFaceAreaRatio':
-      'Ngưỡng lớn nhất cho diện tích mặt khi đăng ký.',
+        'Ngưỡng lớn nhất cho diện tích mặt khi đăng ký.',
     'minEnrollmentFaceAspectRatio':
-      'Tỷ lệ khung mặt nhỏ nhất cho phép khi đăng ký.',
+        'Tỷ lệ khung mặt nhỏ nhất cho phép khi đăng ký.',
     'maxEnrollmentFaceAspectRatio':
-      'Tỷ lệ khung mặt lớn nhất cho phép khi đăng ký.',
+        'Tỷ lệ khung mặt lớn nhất cho phép khi đăng ký.',
     'minEnrollmentFacePixels':
-      'Kích thước cạnh ngắn tối thiểu của mặt khi đăng ký.',
+        'Kích thước cạnh ngắn tối thiểu của mặt khi đăng ký.',
     'scrfdInputSize':
-      'Kích thước input model SCRFD, lớn hơn thì tinh hơn nhưng chậm hơn.',
+        'Kích thước input model SCRFD, lớn hơn thì tinh hơn nhưng chậm hơn.',
     'scrfdScoreThreshold': 'Ngưỡng điểm detector SCRFD để giữ lại bbox.',
     'scrfdNmsThreshold': 'Ngưỡng NMS SCRFD để loại bbox trùng lặp.',
     'hnswM':
-      'Số kết nối tối đa mỗi node trong đồ thị HNSW; lớn hơn thì tìm tốt hơn nhưng tốn RAM hơn.',
+        'Số kết nối tối đa mỗi node trong đồ thị HNSW; lớn hơn thì tìm tốt hơn nhưng tốn RAM hơn.',
     'hnswEfConstruction':
-      'Độ rộng tìm kiếm khi xây dựng index HNSW; lớn hơn thì index chặt hơn nhưng build chậm hơn.',
+        'Độ rộng tìm kiếm khi xây dựng index HNSW; lớn hơn thì index chặt hơn nhưng build chậm hơn.',
     'hnswEfSearch':
-      'Độ rộng tìm kiếm lúc query HNSW; lớn hơn thì chính xác hơn nhưng chậm hơn.',
+        'Độ rộng tìm kiếm lúc query HNSW; lớn hơn thì chính xác hơn nhưng chậm hơn.',
     'eyeRegionMinQuality':
-      'Ngưỡng chất lượng vùng mắt để đưa vào partial embedding.',
+        'Ngưỡng chất lượng vùng mắt để đưa vào partial embedding.',
     'noseRegionMinQuality':
-      'Ngưỡng chất lượng vùng mũi để đưa vào partial embedding.',
+        'Ngưỡng chất lượng vùng mũi để đưa vào partial embedding.',
     'mouthRegionMinQuality':
-      'Ngưỡng chất lượng vùng miệng để đưa vào partial embedding.',
+        'Ngưỡng chất lượng vùng miệng để đưa vào partial embedding.',
     'enableRealtimeAutoSharpen':
-      'Tự động tăng sharpen ảnh realtime theo độ mờ và độ tương phản thấp.',
+        'Tự động tăng sharpen ảnh realtime theo độ mờ và độ tương phản thấp.',
     'enableTraceLogs':
-      'Bật các log DecisionTrace/Match/GateSkip/CalibTop2 để debug. Tắt để giảm lag.',
+        'Bật các log DecisionTrace/Match/GateSkip/CalibTop2 để debug. Tắt để giảm lag.',
     'enablePerfLogs':
-      'Bật log hiệu năng Perf[ws]/Perf[db]. Tắt để tránh IO log không cần thiết.',
+        'Bật log hiệu năng Perf[ws]/Perf[db]. Tắt để tránh IO log không cần thiết.',
     'autoTuneMaxSharpenAmount':
-      'Giới hạn mức sharpen tối đa khi bật enableRealtimeAutoSharpen.',
+        'Giới hạn mức sharpen tối đa khi bật enableRealtimeAutoSharpen.',
   };
 
   late TextEditingController _signalingServerController;
@@ -160,6 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _fallbackCaptureIntervalMsController;
   late TextEditingController _fallbackMaxInputEdgeController;
   late TextEditingController _processFrameIntervalMsController;
+  late TextEditingController _faceMeshMaxWorkersController;
   late TextEditingController _detectorInputWidthController;
   late TextEditingController _detectorInputHeightController;
   late TextEditingController _trackKeepAliveMsController;
@@ -249,6 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _fallbackCaptureIntervalMsController = TextEditingController();
     _fallbackMaxInputEdgeController = TextEditingController();
     _processFrameIntervalMsController = TextEditingController();
+    _faceMeshMaxWorkersController = TextEditingController();
     _detectorInputWidthController = TextEditingController();
     _detectorInputHeightController = TextEditingController();
     _trackKeepAliveMsController = TextEditingController();
@@ -324,6 +328,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _processFrameIntervalMsController.text = recognitionConfig
             .processFrameIntervalMs
             .toString();
+        _faceMeshMaxWorkersController.text = recognitionConfig
+            .faceMeshMaxWorkers
+            .toString();
         _detectorInputWidthController.text = recognitionConfig
             .detectorInputWidth
             .toString();
@@ -394,7 +401,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             .autoTuneMaxSharpenAmount
             .toString();
         _enableRealtimeAutoSharpen =
-          recognitionConfig.enableRealtimeAutoSharpen;
+            recognitionConfig.enableRealtimeAutoSharpen;
         _debugRealtimeOverlay = recognitionConfig.debugRealtimeOverlay;
         _enableTraceLogs = recognitionConfig.enableTraceLogs;
         _enablePerfLogs = recognitionConfig.enablePerfLogs;
@@ -432,9 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = false;
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             _l(context, 'Lỗi tải cấu hình: $e', 'Failed to load settings: $e'),
@@ -552,6 +557,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         processFrameIntervalMs: parseInt(
           _processFrameIntervalMsController,
           'processFrameIntervalMs',
+        ),
+        faceMeshMaxWorkers: parseInt(
+          _faceMeshMaxWorkersController,
+          'faceMeshMaxWorkers',
         ),
         detectorInputWidth: parseInt(
           _detectorInputWidthController,
@@ -740,6 +749,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .toString();
     _processFrameIntervalMsController.text = config.processFrameIntervalMs
         .toString();
+    _faceMeshMaxWorkersController.text = config.faceMeshMaxWorkers.toString();
     _detectorInputWidthController.text = config.detectorInputWidth.toString();
     _detectorInputHeightController.text = config.detectorInputHeight.toString();
     _trackKeepAliveMsController.text = config.trackKeepAliveMs.toString();
@@ -1087,6 +1097,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _fallbackCaptureIntervalMsController.dispose();
     _fallbackMaxInputEdgeController.dispose();
     _processFrameIntervalMsController.dispose();
+    _faceMeshMaxWorkersController.dispose();
     _detectorInputWidthController.dispose();
     _detectorInputHeightController.dispose();
     _trackKeepAliveMsController.dispose();
@@ -1160,8 +1171,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 theme.colorScheme.primaryContainer.withValues(
                                   alpha: 0.92,
                                 ),
-                                theme.colorScheme.secondaryContainer
-                                    .withValues(alpha: 0.82),
+                                theme.colorScheme.secondaryContainer.withValues(
+                                  alpha: 0.82,
+                                ),
                               ],
                             ),
                             boxShadow: [
@@ -1234,7 +1246,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             FilledButton.icon(
                               onPressed: _testConnection,
                               icon: const Icon(Icons.cloud_done),
-                              label: Text(i18n.t('settings.quick.testConnection')),
+                              label: Text(
+                                i18n.t('settings.quick.testConnection'),
+                              ),
                             ),
                             OutlinedButton.icon(
                               onPressed: () async {
@@ -1278,13 +1292,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildSectionCard(
                           context,
                           icon: Icons.videocam,
-                          title: _l(context, 'Kết nối WebRTC', 'WebRTC Connectivity'),
-                          subtitle:
-                              _l(
-                                context,
-                                'Thiết lập máy chủ signaling, STUN/TURN và chính sách truyền tải ICE.',
-                                'Configure signaling server, STUN/TURN, and ICE transport policy.',
-                              ),
+                          title: _l(
+                            context,
+                            'Kết nối WebRTC',
+                            'WebRTC Connectivity',
+                          ),
+                          subtitle: _l(
+                            context,
+                            'Thiết lập máy chủ signaling, STUN/TURN và chính sách truyền tải ICE.',
+                            'Configure signaling server, STUN/TURN, and ICE transport policy.',
+                          ),
                           child: Column(
                             children: [
                               _buildTextField(
@@ -1295,18 +1312,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   'Signaling server URL',
                                 ),
                                 hint: 'wss://signaling.example.com',
-                                helperText:
-                                    _l(
-                                      context,
-                                      'Nhập địa chỉ máy chủ signaling (WebSocket)',
-                                      'Enter signaling server address (WebSocket)',
-                                    ),
+                                helperText: _l(
+                                  context,
+                                  'Nhập địa chỉ máy chủ signaling (WebSocket)',
+                                  'Enter signaling server address (WebSocket)',
+                                ),
                                 icon: Icons.link,
                               ),
                               const SizedBox(height: 12),
                               _buildServersField(
                                 controller: _stunServersController,
-                                label: _l(context, 'Máy chủ STUN', 'STUN servers'),
+                                label: _l(
+                                  context,
+                                  'Máy chủ STUN',
+                                  'STUN servers',
+                                ),
                                 hint: 'stun:stun.l.google.com:19302',
                                 helperText: _l(
                                   context,
@@ -1318,7 +1338,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: 12),
                               _buildServersField(
                                 controller: _turnServersController,
-                                label: _l(context, 'Máy chủ TURN', 'TURN servers'),
+                                label: _l(
+                                  context,
+                                  'Máy chủ TURN',
+                                  'TURN servers',
+                                ),
                                 hint: 'turn:turnserver.example.com:3478',
                                 helperText: _l(
                                   context,
@@ -1407,12 +1431,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             'Báo cáo CSV và API công khai',
                             'CSV Reports and Public API',
                           ),
-                          subtitle:
-                              _l(
-                                context,
-                                'Cấu hình lịch xuất báo cáo và dịch vụ API đọc dữ liệu chấm công.',
-                                'Configure report schedule and API service for attendance data.',
-                              ),
+                          subtitle: _l(
+                            context,
+                            'Cấu hình lịch xuất báo cáo và dịch vụ API đọc dữ liệu chấm công.',
+                            'Configure report schedule and API service for attendance data.',
+                          ),
                           child: Column(
                             children: [
                               Material(
@@ -1454,12 +1477,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         'Report export directory',
                                       ),
                                       hint: 'C:/reports/attendance',
-                                      helperText:
-                                          _l(
-                                            context,
-                                            'Dùng cho job định kỳ và API save=true',
-                                            'Used for scheduled job and API save=true',
-                                          ),
+                                      helperText: _l(
+                                        context,
+                                        'Dùng cho job định kỳ và API save=true',
+                                        'Used for scheduled job and API save=true',
+                                      ),
                                       icon: Icons.folder_copy_outlined,
                                     ),
                                   ),
@@ -1481,24 +1503,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         _buildTextField(
                                           controller:
                                               _reportExportTimeController,
-                                          label:
-                                              _l(
-                                                context,
-                                                'Thời gian chạy định kỳ (HH:mm)',
-                                                'Scheduled time (HH:mm)',
-                                              ),
+                                          label: _l(
+                                            context,
+                                            'Thời gian chạy định kỳ (HH:mm)',
+                                            'Scheduled time (HH:mm)',
+                                          ),
                                           hint: '23:55',
-                                          helperText:
-                                              _l(
-                                                context,
-                                                'Mỗi ngày chạy một lần theo giờ này',
-                                                'Runs once daily at this time',
-                                              ),
+                                          helperText: _l(
+                                            context,
+                                            'Mỗi ngày chạy một lần theo giờ này',
+                                            'Runs once daily at this time',
+                                          ),
                                           icon: Icons.schedule,
                                         ),
                                         const SizedBox(height: 12),
                                         _buildTextField(
-                                          controller: _reportFilePrefixController,
+                                          controller:
+                                              _reportFilePrefixController,
                                           label: _l(
                                             context,
                                             'Tiền tố tên tệp báo cáo',
@@ -1516,26 +1537,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         child: _buildTextField(
                                           controller:
                                               _reportExportTimeController,
-                                          label:
-                                              _l(
-                                                context,
-                                                'Thời gian chạy định kỳ (HH:mm)',
-                                                'Scheduled time (HH:mm)',
-                                              ),
+                                          label: _l(
+                                            context,
+                                            'Thời gian chạy định kỳ (HH:mm)',
+                                            'Scheduled time (HH:mm)',
+                                          ),
                                           hint: '23:55',
-                                          helperText:
-                                              _l(
-                                                context,
-                                                'Mỗi ngày chạy một lần theo giờ này',
-                                                'Runs once daily at this time',
-                                              ),
+                                          helperText: _l(
+                                            context,
+                                            'Mỗi ngày chạy một lần theo giờ này',
+                                            'Runs once daily at this time',
+                                          ),
                                           icon: Icons.schedule,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: _buildTextField(
-                                          controller: _reportFilePrefixController,
+                                          controller:
+                                              _reportFilePrefixController,
                                           label: _l(
                                             context,
                                             'Tiền tố tên tệp báo cáo',
@@ -1578,7 +1598,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   Expanded(
                                     child: _buildTextField(
                                       controller: _reportApiHostController,
-                                      label: _l(context, 'Máy chủ API', 'API host'),
+                                      label: _l(
+                                        context,
+                                        'Máy chủ API',
+                                        'API host',
+                                      ),
                                       hint: '0.0.0.0',
                                       icon: Icons.language,
                                     ),
@@ -1587,7 +1611,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   Expanded(
                                     child: _buildTextField(
                                       controller: _reportApiPortController,
-                                      label: _l(context, 'Cổng API', 'API port'),
+                                      label: _l(
+                                        context,
+                                        'Cổng API',
+                                        'API port',
+                                      ),
                                       hint: '8787',
                                       icon: Icons.settings_ethernet,
                                     ),
@@ -1606,12 +1634,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             'Cấu hình nhận diện nâng cao',
                             'Advanced recognition settings',
                           ),
-                          subtitle:
-                              _l(
-                                context,
-                                'Toàn bộ tham số nhận diện đã chuyển sang màn kiểm thử ảnh để tránh trùng lặp và dễ hiệu chỉnh theo ngữ cảnh.',
-                                'Recognition parameters were moved to the image test screen to avoid duplication and support context-based tuning.',
-                              ),
+                          subtitle: _l(
+                            context,
+                            'Toàn bộ tham số nhận diện đã chuyển sang màn kiểm thử ảnh để tránh trùng lặp và dễ hiệu chỉnh theo ngữ cảnh.',
+                            'Recognition parameters were moved to the image test screen to avoid duplication and support context-based tuning.',
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1622,6 +1649,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   'Open image test screen to adjust parameters and apply them immediately to realtime flow.',
                                 ),
                                 style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildTextField(
+                                controller: _faceMeshMaxWorkersController,
+                                label: _l(
+                                  context,
+                                  'Số luồng Face Mesh tối đa',
+                                  'Maximum Face Mesh workers',
+                                ),
+                                hint: '2',
+                                helperText: _l(
+                                  context,
+                                  'Khuyến nghị 1-4 tùy CPU. Tăng cao có thể nóng máy và giảm ổn định.',
+                                  'Recommended 1-4 based on CPU. Too high may reduce stability.',
+                                ),
+                                icon: Icons.hub_outlined,
                               ),
                               const SizedBox(height: 12),
                               FilledButton.icon(
@@ -1919,11 +1962,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         color: Colors.transparent,
         child: CheckboxListTile(
           title: Text(
-            _l(
-              context,
-              'Kích hoạt xử lý âm thanh',
-              'Enable audio processing',
-            ),
+            _l(context, 'Kích hoạt xử lý âm thanh', 'Enable audio processing'),
           ),
           subtitle: Text(
             _l(
@@ -1964,7 +2003,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
-          title: Text(_l(context, 'Đang kiểm tra kết nối...', 'Testing connection...')),
+          title: Text(
+            _l(context, 'Đang kiểm tra kết nối...', 'Testing connection...'),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -55,6 +55,7 @@ class _ImageRecognitionTestScreenState
     final en = <String, String>{
       'Ngưỡng nhận diện': 'Recognition thresholds',
       'Luồng xử lý thời gian thực': 'Realtime pipeline',
+      'Theo dõi ByteTrack': 'ByteTrack tracking',
       'Chất lượng thời gian thực': 'Realtime quality',
       'Đăng ký khuôn mặt': 'Enrollment constraints',
       'Phát hiện và tìm kiếm': 'Detection and search',
@@ -67,8 +68,10 @@ class _ImageRecognitionTestScreenState
     final en = <String, String>{
       'Ngưỡng khớp khuôn mặt': 'Known match threshold',
       'Ngưỡng khớp đã hiệu chỉnh': 'Calibrated match threshold',
-      'Biên an toàn giữa hạng 1 và hạng 2': 'Safety margin between rank 1 and rank 2',
-      'Độ nét tối thiểu của mẫu đăng ký': 'Minimum enrollment template sharpness',
+      'Biên an toàn giữa hạng 1 và hạng 2':
+          'Safety margin between rank 1 and rank 2',
+      'Độ nét tối thiểu của mẫu đăng ký':
+          'Minimum enrollment template sharpness',
       'Thời gian hiệu chỉnh camera (ms)': 'Camera calibration duration (ms)',
       'Khoảng cách log hiệu chỉnh (ms)': 'Calibration log interval (ms)',
       'Khoảng cách log bỏ qua fallback (ms)': 'Fallback skip-log interval (ms)',
@@ -76,33 +79,44 @@ class _ImageRecognitionTestScreenState
       'Cạnh tối đa ảnh fallback (px)': 'Fallback max input edge (px)',
       'Chu kỳ xử lý khung hình (ms)': 'Frame processing interval (ms)',
       'Số khung hình giữ lại của xử lý đơn luồng': 'Keep-latest frame count',
+      'Số luồng Face Mesh tối đa': 'Maximum Face Mesh workers',
       'Chiều rộng đầu vào bộ phát hiện': 'Detector input width',
       'Chiều cao đầu vào bộ phát hiện': 'Detector input height',
       'Thời gian giữ track (ms)': 'Track keep-alive duration (ms)',
       'Điểm tối thiểu để gán track': 'Minimum score to assign track',
+      'ByteTrack: thời gian tái dùng người đã biết (ms)':
+          'ByteTrack: known-track cache reuse (ms)',
+      'ByteTrack: thời gian tái dùng người lạ (ms)':
+          'ByteTrack: stranger-track cache reuse (ms)',
+      'ByteTrack: ngưỡng refresh yaw/pitch (độ)':
+          'ByteTrack: yaw/pitch refresh threshold (deg)',
       'Hệ số làm mượt bbox': 'Bounding-box smoothing factor',
       'Khoảng cách lớp phủ tối thiểu giữa các khung hình (ms)':
-        'Minimum annotated-frame interval (ms)',
+          'Minimum annotated-frame interval (ms)',
       'Khoảng cách phát sự kiện (ms)': 'Event publish interval (ms)',
-      'Chất lượng khung hình tối thiểu thời gian thực': 'Minimum realtime frame quality',
-      'Tỷ lệ diện tích mặt tối thiểu thời gian thực': 'Minimum realtime face area ratio',
+      'Chất lượng khung hình tối thiểu thời gian thực':
+          'Minimum realtime frame quality',
+      'Tỷ lệ diện tích mặt tối thiểu thời gian thực':
+          'Minimum realtime face area ratio',
       'Số pixel mặt tối thiểu thời gian thực': 'Minimum realtime face pixels',
       'Vùng cục bộ thời gian thực: ngưỡng chất lượng tối thiểu':
-        'Realtime partial: minimum quality threshold',
+          'Realtime partial: minimum quality threshold',
       'Vùng cục bộ thời gian thực: tỷ lệ diện tích mặt tối thiểu':
-        'Realtime partial: minimum face area ratio',
+          'Realtime partial: minimum face area ratio',
       'Vùng cục bộ thời gian thực: số pixel mặt tối thiểu':
-        'Realtime partial: minimum face pixels',
+          'Realtime partial: minimum face pixels',
       'Vùng cục bộ thời gian thực: chế độ (0=chất lượng/kích thước, 1=mọi khung hình, 2=tắt)':
-        'Realtime partial: mode (0=quality/size, 1=every frame, 2=off)',
+          'Realtime partial: mode (0=quality/size, 1=every frame, 2=off)',
       'Vùng cục bộ thời gian thực: chu kỳ khung hình (N = 1/N khung)':
-        'Realtime partial: frame cycle (N = 1/N frames)',
-      'Tỷ lệ diện tích mặt tối thiểu khi đăng ký': 'Minimum enrollment face area ratio',
-      'Tỷ lệ diện tích mặt tối đa khi đăng ký': 'Maximum enrollment face area ratio',
+          'Realtime partial: frame cycle (N = 1/N frames)',
+      'Tỷ lệ diện tích mặt tối thiểu khi đăng ký':
+          'Minimum enrollment face area ratio',
+      'Tỷ lệ diện tích mặt tối đa khi đăng ký':
+          'Maximum enrollment face area ratio',
       'Tỷ lệ khung mặt tối thiểu khi đăng ký':
-        'Minimum enrollment face aspect ratio',
+          'Minimum enrollment face aspect ratio',
       'Tỷ lệ khung mặt tối đa khi đăng ký':
-        'Maximum enrollment face aspect ratio',
+          'Maximum enrollment face aspect ratio',
       'Số pixel mặt tối thiểu khi đăng ký': 'Minimum enrollment face pixels',
       'Kích thước đầu vào SCRFD': 'SCRFD input size',
       'Ngưỡng điểm phát hiện SCRFD': 'SCRFD score threshold',
@@ -114,7 +128,8 @@ class _ImageRecognitionTestScreenState
       'Ngưỡng chất lượng vùng mũi': 'Nose region quality threshold',
       'Ngưỡng chất lượng vùng miệng': 'Mouth region quality threshold',
       'Mức làm sắc nét tự động tối đa': 'Maximum auto-sharpen amount',
-      'Mức làm sắc nét tự động tối đa (0.0..1.0)': 'Maximum auto-sharpen amount (0.0..1.0)',
+      'Mức làm sắc nét tự động tối đa (0.0..1.0)':
+          'Maximum auto-sharpen amount (0.0..1.0)',
     };
     return _l(context, label, en[label] ?? label);
   }
@@ -147,8 +162,7 @@ class _ImageRecognitionTestScreenState
   }
 
   static const Map<String, String> _switchLabels = {
-    'enableRealtimeAutoSharpen':
-        'Bật tự động làm sắc nét ảnh thời gian thực',
+    'enableRealtimeAutoSharpen': 'Bật tự động làm sắc nét ảnh thời gian thực',
     'debugRealtimeOverlay': 'Bật lớp phủ gỡ lỗi thời gian thực',
     'enableTraceLogs': 'Bật nhật ký theo vết chi tiết thời gian thực',
     'enablePerfLogs': 'Bật nhật ký hiệu năng độ trễ',
@@ -221,6 +235,11 @@ class _ImageRecognitionTestScreenState
           isInt: true,
         ),
         _RecognitionFieldDef(
+          key: 'faceMeshMaxWorkers',
+          label: 'Số luồng Face Mesh tối đa',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
           key: 'detectorInputWidth',
           label: 'Chiều rộng đầu vào bộ phát hiện',
           isInt: true,
@@ -230,6 +249,11 @@ class _ImageRecognitionTestScreenState
           label: 'Chiều cao đầu vào bộ phát hiện',
           isInt: true,
         ),
+      ],
+    ),
+    _RecognitionSectionDef(
+      title: 'Theo dõi ByteTrack',
+      fields: [
         _RecognitionFieldDef(
           key: 'trackKeepAliveMs',
           label: 'Thời gian giữ track (ms)',
@@ -238,6 +262,21 @@ class _ImageRecognitionTestScreenState
         _RecognitionFieldDef(
           key: 'trackMatchMinScore',
           label: 'Điểm tối thiểu để gán track',
+          isInt: false,
+        ),
+        _RecognitionFieldDef(
+          key: 'trackReuseKnownMs',
+          label: 'ByteTrack: thời gian tái dùng người đã biết (ms)',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
+          key: 'trackReuseStrangerMs',
+          label: 'ByteTrack: thời gian tái dùng người lạ (ms)',
+          isInt: true,
+        ),
+        _RecognitionFieldDef(
+          key: 'trackPoseRefreshDeltaDeg',
+          label: 'ByteTrack: ngưỡng refresh yaw/pitch (độ)',
           isInt: false,
         ),
         _RecognitionFieldDef(
@@ -292,12 +331,14 @@ class _ImageRecognitionTestScreenState
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialMode',
-          label: 'Vùng cục bộ thời gian thực: chế độ (0=chất lượng/kích thước, 1=mọi khung hình, 2=tắt)',
+          label:
+              'Vùng cục bộ thời gian thực: chế độ (0=chất lượng/kích thước, 1=mọi khung hình, 2=tắt)',
           isInt: true,
         ),
         _RecognitionFieldDef(
           key: 'realtimePartialFrameCycle',
-          label: 'Vùng cục bộ thời gian thực: chu kỳ khung hình (N = 1/N khung)',
+          label:
+              'Vùng cục bộ thời gian thực: chu kỳ khung hình (N = 1/N khung)',
           isInt: true,
         ),
       ],
@@ -420,6 +461,7 @@ class _ImageRecognitionTestScreenState
   bool _realtimeCropFacesFromCameraImage = false;
   final Set<String> _expandedConfigSections = <String>{
     'Ngưỡng nhận diện',
+    'Theo dõi ByteTrack',
     'Chất lượng thời gian thực',
     'Xử lý đầu vào và gỡ lỗi',
   };
@@ -515,6 +557,8 @@ class _ImageRecognitionTestScreenState
     _configControllers['singleFlightKeepLatestFrames']!.text = config
         .singleFlightKeepLatestFrames
         .toString();
+    _configControllers['faceMeshMaxWorkers']!.text = config.faceMeshMaxWorkers
+        .toString();
     _configControllers['detectorInputWidth']!.text = config.detectorInputWidth
         .toString();
     _configControllers['detectorInputHeight']!.text = config.detectorInputHeight
@@ -522,6 +566,14 @@ class _ImageRecognitionTestScreenState
     _configControllers['trackKeepAliveMs']!.text = config.trackKeepAliveMs
         .toString();
     _configControllers['trackMatchMinScore']!.text = config.trackMatchMinScore
+        .toString();
+    _configControllers['trackReuseKnownMs']!.text = config.trackReuseKnownMs
+        .toString();
+    _configControllers['trackReuseStrangerMs']!.text = config
+        .trackReuseStrangerMs
+        .toString();
+    _configControllers['trackPoseRefreshDeltaDeg']!.text = config
+        .trackPoseRefreshDeltaDeg
         .toString();
     _configControllers['bboxSmoothingAlpha']!.text = config.bboxSmoothingAlpha
         .toString();
@@ -541,19 +593,19 @@ class _ImageRecognitionTestScreenState
         .minRealtimeFacePixels
         .toString();
     _configControllers['realtimePartialMinFrameQuality']!.text = config
-      .realtimePartialMinFrameQuality
-      .toString();
+        .realtimePartialMinFrameQuality
+        .toString();
     _configControllers['realtimePartialMinFaceAreaRatio']!.text = config
-      .realtimePartialMinFaceAreaRatio
-      .toString();
+        .realtimePartialMinFaceAreaRatio
+        .toString();
     _configControllers['realtimePartialMinFacePixels']!.text = config
-      .realtimePartialMinFacePixels
-      .toString();
+        .realtimePartialMinFacePixels
+        .toString();
     _configControllers['realtimePartialMode']!.text = config.realtimePartialMode
-      .toString();
+        .toString();
     _configControllers['realtimePartialFrameCycle']!.text = config
-      .realtimePartialFrameCycle
-      .toString();
+        .realtimePartialFrameCycle
+        .toString();
     _realtimePartialEnabledRegions = config.realtimePartialEnabledRegions
         .split(',')
         .map((item) => item.trim())
@@ -685,6 +737,10 @@ class _ImageRecognitionTestScreenState
           'singleFlightKeepLatestFrames',
           'Số khung hình giữ lại của xử lý đơn luồng',
         ),
+        faceMeshMaxWorkers: _parseIntField(
+          'faceMeshMaxWorkers',
+          'Số luồng Face Mesh tối đa',
+        ),
         detectorInputWidth: _parseIntField(
           'detectorInputWidth',
           'Chiều rộng đầu vào bộ phát hiện',
@@ -700,6 +756,18 @@ class _ImageRecognitionTestScreenState
         trackMatchMinScore: _parseDoubleField(
           'trackMatchMinScore',
           'Điểm tối thiểu để gán track',
+        ),
+        trackReuseKnownMs: _parseIntField(
+          'trackReuseKnownMs',
+          'ByteTrack: thời gian tái dùng người đã biết (ms)',
+        ),
+        trackReuseStrangerMs: _parseIntField(
+          'trackReuseStrangerMs',
+          'ByteTrack: thời gian tái dùng người lạ (ms)',
+        ),
+        trackPoseRefreshDeltaDeg: _parseDoubleField(
+          'trackPoseRefreshDeltaDeg',
+          'ByteTrack: ngưỡng refresh yaw/pitch (độ)',
         ),
         bboxSmoothingAlpha: _parseDoubleField(
           'bboxSmoothingAlpha',
@@ -741,8 +809,7 @@ class _ImageRecognitionTestScreenState
           'realtimePartialMode',
           'Vùng cục bộ thời gian thực: chế độ',
         ),
-        realtimePartialEnabledRegions:
-            _realtimePartialEnabledRegions.join(','),
+        realtimePartialEnabledRegions: _realtimePartialEnabledRegions.join(','),
         realtimePartialFrameCycle: _parseIntField(
           'realtimePartialFrameCycle',
           'Vùng cục bộ thời gian thực: chu kỳ khung hình',
@@ -828,9 +895,7 @@ class _ImageRecognitionTestScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             _l(
@@ -942,30 +1007,30 @@ class _ImageRecognitionTestScreenState
 
   Future<void> _runTest() async {
     if (_originalImageBytes == null || _originalImageBytes!.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _l(
-                context,
-                'Vui lòng chọn hoặc kéo thả ảnh trước.',
-                'Please pick or drop an image first.',
-              ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _l(
+              context,
+              'Vui lòng chọn hoặc kéo thả ảnh trước.',
+              'Please pick or drop an image first.',
             ),
           ),
-        );
+        ),
+      );
       return;
     }
     if (_selectedPersonIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _l(
-                context,
-                'Vui lòng chọn danh sách đối tượng.',
-                'Please select people for testing.',
-              ),
+        SnackBar(
+          content: Text(
+            _l(
+              context,
+              'Vui lòng chọn danh sách đối tượng.',
+              'Please select people for testing.',
             ),
           ),
+        ),
       );
       return;
     }
@@ -1003,22 +1068,28 @@ class _ImageRecognitionTestScreenState
           ),
         );
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(content: Text(_l(context, 'Kiểm tra bị timeout.', 'Test timed out.'))),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_l(context, 'Kiểm tra bị timeout.', 'Test timed out.')),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _result = _buildSyntheticFailedResult(
-          _l(context, 'Lỗi khi chạy kiểm tra: $e', 'Error while running test: $e'),
+          _l(
+            context,
+            'Lỗi khi chạy kiểm tra: $e',
+            'Error while running test: $e',
+          ),
         );
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(content: Text(_l(context, 'Kiểm tra thất bại: $e', 'Test failed: $e'))),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _l(context, 'Kiểm tra thất bại: $e', 'Test failed: $e'),
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -1220,7 +1291,11 @@ class _ImageRecognitionTestScreenState
                       ).colorScheme.primary.withValues(alpha: 0.08),
                       alignment: Alignment.center,
                       child: Text(
-                        _l(context, 'Thả tệp để tải lên', 'Drop file to upload'),
+                        _l(
+                          context,
+                          'Thả tệp để tải lên',
+                          'Drop file to upload',
+                        ),
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: Theme.of(context).colorScheme.primary,
@@ -1458,7 +1533,7 @@ class _ImageRecognitionTestScreenState
       children: result.faceDebugInfos
           .map((face) {
             final top1 = face.topCandidates.isEmpty
-              ? _l(context, 'Không có', 'None')
+                ? _l(context, 'Không có', 'None')
                 : face.topCandidates.first.personName;
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
@@ -1489,7 +1564,11 @@ class _ImageRecognitionTestScreenState
                           Expanded(
                             child: _buildFaceColImage(
                               context,
-                              title: _l(context, 'Khuôn mặt gốc', 'Original face'),
+                              title: _l(
+                                context,
+                                'Khuôn mặt gốc',
+                                'Original face',
+                              ),
                               bytes: face.originalFaceBytes,
                             ),
                           ),
@@ -1497,7 +1576,11 @@ class _ImageRecognitionTestScreenState
                           Expanded(
                             child: _buildFaceColImage(
                               context,
-                              title: _l(context, 'Khuôn mặt đã xử lý', 'Processed face'),
+                              title: _l(
+                                context,
+                                'Khuôn mặt đã xử lý',
+                                'Processed face',
+                              ),
                               bytes: face.cleanedFaceBytes,
                             ),
                           ),
@@ -1570,7 +1653,11 @@ class _ImageRecognitionTestScreenState
                         Expanded(
                           child: _buildZoomPanel(
                             dialogContext,
-                            title: _l(dialogContext, 'Khuôn mặt gốc', 'Original face'),
+                            title: _l(
+                              dialogContext,
+                              'Khuôn mặt gốc',
+                              'Original face',
+                            ),
                             bytes: face.originalFaceBytes,
                           ),
                         ),
@@ -1578,7 +1665,11 @@ class _ImageRecognitionTestScreenState
                         Expanded(
                           child: _buildZoomPanel(
                             dialogContext,
-                            title: _l(dialogContext, 'Khuôn mặt đã xử lý', 'Processed face'),
+                            title: _l(
+                              dialogContext,
+                              'Khuôn mặt đã xử lý',
+                              'Processed face',
+                            ),
                             bytes: face.cleanedFaceBytes,
                           ),
                         ),
@@ -1723,11 +1814,7 @@ class _ImageRecognitionTestScreenState
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     title: Text(
-                      _l(
-                        context,
-                        'Chọn tất cả đối tượng',
-                        'Select all people',
-                      ),
+                      _l(context, 'Chọn tất cả đối tượng', 'Select all people'),
                     ),
                     subtitle: Text(
                       _l(
@@ -1971,7 +2058,13 @@ class _ImageRecognitionTestScreenState
                                             onPressed: () => Navigator.of(
                                               dialogContext,
                                             ).pop(),
-                                            child: Text(_l(dialogContext, 'Đóng', 'Close')),
+                                            child: Text(
+                                              _l(
+                                                dialogContext,
+                                                'Đóng',
+                                                'Close',
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(width: 10),
                                           FilledButton.icon(
@@ -1995,8 +2088,16 @@ class _ImageRecognitionTestScreenState
                                                 : const Icon(Icons.save),
                                             label: Text(
                                               _isApplyingConfig
-                                                  ? _l(dialogContext, 'Đang áp dụng...', 'Applying...')
-                                                  : _l(dialogContext, 'Áp dụng và lưu', 'Apply and save'),
+                                                  ? _l(
+                                                      dialogContext,
+                                                      'Đang áp dụng...',
+                                                      'Applying...',
+                                                    )
+                                                  : _l(
+                                                      dialogContext,
+                                                      'Áp dụng và lưu',
+                                                      'Apply and save',
+                                                    ),
                                             ),
                                           ),
                                         ],
@@ -2069,9 +2170,9 @@ class _ImageRecognitionTestScreenState
               Expanded(
                 child: Text(
                   _sectionTitleText(context, section.title),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
               if (section.fields.isNotEmpty)
@@ -2100,9 +2201,7 @@ class _ImageRecognitionTestScreenState
                     : width >= 640
                     ? 2
                     : 1;
-                final int switchColumns = width >= 920
-                    ? 2
-                    : 1;
+                final int switchColumns = width >= 920 ? 2 : 1;
 
                 return Column(
                   children: [
@@ -2142,7 +2241,9 @@ class _ImageRecognitionTestScreenState
                     ],
                     if (section.title == 'Chất lượng thời gian thực') ...[
                       const SizedBox(height: 10),
-                      _buildPartialRegionSelector(onStateChanged: onStateChanged),
+                      _buildPartialRegionSelector(
+                        onStateChanged: onStateChanged,
+                      ),
                     ],
                   ],
                 );
@@ -2161,6 +2262,8 @@ class _ImageRecognitionTestScreenState
       case 'Realtime pipeline':
       case 'Luồng xử lý thời gian thực':
         return Icons.speed;
+      case 'Theo dõi ByteTrack':
+        return Icons.track_changes;
       case 'Chất lượng thời gian thực':
         return Icons.high_quality;
       case 'Đăng ký khuôn mặt':
@@ -2174,7 +2277,10 @@ class _ImageRecognitionTestScreenState
     }
   }
 
-  Widget _buildConfigFieldTile(BuildContext context, _RecognitionFieldDef field) {
+  Widget _buildConfigFieldTile(
+    BuildContext context,
+    _RecognitionFieldDef field,
+  ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
@@ -2188,9 +2294,9 @@ class _ImageRecognitionTestScreenState
             _fieldLabelText(context, field.label),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Expanded(child: _buildConfigTextField(field)),
@@ -2222,7 +2328,9 @@ class _ImageRecognitionTestScreenState
           LayoutBuilder(
             builder: (context, constraints) {
               final columns = constraints.maxWidth >= 720 ? 3 : 2;
-              final entries = _partialRegionLabels.entries.toList(growable: false);
+              final entries = _partialRegionLabels.entries.toList(
+                growable: false,
+              );
               return GridView.builder(
                 itemCount: entries.length,
                 shrinkWrap: true,
@@ -2235,12 +2343,17 @@ class _ImageRecognitionTestScreenState
                 ),
                 itemBuilder: (context, index) {
                   final entry = entries[index];
-                  final selected = _realtimePartialEnabledRegions.contains(entry.key);
+                  final selected = _realtimePartialEnabledRegions.contains(
+                    entry.key,
+                  );
                   return Material(
                     color: Colors.transparent,
                     child: CheckboxListTile(
                       dense: true,
-                      visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                      visualDensity: const VisualDensity(
+                        horizontal: -4,
+                        vertical: -4,
+                      ),
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
                       title: Text(_regionLabelText(context, entry.value)),
@@ -2249,7 +2362,8 @@ class _ImageRecognitionTestScreenState
                         if (next == null) {
                           return;
                         }
-                        if (!next && _realtimePartialEnabledRegions.length <= 1) {
+                        if (!next &&
+                            _realtimePartialEnabledRegions.length <= 1) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -2308,7 +2422,10 @@ class _ImageRecognitionTestScreenState
           ),
         ),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 10,
+        ),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.86),
       ),

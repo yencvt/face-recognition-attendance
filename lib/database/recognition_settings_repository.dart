@@ -18,10 +18,14 @@ class RecognitionRuntimeConfig {
     this.fallbackMaxInputEdge = 960,
     this.processFrameIntervalMs = 82,
     this.singleFlightKeepLatestFrames = 1,
+    this.faceMeshMaxWorkers = 2,
     this.detectorInputWidth = 640,
     this.detectorInputHeight = 480,
     this.trackKeepAliveMs = 1200,
     this.trackMatchMinScore = 0.42,
+    this.trackReuseKnownMs = 1000,
+    this.trackReuseStrangerMs = 500,
+    this.trackPoseRefreshDeltaDeg = 15.0,
     this.bboxSmoothingAlpha = 0.34,
     this.annotatedFrameMinIntervalMs = 140,
     this.eventPublishIntervalMs = 80000,
@@ -33,7 +37,7 @@ class RecognitionRuntimeConfig {
     this.realtimePartialMinFacePixels = 64,
     this.realtimePartialMode = 0,
     this.realtimePartialEnabledRegions =
-      'forehead,leftEye,rightEye,nose,leftCheek,rightCheek,mouth,chin',
+        'forehead,leftEye,rightEye,nose,leftCheek,rightCheek,mouth,chin',
     this.realtimePartialFrameCycle = 2,
     this.minEnrollmentFaceAreaRatio = 0.08,
     this.maxEnrollmentFaceAreaRatio = 0.75,
@@ -68,10 +72,14 @@ class RecognitionRuntimeConfig {
   final int fallbackMaxInputEdge;
   final int processFrameIntervalMs;
   final int singleFlightKeepLatestFrames;
+  final int faceMeshMaxWorkers;
   final int detectorInputWidth;
   final int detectorInputHeight;
   final int trackKeepAliveMs;
   final double trackMatchMinScore;
+  final int trackReuseKnownMs;
+  final int trackReuseStrangerMs;
+  final double trackPoseRefreshDeltaDeg;
   final double bboxSmoothingAlpha;
   final int annotatedFrameMinIntervalMs;
   final int eventPublishIntervalMs;
@@ -117,10 +125,14 @@ class RecognitionRuntimeConfig {
     int? fallbackMaxInputEdge,
     int? processFrameIntervalMs,
     int? singleFlightKeepLatestFrames,
+    int? faceMeshMaxWorkers,
     int? detectorInputWidth,
     int? detectorInputHeight,
     int? trackKeepAliveMs,
     double? trackMatchMinScore,
+    int? trackReuseKnownMs,
+    int? trackReuseStrangerMs,
+    double? trackPoseRefreshDeltaDeg,
     double? bboxSmoothingAlpha,
     int? annotatedFrameMinIntervalMs,
     int? eventPublishIntervalMs,
@@ -173,10 +185,15 @@ class RecognitionRuntimeConfig {
           processFrameIntervalMs ?? this.processFrameIntervalMs,
       singleFlightKeepLatestFrames:
           singleFlightKeepLatestFrames ?? this.singleFlightKeepLatestFrames,
+      faceMeshMaxWorkers: faceMeshMaxWorkers ?? this.faceMeshMaxWorkers,
       detectorInputWidth: detectorInputWidth ?? this.detectorInputWidth,
       detectorInputHeight: detectorInputHeight ?? this.detectorInputHeight,
       trackKeepAliveMs: trackKeepAliveMs ?? this.trackKeepAliveMs,
       trackMatchMinScore: trackMatchMinScore ?? this.trackMatchMinScore,
+      trackReuseKnownMs: trackReuseKnownMs ?? this.trackReuseKnownMs,
+      trackReuseStrangerMs: trackReuseStrangerMs ?? this.trackReuseStrangerMs,
+      trackPoseRefreshDeltaDeg:
+          trackPoseRefreshDeltaDeg ?? this.trackPoseRefreshDeltaDeg,
       bboxSmoothingAlpha: bboxSmoothingAlpha ?? this.bboxSmoothingAlpha,
       annotatedFrameMinIntervalMs:
           annotatedFrameMinIntervalMs ?? this.annotatedFrameMinIntervalMs,
@@ -220,7 +237,7 @@ class RecognitionRuntimeConfig {
       noseRegionMinQuality: noseRegionMinQuality ?? this.noseRegionMinQuality,
       mouthRegionMinQuality:
           mouthRegionMinQuality ?? this.mouthRegionMinQuality,
-        enableRealtimeAutoSharpen:
+      enableRealtimeAutoSharpen:
           enableRealtimeAutoSharpen ?? this.enableRealtimeAutoSharpen,
       debugRealtimeOverlay: debugRealtimeOverlay ?? this.debugRealtimeOverlay,
       enableTraceLogs: enableTraceLogs ?? this.enableTraceLogs,
@@ -246,10 +263,14 @@ class RecognitionRuntimeConfig {
       'fallbackMaxInputEdge': fallbackMaxInputEdge,
       'processFrameIntervalMs': processFrameIntervalMs,
       'singleFlightKeepLatestFrames': singleFlightKeepLatestFrames,
+      'faceMeshMaxWorkers': faceMeshMaxWorkers,
       'detectorInputWidth': detectorInputWidth,
       'detectorInputHeight': detectorInputHeight,
       'trackKeepAliveMs': trackKeepAliveMs,
       'trackMatchMinScore': trackMatchMinScore,
+      'trackReuseKnownMs': trackReuseKnownMs,
+      'trackReuseStrangerMs': trackReuseStrangerMs,
+      'trackPoseRefreshDeltaDeg': trackPoseRefreshDeltaDeg,
       'bboxSmoothingAlpha': bboxSmoothingAlpha,
       'annotatedFrameMinIntervalMs': annotatedFrameMinIntervalMs,
       'eventPublishIntervalMs': eventPublishIntervalMs,
@@ -333,10 +354,14 @@ class RecognitionRuntimeConfig {
       fallbackMaxInputEdge: i('fallbackMaxInputEdge', 960),
       processFrameIntervalMs: i('processFrameIntervalMs', 82),
       singleFlightKeepLatestFrames: i('singleFlightKeepLatestFrames', 1),
+      faceMeshMaxWorkers: i('faceMeshMaxWorkers', 2),
       detectorInputWidth: i('detectorInputWidth', 640),
       detectorInputHeight: i('detectorInputHeight', 480),
       trackKeepAliveMs: i('trackKeepAliveMs', 1200),
       trackMatchMinScore: d('trackMatchMinScore', 0.42),
+      trackReuseKnownMs: i('trackReuseKnownMs', 1000),
+      trackReuseStrangerMs: i('trackReuseStrangerMs', 500),
+      trackPoseRefreshDeltaDeg: d('trackPoseRefreshDeltaDeg', 15.0),
       bboxSmoothingAlpha: d('bboxSmoothingAlpha', 0.34),
       annotatedFrameMinIntervalMs: i('annotatedFrameMinIntervalMs', 140),
       eventPublishIntervalMs: i('eventPublishIntervalMs', 80000),
@@ -344,7 +369,10 @@ class RecognitionRuntimeConfig {
       minRealtimeFaceAreaRatio: d('minRealtimeFaceAreaRatio', 0.030),
       minRealtimeFacePixels: i('minRealtimeFacePixels', 52),
       realtimePartialMinFrameQuality: d('realtimePartialMinFrameQuality', 0.60),
-      realtimePartialMinFaceAreaRatio: d('realtimePartialMinFaceAreaRatio', 0.035),
+      realtimePartialMinFaceAreaRatio: d(
+        'realtimePartialMinFaceAreaRatio',
+        0.035,
+      ),
       realtimePartialMinFacePixels: i('realtimePartialMinFacePixels', 64),
       realtimePartialMode: i('realtimePartialMode', 0),
       realtimePartialEnabledRegions: s(
