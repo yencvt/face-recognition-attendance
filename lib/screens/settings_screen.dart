@@ -201,7 +201,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _enablePerfLogs = false;
   bool _enableScheduledReportExport = false;
   bool _enablePublicReportApi = true;
-  bool _isRecognitionAdvancedExpanded = false;
+  final bool _isRecognitionAdvancedExpanded = false;
   bool _isLoading = true;
 
   String _recognitionLabel(String key) =>

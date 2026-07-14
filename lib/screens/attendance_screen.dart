@@ -541,11 +541,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
 
     final hosts = List<String>.generate(
-      80,
+      253,
       (index) => '$subnetPrefix.${index + 2}',
     );
     final found = <_DiscoveredCamera>[];
-    const chunkSize = 16;
+    const chunkSize = 32;
 
     for (var i = 0; i < hosts.length; i += chunkSize) {
       final chunk = hosts.sublist(i, (i + chunkSize).clamp(0, hosts.length));
@@ -600,7 +600,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         socket = await Socket.connect(
           host,
           port,
-          timeout: const Duration(milliseconds: 220),
+          timeout: const Duration(milliseconds: 2000),
         );
         return true;
       } catch (_) {
@@ -628,6 +628,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       endpoint = 'rtsp://$host:8554/stream';
     } else if (opened.contains(8080)) {
       endpoint = 'http://$host:8080/video';
+    } else if (opened.contains(8000)) {
+      endpoint = 'http://$host:8000/video';
+    } else if (opened.contains(8000)) {
+      endpoint = 'http://$host:8000/stream';
     } else if (opened.contains(81)) {
       endpoint = 'http://$host:81/stream';
     } else {

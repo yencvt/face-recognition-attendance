@@ -1784,7 +1784,7 @@ class FaceRecognitionService {
       matches.add(
         UploadedImageRecognitionFaceMatch(
           rect: rect,
-          name: isRecognized && top1 != null ? top1.personName : 'Unknown',
+          name: isRecognized ? top1.personName : 'Unknown',
           personId: recognizedPersonId,
           score: top1?.score ?? 0.0,
         ),
@@ -6419,10 +6419,8 @@ class FaceRecognitionService {
     final matchThreshold = _knownMatchThreshold;
 
     final templateConsensus =
-        bestByTemplate != null &&
         bestByTemplate.bucket.person.id == best.bucket.person.id;
     final centroidConsensus =
-        bestByCentroid != null &&
         bestByCentroid.bucket.person.id == best.bucket.person.id;
     final dualConsensus = templateConsensus && centroidConsensus;
 
