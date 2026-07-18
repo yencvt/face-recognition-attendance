@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cam/models/recognition_event.dart';
+import 'package:flutter_cam/models/recognition_frame_packet.dart';
+import 'package:flutter_cam/models/face_overlay_box.dart';
 
 import '../database/face_attendance_repository.dart';
 import '../l10n/app_i18n.dart';
@@ -600,7 +603,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         socket = await Socket.connect(
           host,
           port,
-          timeout: const Duration(milliseconds: 2000),
+          timeout: const Duration(milliseconds: 500),
         );
         return true;
       } catch (_) {

@@ -14,52 +14,21 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:face_detection_tflite/face_detection_tflite.dart' as tfl;
+import 'package:flutter_cam/models/face_person.dart';
+import 'package:flutter_cam/models/face_template.dart' as face_template;
+import 'package:flutter_cam/models/recognition_event.dart';
+import 'package:flutter_cam/models/face_overlay_box.dart';
+import 'package:flutter_cam/models/recognition_frame_packet.dart';
 import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'package:image/image.dart' as img;
+import 'package:opencv_dart/opencv.dart' as opencv;
 import 'package:mediapipe_face_mesh/mediapipe_face_mesh.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter_cam/cacher/hnsw_vector_index.dart';
 
 import '../database/face_attendance_repository.dart';
 import '../database/recognition_settings_repository.dart';
 import '../log/log_service.dart';
-
-class FaceOverlayBox {
-  FaceOverlayBox({
-    required this.trackKey,
-    required this.rectRatio,
-    required this.event,
-    this.debugLabel,
-  });
-
-  final String trackKey;
-  final Rect rectRatio;
-  final RecognitionEvent event;
-  final String? debugLabel;
-}
-
-class RecognitionFramePacket {
-  RecognitionFramePacket({
-    required this.cameraId,
-    required this.overlays,
-    required this.createdAt,
-    this.trackStats,
-    this.workerStats,
-    this.inputFps = 0,
-    this.recognitionFps = 0,
-    this.annotatedFrameJpeg,
-    this.annotatedOverlayPng,
-  });
-
-  final String cameraId;
-  final List<FaceOverlayBox> overlays;
-  final int createdAt;
-  final CameraTrackRuntimeStats? trackStats;
-  final CameraWorkerRuntimeStats? workerStats;
-  final double inputFps;
-  final double recognitionFps;
-  final Uint8List? annotatedFrameJpeg;
-  final Uint8List? annotatedOverlayPng;
-}
 
 class CameraTrackRuntimeStats {
   const CameraTrackRuntimeStats({
@@ -351,36 +320,6 @@ class UploadedImageRecognitionResult {
   final double matchThreshold;
 }
 
-class _FaceTemplate {
-  _FaceTemplate({
-    required this.person,
-    required this.vector,
-    required this.quality,
-    this.eyeVector,
-    this.leftEyeVector,
-    this.rightEyeVector,
-    this.noseVector,
-    this.mouthVector,
-    this.foreheadVector,
-    this.leftCheekVector,
-    this.rightCheekVector,
-    this.chinVector,
-  });
-
-  final FacePerson person;
-  final List<double> vector;
-  final double quality;
-  final List<double>? eyeVector;
-  final List<double>? leftEyeVector;
-  final List<double>? rightEyeVector;
-  final List<double>? noseVector;
-  final List<double>? mouthVector;
-  final List<double>? foreheadVector;
-  final List<double>? leftCheekVector;
-  final List<double>? rightCheekVector;
-  final List<double>? chinVector;
-}
-
 class _PartialEmbeddingBundle {
   const _PartialEmbeddingBundle({
     this.eyeVector,
@@ -461,7 +400,7 @@ class _MatchResult {
     required this.dualConsensus,
   });
 
-  final _FaceTemplate template;
+  final face_template.FaceTemplate template;
   final double score;
   final double calibratedScore;
   final double margin;
@@ -491,7 +430,7 @@ class _CandidateScore {
   });
 
   final _PersonScoreBucket bucket;
-  final _FaceTemplate template;
+  final face_template.FaceTemplate template;
   final double templateScore;
   final double multiPoseScore;
   final double partialScore;
@@ -557,317 +496,16 @@ class _CalibrationWindow {
   Timer? timer;
 }
 
-class _HnswScoredNode {
-  _HnswScoredNode({required this.id, required this.score});
-
-  final int id;
-  final double score;
-}
-
-class _HnswNode {
-  _HnswNode({required this.template, required this.level})
-    : neighborsByLevel = List<Set<int>>.generate(level + 1, (_) => <int>{});
-
-  final _FaceTemplate template;
-  final int level;
-  final List<Set<int>> neighborsByLevel;
-}
-
-class _HnswVectorIndex {
-  _HnswVectorIndex._({
-    required this.dimension,
-    required this.m,
-    required this.efConstruction,
-    required this.efSearchBase,
-    required this.levelNormalizer,
-    required this.random,
-  });
-
-  final int dimension;
-  final int m;
-  final int efConstruction;
-  final int efSearchBase;
-  final double levelNormalizer;
-  final math.Random random;
-
-  final List<_HnswNode> _nodes = <_HnswNode>[];
-  int _entryPoint = -1;
-  int _maxLevel = -1;
-
-  static _HnswVectorIndex? build(
-    List<_FaceTemplate> templates, {
-    int? m,
-    int? efConstruction,
-    int? efSearchBase,
-  }) {
-    if (templates.isEmpty) return null;
-    final dimension = templates.first.vector.length;
-    if (dimension == 0) return null;
-
-    final defaultM = dimension >= 512 ? 16 : 12;
-    final resolvedM = (m ?? defaultM).clamp(4, 48);
-    final resolvedEfConstruction = (efConstruction ?? 96).clamp(16, 512);
-    final resolvedEfSearchBase = (efSearchBase ?? 80).clamp(8, 512);
-    final index = _HnswVectorIndex._(
-      dimension: dimension,
-      m: resolvedM,
-      efConstruction: resolvedEfConstruction,
-      efSearchBase: resolvedEfSearchBase,
-      levelNormalizer: 1.0 / math.log(resolvedM.toDouble()),
-      random: math.Random(73),
-    );
-
-    for (final template in templates) {
-      if (template.vector.length != dimension) continue;
-      index._insert(template);
-    }
-    return index;
-  }
-
-  List<_FaceTemplate> query(List<double> vector, {int minResults = 96}) {
-    if (_nodes.isEmpty || vector.isEmpty || vector.length != dimension) {
-      return const <_FaceTemplate>[];
-    }
-
-    var entry = _entryPoint;
-    var entryScore = _score(vector, _nodes[entry].template.vector);
-    for (var level = _maxLevel; level > 0; level--) {
-      var changed = true;
-      while (changed) {
-        changed = false;
-        for (final neighbor in _nodes[entry].neighborsByLevel[level]) {
-          final s = _score(vector, _nodes[neighbor].template.vector);
-          if (s > entryScore) {
-            entry = neighbor;
-            entryScore = s;
-            changed = true;
-          }
-        }
-      }
-    }
-
-    final efSearch = math.max(efSearchBase, minResults * 2);
-    final layerCandidates = _searchLayer(
-      query: vector,
-      entryIds: <int>[entry],
-      level: 0,
-      ef: efSearch,
-    );
-
-    final result = <_FaceTemplate>[];
-    final seenPersonIds = <String>{};
-    for (final scored in layerCandidates) {
-      final template = _nodes[scored.id].template;
-      if (seenPersonIds.add(template.person.id)) {
-        result.add(template);
-      }
-      if (result.length >= minResults) {
-        break;
-      }
-    }
-    return result;
-  }
-
-  void _insert(_FaceTemplate template) {
-    final level = _sampleLevel();
-    final nodeId = _nodes.length;
-    final node = _HnswNode(template: template, level: level);
-    _nodes.add(node);
-
-    if (_entryPoint < 0) {
-      _entryPoint = nodeId;
-      _maxLevel = level;
-      return;
-    }
-
-    var entry = _entryPoint;
-    var entryScore = _score(template.vector, _nodes[entry].template.vector);
-
-    if (level < _maxLevel) {
-      for (var currentLevel = _maxLevel; currentLevel > level; currentLevel--) {
-        var changed = true;
-        while (changed) {
-          changed = false;
-          for (final neighbor in _nodes[entry].neighborsByLevel[currentLevel]) {
-            final s = _score(template.vector, _nodes[neighbor].template.vector);
-            if (s > entryScore) {
-              entry = neighbor;
-              entryScore = s;
-              changed = true;
-            }
-          }
-        }
-      }
-    }
-
-    final maxLayerToConnect = math.min(level, _maxLevel);
-    for (
-      var currentLevel = maxLayerToConnect;
-      currentLevel >= 0;
-      currentLevel--
-    ) {
-      final found = _searchLayer(
-        query: template.vector,
-        entryIds: <int>[entry],
-        level: currentLevel,
-        ef: efConstruction,
-      );
-      final selected = _selectNeighbors(found, m);
-      for (final scored in selected) {
-        _connect(nodeId, scored.id, currentLevel);
-      }
-
-      if (selected.isNotEmpty) {
-        entry = selected.first.id;
-      }
-    }
-
-    if (level > _maxLevel) {
-      _entryPoint = nodeId;
-      _maxLevel = level;
-    }
-  }
-
-  void _connect(int a, int b, int level) {
-    final nodeA = _nodes[a];
-    final nodeB = _nodes[b];
-    if (level > nodeA.level || level > nodeB.level) return;
-
-    nodeA.neighborsByLevel[level].add(b);
-    nodeB.neighborsByLevel[level].add(a);
-
-    _trimNeighbors(a, level);
-    _trimNeighbors(b, level);
-  }
-
-  void _trimNeighbors(int nodeId, int level) {
-    final node = _nodes[nodeId];
-    final neighborIds = node.neighborsByLevel[level];
-    if (neighborIds.length <= m) return;
-
-    final scored =
-        neighborIds
-            .map(
-              (id) => _HnswScoredNode(
-                id: id,
-                score: _score(node.template.vector, _nodes[id].template.vector),
-              ),
-            )
-            .toList(growable: false)
-          ..sort((a, b) => b.score.compareTo(a.score));
-
-    neighborIds
-      ..clear()
-      ..addAll(scored.take(m).map((e) => e.id));
-  }
-
-  List<_HnswScoredNode> _searchLayer({
-    required List<double> query,
-    required List<int> entryIds,
-    required int level,
-    required int ef,
-  }) {
-    final visited = <int>{};
-    final candidates = <_HnswScoredNode>[];
-    final top = <_HnswScoredNode>[];
-
-    void insertDesc(List<_HnswScoredNode> target, _HnswScoredNode value) {
-      var index = 0;
-      while (index < target.length && target[index].score >= value.score) {
-        index++;
-      }
-      target.insert(index, value);
-    }
-
-    void insertAsc(List<_HnswScoredNode> target, _HnswScoredNode value) {
-      var index = 0;
-      while (index < target.length && target[index].score <= value.score) {
-        index++;
-      }
-      target.insert(index, value);
-    }
-
-    for (final entry in entryIds) {
-      if (entry < 0 || entry >= _nodes.length) continue;
-      if (!visited.add(entry)) continue;
-      final scored = _HnswScoredNode(
-        id: entry,
-        score: _score(query, _nodes[entry].template.vector),
-      );
-      insertDesc(candidates, scored);
-      insertAsc(top, scored);
-    }
-
-    while (candidates.isNotEmpty) {
-      final current = candidates.removeAt(0);
-      final worstTopScore = top.isEmpty ? -double.infinity : top.first.score;
-      if (top.length >= ef && current.score < worstTopScore) {
-        break;
-      }
-
-      final neighbors = _nodes[current.id].neighborsByLevel[level];
-      for (final neighbor in neighbors) {
-        if (!visited.add(neighbor)) continue;
-        final scored = _HnswScoredNode(
-          id: neighbor,
-          score: _score(query, _nodes[neighbor].template.vector),
-        );
-        final currentWorstTopScore = top.isEmpty
-            ? -double.infinity
-            : top.first.score;
-        if (top.length < ef || scored.score > currentWorstTopScore) {
-          insertDesc(candidates, scored);
-          insertAsc(top, scored);
-          if (top.length > ef) {
-            top.removeAt(0);
-          }
-        }
-      }
-    }
-
-    top.sort((a, b) => b.score.compareTo(a.score));
-    return top;
-  }
-
-  List<_HnswScoredNode> _selectNeighbors(
-    List<_HnswScoredNode> candidates,
-    int count,
-  ) {
-    if (candidates.isEmpty) return const <_HnswScoredNode>[];
-    final sorted = [...candidates]..sort((a, b) => b.score.compareTo(a.score));
-    return sorted.take(count).toList(growable: false);
-  }
-
-  int _sampleLevel() {
-    final u = (1.0 - random.nextDouble()).clamp(1e-9, 1.0);
-    final level = (-math.log(u) * levelNormalizer).floor();
-    return level.clamp(0, 16);
-  }
-
-  double _score(List<double> query, List<double> nodeVector) {
-    return _dotProduct(query, nodeVector);
-  }
-}
-
-double _dotProduct(List<double> a, List<double> b) {
-  final len = math.min(a.length, b.length);
-  var s = 0.0;
-  for (var i = 0; i < len; i++) {
-    s += a[i] * b[i];
-  }
-  return s;
-}
-
 class _PersonScoreBucket {
   _PersonScoreBucket({required this.person});
 
   final FacePerson person;
-  final List<_FaceTemplate> templates = [];
+  final List<face_template.FaceTemplate> templates = [];
   List<double>? centroid;
   double interClassMean = 0.78;
   double interClassStd = 0.10;
 
-  void addTemplate(_FaceTemplate template) {
+  void addTemplate(face_template.FaceTemplate template) {
     templates.add(template);
   }
 
@@ -915,7 +553,7 @@ class _PersonScoreBucket {
     var best = -1.0;
     for (final template in templates) {
       final score =
-          _dotProduct(vector, template.vector) *
+          HnswVectorIndex().dotProduct(vector, template.vector) *
           (0.80 + template.quality * 0.20);
       if (score > best) {
         best = score;
@@ -930,7 +568,7 @@ class _PersonScoreBucket {
       return 0.0;
     }
 
-    return _dotProduct(vector, c);
+    return HnswVectorIndex().dotProduct(vector, c);
   }
 
   double scoreAgainst(List<double> vector) {
@@ -1177,10 +815,9 @@ class FaceRecognitionService {
   final List<RecognitionEvent> _realtimeEventCache = <RecognitionEvent>[];
   final List<RecognitionEvent> _pendingDbEvents = <RecognitionEvent>[];
   final Set<WebSocket> _realtimeWsClients = <WebSocket>{};
-  final List<_FaceTemplate> _templates = [];
+  final List<face_template.FaceTemplate> _templates = [];
   final Map<String, _PersonScoreBucket> _templatesByPersonId = {};
   List<double>? _globalMeanDirection;
-  _HnswVectorIndex? _vectorIndex;
   int _templateVectorDimension = 0;
   final Map<String, _CameraThresholdProfile> _cameraThresholdProfiles = {};
   final Map<String, _CalibrationWindow> _calibrationWindows = {};
@@ -1378,7 +1015,12 @@ class FaceRecognitionService {
             old.hnswEfConstruction != cfg.hnswEfConstruction ||
             old.hnswEfSearch != cfg.hnswEfSearch;
         if (hnswChanged && _templates.isNotEmpty) {
-          _vectorIndex = _buildSearchIndex(_templates);
+          HnswVectorIndex().build(
+            _templates,
+            m: _hnswM,
+            efConstruction: _hnswEfConstruction,
+            efSearchBase: _hnswEfSearch,
+          );
           _log.info(
             'Recognition search index rebuilt m=${cfg.hnswM} efC=${cfg.hnswEfConstruction} efS=${cfg.hnswEfSearch}',
           );
@@ -1843,6 +1485,28 @@ class FaceRecognitionService {
     _fallbackDetectorInitialized = true;
   }
 
+  Future<img.Image?> _resizeWithOpenCvDart(
+    img.Image frame,
+    int targetWidth,
+    int targetHeight,
+  ) async {
+    // Encode sang Uint8List để dùng OpenCV
+    final frameBytes = Uint8List.fromList(img.encodeJpg(frame));
+
+    final mat = await opencv.imdecode(frameBytes, opencv.IMREAD_COLOR);
+
+    final resizedMat = await opencv.resize(
+      mat,
+      (targetWidth, targetHeight),
+      interpolation: opencv.INTER_LINEAR,
+    );
+
+    final result = await opencv.imencode('.jpg', resizedMat);
+
+    // Decode lại sang img.Image để trả về
+    return img.decodeImage(result.$2);
+  }
+
   Rect _centerFallbackRect(img.Image source) {
     final side = (math.min(source.width, source.height) * 0.62).round();
     final clampedSide = math.max(1, side);
@@ -1858,7 +1522,7 @@ class FaceRecognitionService {
 
   List<UploadedImageRecognitionCandidateScore> _topUploadedImageCandidates(
     List<double> query,
-    List<_FaceTemplate> templates, {
+    List<face_template.FaceTemplate> templates, {
     _PartialEmbeddingBundle? partialBundle,
     int maxItems = 3,
   }) {
@@ -1907,7 +1571,7 @@ class FaceRecognitionService {
     for (final bucket in buckets) {
       if (bucket.templates.isEmpty) continue;
 
-      _FaceTemplate bestTemplate = bucket.templates.first;
+      face_template.FaceTemplate bestTemplate = bucket.templates.first;
       var templateScore = -1.0;
       final templateScores = <double>[];
       for (final template in bucket.templates) {
@@ -2054,10 +1718,10 @@ class FaceRecognitionService {
     return candidates;
   }
 
-  Future<List<_FaceTemplate>> _loadReferenceTemplatesForPeople(
+  Future<List<face_template.FaceTemplate>> _loadReferenceTemplatesForPeople(
     List<FacePerson> selectedPeople,
   ) async {
-    final templates = <_FaceTemplate>[];
+    final templates = <face_template.FaceTemplate>[];
     for (final person in selectedPeople) {
       final cacheEntries =
           await FaceAttendanceRepository.getVectorCacheEntriesForPerson(
@@ -2073,7 +1737,7 @@ class FaceRecognitionService {
     return templates;
   }
 
-  _FaceTemplate? _templateFromVectorCacheEntry(
+  face_template.FaceTemplate? _templateFromVectorCacheEntry(
     FacePerson person,
     FaceVectorCacheEntry entry,
   ) {
@@ -2088,7 +1752,7 @@ class FaceRecognitionService {
       return aligned.isEmpty ? null : _normalizeVector(aligned);
     }
 
-    return _FaceTemplate(
+    return face_template.FaceTemplate(
       person: person,
       vector: _normalizeVector(vector),
       quality: entry.quality.clamp(0.20, 1.0).toDouble(),
@@ -2445,7 +2109,7 @@ class FaceRecognitionService {
     }
   }
 
-  img.Image _optimizeFallbackFrame(img.Image frame) {
+  img.Image? _optimizeFallbackFrame(img.Image frame) {
     final maxInputEdge = _fallbackMaxInputEdge.clamp(160, 4096);
     final longestEdge = math.max(frame.width, frame.height);
     if (longestEdge <= maxInputEdge) {
@@ -2455,12 +2119,9 @@ class FaceRecognitionService {
     final scale = maxInputEdge / longestEdge;
     final targetWidth = (frame.width * scale).round().clamp(1, frame.width);
     final targetHeight = (frame.height * scale).round().clamp(1, frame.height);
-    return img.copyResize(
-      frame,
-      width: targetWidth,
-      height: targetHeight,
-      interpolation: img.Interpolation.linear,
-    );
+    
+    // Resize using image package for better compatibility
+    return img.copyResize(frame, width: targetWidth, height: targetHeight);
   }
 
   Future<RecognitionZone> _resolveZone(String cameraId) async {
@@ -2546,7 +2207,7 @@ class FaceRecognitionService {
     final people = await FaceAttendanceRepository.getPeople();
     final peopleById = {for (final person in people) person.id: person};
     final cacheEntries = await FaceAttendanceRepository.getVectorCacheEntries();
-    final result = <_FaceTemplate>[];
+    final result = <face_template.FaceTemplate>[];
     final byPerson = <String, _PersonScoreBucket>{};
     var inferredDim = 0;
 
@@ -2633,7 +2294,7 @@ class FaceRecognitionService {
           ? null
           : _normalizeVector(chinVector);
 
-      final template = _FaceTemplate(
+      final template = face_template.FaceTemplate(
         person: person,
         vector: normalizedVector,
         quality: entry.quality.clamp(0.20, 1.0).toDouble(),
@@ -2686,7 +2347,12 @@ class FaceRecognitionService {
     _templatesByPersonId
       ..clear()
       ..addAll(byPerson);
-    _vectorIndex = _buildSearchIndex(result);
+    HnswVectorIndex().build(
+      result,
+      m: _hnswM,
+      efConstruction: _hnswEfConstruction,
+      efSearchBase: _hnswEfSearch,
+    );
 
     for (final bucket in _templatesByPersonId.values) {
       bucket.finalize();
@@ -2760,15 +2426,6 @@ class FaceRecognitionService {
       bucket.interClassMean = mean;
       bucket.interClassStd = math.sqrt(variance).clamp(0.015, 0.25);
     }
-  }
-
-  _HnswVectorIndex? _buildSearchIndex(List<_FaceTemplate> templates) {
-    return _HnswVectorIndex.build(
-      templates,
-      m: _hnswM,
-      efConstruction: _hnswEfConstruction,
-      efSearchBase: _hnswEfSearch,
-    );
   }
 
   Future<List<FaceVectorCacheEntry>> _buildVectorCacheEntriesForPerson(
@@ -3029,14 +2686,13 @@ class FaceRecognitionService {
           return;
         }
 
-        final resizedForDetector = img.copyResize(
+        final resizedForDetector = await _resizeWithOpenCvDart(
           rgb,
-          width: _detectorInputWidth,
-          height: _detectorInputHeight,
-          interpolation: img.Interpolation.linear,
+          _detectorInputWidth,
+          _detectorInputHeight,
         );
         final frameInput = _buildMediaPipeFrameFromRgb(
-          resizedForDetector,
+          resizedForDetector!,
           rotationDegrees: _rotationDegreesFor(cameraId, image),
         );
         if (frameInput == null) {
@@ -3439,9 +3095,10 @@ class FaceRecognitionService {
   Future<void> _processFallbackImage(
     String cameraId,
     RecognitionZone zone,
-    img.Image rgb, {
+    img.Image? rgb, {
     int frameIndex = 0,
   }) async {
+    if (rgb == null) return;
     try {
       final detections = await _detectFacesForFallback(rgb, cameraId);
       final filteredDetections = _filterFallbackDetectionsForRealtime(
@@ -3946,13 +3603,8 @@ class FaceRecognitionService {
     final session = _scrfdSession;
     if (session == null) return const <_DetectedFace>[];
 
-    final resized = img.copyResize(
-      source,
-      width: _scrfdInputSize,
-      height: _scrfdInputSize,
-      interpolation: img.Interpolation.linear,
-    );
-    final rgb = resized.getBytes(order: img.ChannelOrder.rgb);
+    final resized = await _resizeWithOpenCvDart(source, _scrfdInputSize, _scrfdInputSize);
+    final rgb = resized!.getBytes(order: img.ChannelOrder.rgb);
 
     final input = List<double>.filled(
       1 * 3 * _scrfdInputSize * _scrfdInputSize,
@@ -5083,70 +4735,149 @@ class FaceRecognitionService {
     required int createdAt,
     required String cameraId,
   }) {
-    final annotated = img.Image.from(frame);
-    final left = faceRect.left.floor().clamp(0, annotated.width - 1);
-    final top = faceRect.top.floor().clamp(0, annotated.height - 1);
-    final right = faceRect.right.ceil().clamp(left, annotated.width - 1);
-    final bottom = faceRect.bottom.ceil().clamp(top, annotated.height - 1);
+    // Chuyển frame từ image sang Mat của OpenCV
+    final mat = opencv.Mat.fromList(frame.height, frame.width, opencv.MatType.CV_8UC3, frame.getBytes());
+
+    // Tính toán tọa độ bbox
+    final left = faceRect.left.floor().clamp(0, frame.width - 1);
+    final top = faceRect.top.floor().clamp(0, frame.height - 1);
+    final right = faceRect.right.ceil().clamp(left, frame.width - 1);
+    final bottom = faceRect.bottom.ceil().clamp(top, frame.height - 1);
+
+    // Màu bbox
     final color = isStranger
-        ? img.ColorRgba8(255, 165, 0, 245)
-        : img.ColorRgba8(120, 235, 0, 245);
-    img.drawRect(
-      annotated,
-      x1: left,
-      y1: top,
-      x2: right,
-      y2: bottom,
-      color: color,
+        ? opencv.Scalar(255, 165, 0, 245) // cam
+        : opencv.Scalar(120, 235, 0, 245); // xanh lá
+
+    // Tạo Rect đúng kiểu cho OpenCV
+    final cvRect = opencv.Rect(left, top, right - left, bottom - top);
+    // Vẽ rectangle bằng OpenCV
+    opencv.rectangle(
+      mat,
+      cvRect,
+      color,
       thickness: 3,
     );
 
+    // Chuẩn bị text
     final label = '$personName ${(confidence * 100).toStringAsFixed(0)}%';
     final timeText = _formatLogTimestamp(createdAt);
     final cameraText = 'Cam: $cameraId';
 
-    final textX = left.clamp(0, annotated.width - 1);
-    final textY1 = (top - 42).clamp(0, annotated.height - 1);
-    final textY2 = (textY1 + 14).clamp(0, annotated.height - 1);
-    final textY3 = (textY2 + 14).clamp(0, annotated.height - 1);
+    final textX = left.clamp(0, frame.width - 1);
+    final textY1 = (top - 42).clamp(0, frame.height - 1);
+    final textY2 = (textY1 + 14).clamp(0, frame.height - 1);
+    final textY3 = (textY2 + 14).clamp(0, frame.height - 1);
 
-    img.drawString(
-      annotated,
-      label,
-      font: img.arial14,
-      x: textX,
-      y: textY1,
-      color: color,
-    );
-    img.drawString(
-      annotated,
-      timeText,
-      font: img.arial14,
-      x: textX,
-      y: textY2,
-      color: img.ColorRgba8(255, 255, 255, 245),
-    );
-    img.drawString(
-      annotated,
-      cameraText,
-      font: img.arial14,
-      x: textX,
-      y: textY3,
-      color: img.ColorRgba8(255, 255, 255, 245),
+    // Vẽ text bằng OpenCV
+    opencv.putText(mat, label, opencv.Point(textX, textY1), opencv.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness: 1,);
+    opencv.putText(mat, timeText, opencv.Point(textX, textY2), opencv.FONT_HERSHEY_SIMPLEX, 0.5, opencv.Scalar(255,255,255,245), thickness: 1,);
+    opencv.putText(mat, cameraText, opencv.Point(textX, textY3), opencv.FONT_HERSHEY_SIMPLEX, 0.5, opencv.Scalar(255,255,255,245), thickness: 1,);
+
+    // Resize nếu cần
+    final maxSide = math.max(frame.width, frame.height);
+    opencv.Mat normalized = mat;
+    if (maxSide > 640) {
+      final newWidth  = frame.width >= frame.height ? 640 : (frame.width * 640 ~/ frame.height);
+      final newHeight = frame.height > frame.width ? 640 : (frame.height * 640 ~/ frame.width);
+      normalized = opencv.resize(
+        mat,
+        (newWidth, newHeight), // tuple (int, int)
+        interpolation: opencv.INTER_LINEAR,
+      );
+    }
+
+    // Encode sang JPG
+    final params = opencv.VecI32.fromList([opencv.IMWRITE_JPEG_QUALITY, 80]);
+    final result = opencv.imencode(
+      '.jpg',
+      normalized,
+      params: params,
     );
 
-    final maxSide = math.max(annotated.width, annotated.height);
-    final normalized = maxSide > 640
-        ? img.copyResize(
-            annotated,
-            width: annotated.width >= annotated.height ? 640 : null,
-            height: annotated.height > annotated.width ? 640 : null,
-            interpolation: img.Interpolation.linear,
-          )
-        : annotated;
-    final jpg = img.encodeJpg(normalized, quality: 80);
-    return base64Encode(jpg);
+    // result là (bool, Uint8List)
+    final success = result.$1;      // hoặc result.item1
+    final jpgBytes = result.$2;     // hoặc result.item2
+
+    if (!success) {
+      throw Exception('imencode failed');
+    }
+    return base64Encode(jpgBytes);
   }
+
+  // String _encodeSnapshotWithBboxBase64(
+  //   img.Image frame,
+  //   Rect faceRect, {
+  //   required bool isStranger,
+  //   required String personName,
+  //   required double confidence,
+  //   required int createdAt,
+  //   required String cameraId,
+  // }) {
+  //   final annotated = img.Image.from(frame);
+  //   final left = faceRect.left.floor().clamp(0, annotated.width - 1);
+  //   final top = faceRect.top.floor().clamp(0, annotated.height - 1);
+  //   final right = faceRect.right.ceil().clamp(left, annotated.width - 1);
+  //   final bottom = faceRect.bottom.ceil().clamp(top, annotated.height - 1);
+  //   final color = isStranger
+  //       ? img.ColorRgba8(255, 165, 0, 245)
+  //       : img.ColorRgba8(120, 235, 0, 245);
+  //   img.drawRect(
+  //     annotated,
+  //     x1: left,
+  //     y1: top,
+  //     x2: right,
+  //     y2: bottom,
+  //     color: color,
+  //     thickness: 3,
+  //   );
+
+  //   final label = '$personName ${(confidence * 100).toStringAsFixed(0)}%';
+  //   final timeText = _formatLogTimestamp(createdAt);
+  //   final cameraText = 'Cam: $cameraId';
+
+  //   final textX = left.clamp(0, annotated.width - 1);
+  //   final textY1 = (top - 42).clamp(0, annotated.height - 1);
+  //   final textY2 = (textY1 + 14).clamp(0, annotated.height - 1);
+  //   final textY3 = (textY2 + 14).clamp(0, annotated.height - 1);
+
+  //   img.drawString(
+  //     annotated,
+  //     label,
+  //     font: img.arial14,
+  //     x: textX,
+  //     y: textY1,
+  //     color: color,
+  //   );
+  //   img.drawString(
+  //     annotated,
+  //     timeText,
+  //     font: img.arial14,
+  //     x: textX,
+  //     y: textY2,
+  //     color: img.ColorRgba8(255, 255, 255, 245),
+  //   );
+  //   img.drawString(
+  //     annotated,
+  //     cameraText,
+  //     font: img.arial14,
+  //     x: textX,
+  //     y: textY3,
+  //     color: img.ColorRgba8(255, 255, 255, 245),
+  //   );
+
+  //   final maxSide = math.max(annotated.width, annotated.height);
+  //   final normalized = maxSide > 640
+  //       ? img.copyResize(
+  //           annotated,
+  //           width: annotated.width >= annotated.height ? 640 : null,
+  //           height: annotated.height > annotated.width ? 640 : null,
+  //           interpolation: img.Interpolation.linear,
+  //         )
+  //       : annotated;
+  //   final jpg = img.encodeJpg(normalized, quality: 80);
+  //   return base64Encode(jpg);
+  // }
 
   String _formatLogTimestamp(int millis) {
     final dt = DateTime.fromMillisecondsSinceEpoch(millis);
@@ -5448,13 +5179,8 @@ class FaceRecognitionService {
     }
 
     Future<List<double>> runArcFace(img.Image preparedInput) async {
-      final resized = img.copyResize(
-        preparedInput,
-        width: 112,
-        height: 112,
-        interpolation: img.Interpolation.linear,
-      );
-      final rgb = resized.getBytes(order: img.ChannelOrder.rgb);
+      final resized = await _resizeWithOpenCvDart(preparedInput, 112, 112);
+      final rgb = resized!.getBytes(order: img.ChannelOrder.rgb);
       final nchwInput = List<double>.filled(1 * 3 * 112 * 112, 0);
       final nhwcInput = List<double>.filled(1 * 112 * 112 * 3, 0);
       for (var y = 0; y < 112; y++) {
@@ -5577,7 +5303,7 @@ class FaceRecognitionService {
     return normalized;
   }
 
-  List<double>? _computeGlobalMeanDirection(List<_FaceTemplate> templates) {
+  List<double>? _computeGlobalMeanDirection(List<face_template.FaceTemplate> templates) {
     if (templates.isEmpty) return null;
     final dimension = templates.first.vector.length;
     if (dimension <= 0) return null;
@@ -5601,7 +5327,7 @@ class FaceRecognitionService {
   }
 
   double _debiasedCosine(List<double> a, List<double> b) {
-    final raw = _dotProduct(a, b);
+    final raw = HnswVectorIndex().dotProduct(a, b);
     final mean = _globalMeanDirection;
     if (mean == null || mean.isEmpty) {
       return raw.clamp(-1.0, 1.0).toDouble();
@@ -6348,17 +6074,16 @@ class FaceRecognitionService {
     }
 
     final excluded = excludedPersonIds ?? const <String>{};
-    final indexedTemplates =
-        _vectorIndex?.query(vector) ?? const <_FaceTemplate>[];
+    final results = HnswVectorIndex().query(vector);
     final totalPersons = _templatesByPersonId.length;
 
     Set<String>? candidatePersonIds;
     var usedIndexedPruning = false;
-    if (indexedTemplates.isNotEmpty) {
+    if (results.isNotEmpty) {
       final ids = <String>{};
-      for (final template in indexedTemplates) {
-        if (excluded.contains(template.person.id)) continue;
-        ids.add(template.person.id);
+      for (final item in results) {
+        if (excluded.contains(item.template.person.id)) continue;
+        ids.add(item.template.person.id);
       }
       if (ids.length >= 80 && totalPersons >= 200) {
         final augmented = <String>{...ids};
@@ -7414,15 +7139,10 @@ class FaceRecognitionService {
     return aligned;
   }
 
-  List<double> _vectorFromImage(img.Image source) {
+  Future<List<double>> _vectorFromImage(img.Image source) async {
     final square = _centerCropSquare(source);
-    final resized = img.copyResize(
-      square,
-      width: 24,
-      height: 24,
-      interpolation: img.Interpolation.linear,
-    );
-    final rgb = resized.getBytes(order: img.ChannelOrder.rgb);
+    final resized = await _resizeWithOpenCvDart(square, 24, 24);
+    final rgb = resized!.getBytes(order: img.ChannelOrder.rgb);
     final vector = List<double>.filled(24 * 24, 0);
 
     var sumSq = 0.0;

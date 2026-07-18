@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter_cam/models/face_person.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -1432,9 +1433,9 @@ class _ImageRecognitionTestScreenState
         ),
         Slider(
           value: _matchThreshold,
-          min: 0.30,
-          max: 0.90,
-          divisions: 60,
+          min: 0,
+          max: 1,
+          divisions: 100,
           label: _matchThreshold.toStringAsFixed(2),
           onChanged: _isRunning
               ? null
@@ -1442,7 +1443,7 @@ class _ImageRecognitionTestScreenState
                   setState(() {
                     _matchThreshold = value;
                     _configControllers['knownMatchThreshold']!.text = value
-                        .toStringAsFixed(3);
+                        .toStringAsFixed(2);
                   });
                 },
         ),

@@ -1,58 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter_cam/models/face_person.dart';
+import 'package:flutter_cam/models/recognition_event.dart';
+
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_database.dart';
-
-class FacePerson {
-  FacePerson({
-    required this.id,
-    required this.name,
-    required this.createdAt,
-    this.employeeCode = '',
-    this.department = '',
-    this.notes = '',
-    this.imageBase64 = '',
-    this.imageCropBase64 = '',
-  });
-
-  final String id;
-  final String name;
-  final String employeeCode;
-  final String department;
-  final String notes;
-  final String imageBase64;
-  final String imageCropBase64;
-  final int createdAt;
-
-  factory FacePerson.fromMap(Map<String, dynamic> map) {
-    return FacePerson(
-      id: map['id'].toString(),
-      name: map['name'].toString(),
-      employeeCode: map['employee_code']?.toString() ?? '',
-      department: map['department']?.toString() ?? '',
-      notes: map['notes']?.toString() ?? '',
-      imageBase64: map['image_base64']?.toString() ?? '',
-      imageCropBase64: map['image_crop_base64']?.toString() ?? '',
-      createdAt: (map['created_at'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  Map<String, Object?> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'employee_code': employeeCode,
-      'department': department,
-      'notes': notes,
-      'image_base64': imageBase64,
-      'image_crop_base64': imageCropBase64,
-      'created_at': createdAt,
-    };
-  }
-}
 
 class FacePersonImage {
   FacePersonImage({
@@ -263,54 +218,6 @@ class RecognitionZone {
       'rotation_degrees': rotationDegrees,
       'enabled': enabled ? 1 : 0,
       'updated_at': updatedAt,
-    };
-  }
-}
-
-class RecognitionEvent {
-  RecognitionEvent({
-    required this.id,
-    required this.personName,
-    required this.confidence,
-    required this.isStranger,
-    required this.createdAt,
-    this.personId,
-    this.cameraId,
-    this.snapshotBase64 = '',
-  });
-
-  final String id;
-  final String? personId;
-  final String personName;
-  final String? cameraId;
-  final double confidence;
-  final bool isStranger;
-  final int createdAt;
-  final String snapshotBase64;
-
-  factory RecognitionEvent.fromMap(Map<String, dynamic> map) {
-    return RecognitionEvent(
-      id: map['id'].toString(),
-      personId: map['person_id']?.toString(),
-      personName: map['person_name'].toString(),
-      cameraId: map['camera_id']?.toString(),
-      confidence: (map['confidence'] as num?)?.toDouble() ?? 0,
-      isStranger: (map['is_stranger'] as int?) == 1,
-      createdAt: (map['created_at'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
-      snapshotBase64: map['snapshot_base64']?.toString() ?? '',
-    );
-  }
-
-  Map<String, Object?> toMap() {
-    return {
-      'id': id,
-      'person_id': personId,
-      'person_name': personName,
-      'camera_id': cameraId,
-      'confidence': confidence,
-      'is_stranger': isStranger ? 1 : 0,
-      'created_at': createdAt,
-      'snapshot_base64': snapshotBase64,
     };
   }
 }
