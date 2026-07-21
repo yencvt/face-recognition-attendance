@@ -424,11 +424,11 @@ class HnswVectorIndex {
   }
 
   double dotProduct(List<double> a, List<double> b) {
-  final len = math.min(a.length, b.length);
-  var s = 0.0;
-  for (var i = 0; i < len; i++) {
-    s += a[i] * b[i];
+    final len = math.min(a.length, b.length);
+    var s = 0.0;
+    for (var i = 0; i < len; i++) {
+      s += a[i] * b[i];
+    }
+    return s;
   }
-  return s;
-}
 }

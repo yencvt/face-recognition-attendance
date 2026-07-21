@@ -174,35 +174,63 @@ class CameraStreamService {
     if (session.connectionState == CameraStreamConnectionState.connecting) return;
 
     session.connectionState = CameraStreamConnectionState.connecting;
-    session.statusMessage = 'Connecting via WebRTC';
+    session.statusMessage = 'Connecting...';
     _emit();
     await _persistSession(session);
 
     try {
-      final status = await Permission.camera.request();
-      if (!status.isGranted) {
-        throw Exception('Camera permission denied');
+      if (session.endpoint.startsWith('ipcam:')) {
+        // Kết nối IP cam qua WebRTC signaling
+        session.renderer ??= RTCVideoRenderer();
+        if (session.renderer!.textureId == null) {
+          await session.renderer!.initialize();
+        }
+
+        final pc = await createPeerConnection({
+          'iceServers': [
+            {'urls': 'stun:stun.l.google.com:19302'},
+          ]
+        });
+
+        // Lắng nghe remote stream từ IP cam
+        pc.onAddStream = (MediaStream stream) {
+          session.mediaStream = stream;
+          session.renderer!.srcObject = stream;
+          session.connectionState = CameraStreamConnectionState.connected;
+          session.statusMessage = 'IP camera stream active';
+          _emit();
+          _persistSession(session);
+        };
+
+        // TODO: signaling với server IP cam (gửi offer, nhận answer)
+        // Ví dụ: gửi SDP offer qua HTTP/WebSocket tới IP cam server
+        final offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        // gửi offer tới server, nhận lại answer, rồi setRemoteDescription(answer)
+
+      } else {
+        // Local camera
+        final status = await Permission.camera.request();
+        if (!status.isGranted) throw Exception('Camera permission denied');
+
+        session.renderer ??= RTCVideoRenderer();
+        if (session.renderer!.textureId == null) {
+          await session.renderer!.initialize();
+        }
+
+        final stream = await navigator.mediaDevices.getUserMedia(
+          _buildMediaConstraints(session.endpoint),
+        );
+
+        session.mediaStream = stream;
+        session.renderer!.srcObject = stream;
+        session.connectionState = CameraStreamConnectionState.connected;
+        session.statusMessage = 'Local camera stream active';
+        if (markAutoStart) session.autoStart = true;
+
+        _emit();
+        await _persistSession(session);
       }
-
-      session.renderer ??= RTCVideoRenderer();
-      if (session.renderer!.textureId == null) {
-        await session.renderer!.initialize();
-      }
-
-      final stream = await navigator.mediaDevices.getUserMedia(
-        _buildMediaConstraints(session.endpoint),
-      );
-
-      session.mediaStream = stream;
-      session.renderer!.srcObject = stream;
-      session.connectionState = CameraStreamConnectionState.connected;
-      session.statusMessage = 'WebRTC stream active';
-      if (markAutoStart) {
-        session.autoStart = true;
-      }
-
-      _emit();
-      await _persistSession(session);
     } catch (e) {
       await _disposeSessionMedia(session);
       session.connectionState = CameraStreamConnectionState.failed;

@@ -25,6 +25,7 @@ import 'package:opencv_dart/opencv.dart' as opencv;
 import 'package:mediapipe_face_mesh/mediapipe_face_mesh.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_cam/cacher/hnsw_vector_index.dart';
+import 'package:flutter_cam/cacher/person_score_bucket.dart';
 
 import '../database/face_attendance_repository.dart';
 import '../database/recognition_settings_repository.dart';
@@ -429,7 +430,7 @@ class _CandidateScore {
     required this.decisionScore,
   });
 
-  final _PersonScoreBucket bucket;
+  final PersonScoreBucket bucket;
   final face_template.FaceTemplate template;
   final double templateScore;
   final double multiPoseScore;
@@ -494,96 +495,6 @@ class _CalibrationWindow {
   final List<_CalibrationSample> samples = [];
   final Map<String, int> lastLogAtByFaceKey = {};
   Timer? timer;
-}
-
-class _PersonScoreBucket {
-  _PersonScoreBucket({required this.person});
-
-  final FacePerson person;
-  final List<face_template.FaceTemplate> templates = [];
-  List<double>? centroid;
-  double interClassMean = 0.78;
-  double interClassStd = 0.10;
-
-  void addTemplate(face_template.FaceTemplate template) {
-    templates.add(template);
-  }
-
-  void finalize() {
-    if (templates.isEmpty) {
-      centroid = null;
-      return;
-    }
-
-    final length = templates.first.vector.length;
-    final sum = List<double>.filled(length, 0);
-    var totalWeight = 0.0;
-    for (final template in templates) {
-      final vector = template.vector;
-      final weight = template.quality.clamp(0.2, 1.0);
-      final limit = math.min(length, vector.length);
-      for (var i = 0; i < limit; i++) {
-        sum[i] += vector[i] * weight;
-      }
-      totalWeight += weight;
-    }
-
-    if (totalWeight > 0) {
-      for (var i = 0; i < sum.length; i++) {
-        sum[i] /= totalWeight;
-      }
-    }
-
-    var norm = 0.0;
-    for (final value in sum) {
-      norm += value * value;
-    }
-    norm = math.sqrt(norm);
-    if (norm > 0) {
-      for (var i = 0; i < sum.length; i++) {
-        sum[i] /= norm;
-      }
-    }
-    centroid = sum;
-  }
-
-  double bestTemplateScore(List<double> vector) {
-    if (templates.isEmpty) return 0.0;
-
-    var best = -1.0;
-    for (final template in templates) {
-      final score =
-          HnswVectorIndex().dotProduct(vector, template.vector) *
-          (0.80 + template.quality * 0.20);
-      if (score > best) {
-        best = score;
-      }
-    }
-    return best;
-  }
-
-  double centroidScore(List<double> vector) {
-    final c = centroid;
-    if (c == null || c.isEmpty) {
-      return 0.0;
-    }
-
-    return HnswVectorIndex().dotProduct(vector, c);
-  }
-
-  double scoreAgainst(List<double> vector) {
-    final t = bestTemplateScore(vector);
-    final c = centroidScore(vector);
-    if (c == 0.0) return t;
-
-    final blended = c * 0.65 + t * 0.35;
-    return blended.clamp(-1.0, 1.0);
-  }
-
-  double calibrate(double rawScore) {
-    final std = interClassStd < 0.015 ? 0.015 : interClassStd;
-    return (rawScore - interClassMean) / std;
-  }
 }
 
 class _Processor {
@@ -816,7 +727,7 @@ class FaceRecognitionService {
   final List<RecognitionEvent> _pendingDbEvents = <RecognitionEvent>[];
   final Set<WebSocket> _realtimeWsClients = <WebSocket>{};
   final List<face_template.FaceTemplate> _templates = [];
-  final Map<String, _PersonScoreBucket> _templatesByPersonId = {};
+
   List<double>? _globalMeanDirection;
   int _templateVectorDimension = 0;
   final Map<String, _CameraThresholdProfile> _cameraThresholdProfiles = {};
@@ -1526,11 +1437,11 @@ class FaceRecognitionService {
     _PartialEmbeddingBundle? partialBundle,
     int maxItems = 3,
   }) {
-    final bucketsByPerson = <String, _PersonScoreBucket>{};
+    final bucketsByPerson = <String, PersonScoreBucket>{};
     for (final template in templates) {
       final bucket = bucketsByPerson.putIfAbsent(
         template.person.id,
-        () => _PersonScoreBucket(person: template.person),
+        () => PersonScoreBucket()..person = template.person,
       );
       bucket.addTemplate(template);
     }
@@ -1561,7 +1472,7 @@ class FaceRecognitionService {
 
   List<_CandidateScore> _scoreCandidateBuckets(
     List<double> vector, {
-    required Iterable<_PersonScoreBucket> buckets,
+    required Iterable<PersonScoreBucket> buckets,
     _PartialEmbeddingBundle? partialBundle,
     double frameQuality = 1.0,
   }) {
@@ -1824,7 +1735,7 @@ class FaceRecognitionService {
       await _loadTemplates();
       _lastPeopleCacheVersion = version;
       _log.info(
-        'Face template cache refreshed version=$version templates=${_templates.length} persons=${_templatesByPersonId.length}',
+        'Face template cache refreshed version=$version templates=${_templates.length} persons=${PersonScoreBucket().templatesByPersonId.length}',
       );
     } catch (e) {
       _log.error('Face template cache sync failed error=$e');
@@ -2208,11 +2119,11 @@ class FaceRecognitionService {
     final peopleById = {for (final person in people) person.id: person};
     final cacheEntries = await FaceAttendanceRepository.getVectorCacheEntries();
     final result = <face_template.FaceTemplate>[];
-    final byPerson = <String, _PersonScoreBucket>{};
+    final byPerson = <String, PersonScoreBucket>{};
     var inferredDim = 0;
 
     for (final person in people) {
-      byPerson.putIfAbsent(person.id, () => _PersonScoreBucket(person: person));
+      byPerson.putIfAbsent(person.id, () => PersonScoreBucket()..person = person);
     }
 
     for (final entry in cacheEntries) {
@@ -2344,7 +2255,7 @@ class FaceRecognitionService {
       ..addAll(result);
     _templateVectorDimension = inferredDim;
     _globalMeanDirection = _computeGlobalMeanDirection(result);
-    _templatesByPersonId
+    PersonScoreBucket().templatesByPersonId
       ..clear()
       ..addAll(byPerson);
     HnswVectorIndex().build(
@@ -2354,12 +2265,12 @@ class FaceRecognitionService {
       efSearchBase: _hnswEfSearch,
     );
 
-    for (final bucket in _templatesByPersonId.values) {
+    for (final bucket in PersonScoreBucket().templatesByPersonId.values) {
       bucket.finalize();
     }
 
-    if (_templatesByPersonId.length >= 2) {
-      final centroids = _templatesByPersonId.values
+    if (PersonScoreBucket().templatesByPersonId.length >= 2) {
+      final centroids = PersonScoreBucket().templatesByPersonId.values
           .where(
             (bucket) => bucket.centroid != null && bucket.centroid!.isNotEmpty,
           )
@@ -2392,7 +2303,7 @@ class FaceRecognitionService {
       }
     }
 
-    final buckets = _templatesByPersonId.values.toList(growable: false);
+    final buckets = PersonScoreBucket().templatesByPersonId.values.toList(growable: false);
     for (final bucket in buckets) {
       final c = bucket.centroid;
       if (c == null || c.isEmpty) {
@@ -6074,19 +5985,69 @@ class FaceRecognitionService {
     }
 
     final excluded = excludedPersonIds ?? const <String>{};
-    final results = HnswVectorIndex().query(vector);
-    final totalPersons = _templatesByPersonId.length;
+    final results = HnswVectorIndex().query(
+      vector,
+      maxResults: 10,
+      threshold: _knownMatchThreshold,
+      sortByScore: true,
+      descending: true,
+      uniquePerPerson: false,
+      advancedSearch: false,
+    );
+    // nếu không có kết quả thì đi tiếp như cũ
+    if (results.isNotEmpty) {
+      // gom theo person
+      final scoresByPerson = <String, List<double>>{};
+      for (final r in results) {
+        scoresByPerson.putIfAbsent(r.template.person.id, () => []).add(r.score);
+      }
 
-    Set<String>? candidatePersonIds;
+      // tính trung bình
+      final avgScores = scoresByPerson.map(
+        (pid, list) => MapEntry(pid, list.reduce((a, b) => a + b) / list.length),
+      );
+
+      // sắp xếp theo điểm trung bình
+      final sortedPersons = avgScores.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      final best = sortedPersons.first;
+      final second = sortedPersons.length > 1 ? sortedPersons[1] : null;
+      final margin = second == null ? best.value : best.value - second.value;
+
+      // nếu score của best đủ lớn => ngưỡng quyết định ngay và margin đủ lớn thì chấp nhận ngay
+      if (best.value >= _knownCalibratedThreshold && margin >= _knownMatchMargin) {
+        return _MatchResult(
+          template: results.firstWhere((r) => r.template.person.id == best.key).template,
+          score: best.value,
+          calibratedScore: best.value,
+          margin: margin,
+          templateScore: best.value,
+          globalScore: best.value,
+          partialScore: 0.0,
+          partialCoverage: 0.0,
+          eyeWeight: 0.0,
+          noseWeight: 0.0,
+          mouthWeight: 0.0,
+          centroidScore: best.value,
+          dualConsensus: true,
+        );
+      }
+    } else{
+      return null;
+    }
+
+    final totalPersons = PersonScoreBucket().templatesByPersonId.length;
+
+    Set<String>? candidatePersonIds = {};
     var usedIndexedPruning = false;
     if (results.isNotEmpty) {
-      final ids = <String>{};
       for (final item in results) {
         if (excluded.contains(item.template.person.id)) continue;
-        ids.add(item.template.person.id);
+        candidatePersonIds.add(item.template.person.id);
       }
-      if (ids.length >= 80 && totalPersons >= 200) {
-        final augmented = <String>{...ids};
+      if (candidatePersonIds.length >= 80 && totalPersons >= 200) {
+        final augmented = <String>{...candidatePersonIds};
         augmented.addAll(
           _topCentroidCandidateIds(
             vector,
@@ -6105,12 +6066,10 @@ class FaceRecognitionService {
       }
     }
 
-    final Iterable<_PersonScoreBucket> searchBuckets =
-        candidatePersonIds == null
-        ? _templatesByPersonId.values
-        : candidatePersonIds
-              .map((id) => _templatesByPersonId[id])
-              .whereType<_PersonScoreBucket>();
+    final Iterable<PersonScoreBucket> searchBuckets =
+        candidatePersonIds
+              .map((id) => PersonScoreBucket().templatesByPersonId[id])
+              .whereType<PersonScoreBucket>();
     final probePartials = partialBundle ?? const _PartialEmbeddingBundle();
     final scoredBuckets = searchBuckets.where(
       (bucket) =>
@@ -6242,7 +6201,7 @@ class FaceRecognitionService {
   }) {
     if (limit <= 0) return const <String>{};
     final scored = <(String, double)>[];
-    for (final bucket in _templatesByPersonId.values) {
+    for (final bucket in PersonScoreBucket().templatesByPersonId.values) {
       if (bucket.templates.isEmpty) continue;
       if (excluded.contains(bucket.person.id)) continue;
       final centroidVector = bucket.centroid;
